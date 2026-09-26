@@ -12,6 +12,8 @@ const SAVE_ID := "view_mode"
 @export var bird_eye: BirdEyeCamera
 @export var transition_camera: Camera3D
 @export var transition_time := 0.9
+## Ansicht beim Spielstart.
+@export var start_mode := GameDefs.ViewMode.BIRD_EYE
 
 var mode := GameDefs.ViewMode.EXPLORE
 
@@ -20,7 +22,8 @@ var _tween: Tween
 
 func _ready() -> void:
 	add_to_group(GameDefs.GROUP_SAVEABLE)
-	set_mode(GameDefs.ViewMode.EXPLORE, true)
+	# Erst nach dem Aufbau der Szene, damit die Spielfigur schon am Startpunkt steht.
+	set_mode.call_deferred(start_mode, true)
 
 
 func _unhandled_input(event: InputEvent) -> void:

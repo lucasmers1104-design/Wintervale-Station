@@ -14,6 +14,16 @@
 [ext_resource type="PackedScene" path="res://scenes/camera/bird_eye_camera.tscn" id="12_bird"]
 [ext_resource type="Script" path="res://scripts/main/view_mode_controller.gd" id="13_view"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="14_hud"]
+[ext_resource type="PackedScene" path="res://scenes/rail/railway_platform.tscn" id="15_platform"]
+[ext_resource type="Script" path="res://scripts/rail/rail_network.gd" id="16_network"]
+[ext_resource type="Script" path="res://scripts/rail/rail_network_view.gd" id="17_network_view"]
+[ext_resource type="Material" path="res://assets/materials/rail_steel.tres" id="18_steel"]
+[ext_resource type="Script" path="res://scripts/building/build_mode.gd" id="19_build"]
+[ext_resource type="Script" path="res://scripts/building/rail_place_tool.gd" id="20_place"]
+[ext_resource type="Script" path="res://scripts/building/rail_remove_tool.gd" id="21_remove"]
+[ext_resource type="Material" path="res://assets/materials/ghost_valid.tres" id="22_ghost_valid"]
+[ext_resource type="Material" path="res://assets/materials/ghost_invalid.tres" id="23_ghost_invalid"]
+[ext_resource type="Material" path="res://assets/materials/build_marker.tres" id="24_marker"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("2_sky")
@@ -80,36 +90,50 @@ script = ExtResource("7_scatter")
 terrain = NodePath("../Terrain")
 prop_material = ExtResource("5_nature")
 
+[node name="Railway" type="Node3D" parent="World"]
+
+[node name="RailNetwork" type="Node" parent="World/Railway"]
+script = ExtResource("16_network")
+
+[node name="RailNetworkView" type="Node3D" parent="World/Railway" node_paths=PackedStringArray("network")]
+script = ExtResource("17_network_view")
+network = NodePath("../RailNetwork")
+ballast_material = ExtResource("5_nature")
+rail_material = ExtResource("18_steel")
+
 [node name="TestArea" type="Node3D" parent="World" node_paths=PackedStringArray("terrain")]
 script = ExtResource("8_snapper")
 terrain = NodePath("../Terrain")
 
+[node name="Platform" parent="World/TestArea" instance=ExtResource("15_platform")]
+position = Vector3(0, 0, -9)
+
 [node name="LanternA" parent="World/TestArea" instance=ExtResource("9_lantern")]
-position = Vector3(-3.5, 0, -4)
+position = Vector3(-1.45, 0.55, -1)
 
 [node name="LanternB" parent="World/TestArea" instance=ExtResource("9_lantern")]
-position = Vector3(3.5, 0, -4)
+position = Vector3(-1.45, 0.55, -9)
 
 [node name="LanternC" parent="World/TestArea" instance=ExtResource("9_lantern")]
-position = Vector3(-3.5, 0, -14)
+position = Vector3(-1.45, 0.55, -17)
 
 [node name="LanternD" parent="World/TestArea" instance=ExtResource("9_lantern")]
-position = Vector3(3.5, 0, -14)
+position = Vector3(-5.5, 0, 4.5)
 
 [node name="CrateA" parent="World/TestArea" instance=ExtResource("10_crate")]
-position = Vector3(7, 0, 1)
+position = Vector3(-7, 0, 3)
 rotation = Vector3(0, 0.3, 0)
 
 [node name="CrateB" parent="World/TestArea" instance=ExtResource("10_crate")]
-position = Vector3(8.3, 0, 1.4)
+position = Vector3(-8.3, 0, 3.4)
 rotation = Vector3(0, 0.75, 0)
 
 [node name="CrateC" parent="World/TestArea" instance=ExtResource("10_crate")]
-position = Vector3(7.6, 1.0, 1.15)
+position = Vector3(-7.6, 1, 3.15)
 rotation = Vector3(0, 0.5, 0)
 
 [node name="CrateD" parent="World/TestArea" instance=ExtResource("10_crate")]
-position = Vector3(-8, 0, -1)
+position = Vector3(-8.5, 0, -3)
 rotation = Vector3(0, -0.4, 0)
 
 [node name="Player" parent="." instance=ExtResource("11_player")]
@@ -125,5 +149,25 @@ script = ExtResource("13_view")
 player = NodePath("../Player")
 bird_eye = NodePath("../BirdEyeCamera")
 transition_camera = NodePath("../TransitionCamera")
+
+[node name="BuildMode" type="Node" parent="." node_paths=PackedStringArray("view_mode_controller", "bird_eye", "terrain", "rail_network", "rail_view")]
+script = ExtResource("19_build")
+view_mode_controller = NodePath("../ViewModeController")
+bird_eye = NodePath("../BirdEyeCamera")
+terrain = NodePath("../World/Terrain")
+rail_network = NodePath("../World/Railway/RailNetwork")
+rail_view = NodePath("../World/Railway/RailNetworkView")
+
+[node name="RailPlaceTool" type="Node3D" parent="BuildMode"]
+script = ExtResource("20_place")
+tool_id = &"rail"
+valid_material = ExtResource("22_ghost_valid")
+invalid_material = ExtResource("23_ghost_invalid")
+marker_material = ExtResource("24_marker")
+
+[node name="RailRemoveTool" type="Node3D" parent="BuildMode"]
+script = ExtResource("21_remove")
+tool_id = &"remove"
+highlight_material = ExtResource("23_ghost_invalid")
 
 [node name="HUD" parent="." instance=ExtResource("14_hud")]

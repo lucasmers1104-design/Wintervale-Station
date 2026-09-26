@@ -1,0 +1,7 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[resource]
+resource_name = "GhostInvalid"
+transparency = 1
+shading_mode = 0
+albedo_color = Color(1, 0.3, 0.25, 0.5)

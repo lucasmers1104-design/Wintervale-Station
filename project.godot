@@ -37,6 +37,8 @@ window/stretch/aspect="expand"
 
 3d_physics/layer_1="Welt"
 3d_physics/layer_2="Spieler"
+3d_physics/layer_3="Objekte"
+3d_physics/layer_4="Gleise"
 
 [physics]
 

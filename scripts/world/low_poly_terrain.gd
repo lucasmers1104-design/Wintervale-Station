@@ -107,6 +107,35 @@ func get_half_extent() -> float:
 	return cells_per_side * cell_size * 0.5
 
 
+## Schnittpunkt eines Strahls (z.B. vom Mauszeiger) mit dem Gelände.
+## Tastet die Höhenfunktion schrittweise ab und verfeinert per Bisektion.
+## Gibt [code]Vector3.INF[/code] zurück, wenn der Strahl das Gelände nicht trifft.
+func intersect_ray(origin: Vector3, direction: Vector3, max_distance := 1000.0) -> Vector3:
+	var half := get_half_extent()
+	var previous := 0.0
+	var t := 0.0
+	while t < max_distance:
+		var p := origin + direction * t
+		var above := p.y - get_height(p.x, p.z)
+		if above <= 0.0:
+			var low := previous
+			var high := t
+			for i in 14:
+				var mid := (low + high) * 0.5
+				var q := origin + direction * mid
+				if q.y - get_height(q.x, q.z) <= 0.0:
+					high = mid
+				else:
+					low = mid
+			var hit := origin + direction * high
+			if absf(hit.x) > half or absf(hit.z) > half:
+				return Vector3.INF
+			return hit
+		previous = t
+		t += clampf(above * 0.5, 0.25, 8.0)
+	return Vector3.INF
+
+
 func is_in_lake(x: float, z: float) -> bool:
 	return Vector2(x, z).distance_to(lake_center) < lake_radius * 1.05
 

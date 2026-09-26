@@ -1,212 +1,38 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/player/player_controller.gd" id="1_player"]
-[ext_resource type="Shader" path="res://assets/materials/flat_shaded.gdshader" id="2_flat"]
+[ext_resource type="Script" path="res://scripts/characters/character_model.gd" id="2_model"]
+[ext_resource type="Resource" path="res://assets/characters/player_appearance.tres" id="3_look"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
-radius = 0.32
-height = 1.75
-
-[sub_resource type="ShaderMaterial" id="Mat_coat"]
-render_priority = 0
-shader = ExtResource("2_flat")
-shader_parameter/albedo = Color(0.56, 0.16, 0.14, 1)
-shader_parameter/roughness = 0.9
-shader_parameter/metallic = 0.0
-
-[sub_resource type="ShaderMaterial" id="Mat_knit"]
-render_priority = 0
-shader = ExtResource("2_flat")
-shader_parameter/albedo = Color(0.86, 0.62, 0.2, 1)
-shader_parameter/roughness = 1.0
-shader_parameter/metallic = 0.0
-
-[sub_resource type="ShaderMaterial" id="Mat_cream"]
-render_priority = 0
-shader = ExtResource("2_flat")
-shader_parameter/albedo = Color(0.95, 0.92, 0.85, 1)
-shader_parameter/roughness = 1.0
-shader_parameter/metallic = 0.0
-
-[sub_resource type="ShaderMaterial" id="Mat_skin"]
-render_priority = 0
-shader = ExtResource("2_flat")
-shader_parameter/albedo = Color(0.93, 0.74, 0.62, 1)
-shader_parameter/roughness = 0.8
-shader_parameter/metallic = 0.0
-
-[sub_resource type="ShaderMaterial" id="Mat_nose"]
-render_priority = 0
-shader = ExtResource("2_flat")
-shader_parameter/albedo = Color(0.9, 0.52, 0.48, 1)
-shader_parameter/roughness = 0.8
-shader_parameter/metallic = 0.0
-
-[sub_resource type="ShaderMaterial" id="Mat_dark"]
-render_priority = 0
-shader = ExtResource("2_flat")
-shader_parameter/albedo = Color(0.2, 0.2, 0.24, 1)
-shader_parameter/roughness = 0.9
-shader_parameter/metallic = 0.0
-
-[sub_resource type="ShaderMaterial" id="Mat_eyes"]
-render_priority = 0
-shader = ExtResource("2_flat")
-shader_parameter/albedo = Color(0.08, 0.07, 0.07, 1)
-shader_parameter/roughness = 0.5
-shader_parameter/metallic = 0.0
-
-[sub_resource type="CylinderMesh" id="Mesh_leg"]
-material = SubResource("Mat_dark")
-top_radius = 0.09
-bottom_radius = 0.11
-height = 0.72
-radial_segments = 6
-rings = 0
-
-[sub_resource type="CylinderMesh" id="Mesh_coat"]
-material = SubResource("Mat_coat")
-top_radius = 0.24
-bottom_radius = 0.34
-height = 0.78
-radial_segments = 8
-rings = 0
-
-[sub_resource type="CapsuleMesh" id="Mesh_arm"]
-material = SubResource("Mat_coat")
-radius = 0.075
-height = 0.62
-radial_segments = 6
-rings = 1
-
-[sub_resource type="CylinderMesh" id="Mesh_scarf"]
-material = SubResource("Mat_knit")
-top_radius = 0.17
-bottom_radius = 0.22
-height = 0.12
-radial_segments = 8
-rings = 0
-
-[sub_resource type="SphereMesh" id="Mesh_head"]
-material = SubResource("Mat_skin")
-radius = 0.17
-height = 0.34
-radial_segments = 8
-rings = 5
-
-[sub_resource type="CylinderMesh" id="Mesh_hat"]
-material = SubResource("Mat_knit")
-top_radius = 0.1
-bottom_radius = 0.18
-height = 0.2
-radial_segments = 8
-rings = 0
-
-[sub_resource type="SphereMesh" id="Mesh_pompom"]
-material = SubResource("Mat_cream")
-radius = 0.065
-height = 0.13
-radial_segments = 6
-rings = 3
-
-[sub_resource type="SphereMesh" id="Mesh_eye"]
-material = SubResource("Mat_eyes")
-radius = 0.022
-height = 0.044
-radial_segments = 4
-rings = 2
-
-[sub_resource type="SphereMesh" id="Mesh_nose"]
-material = SubResource("Mat_nose")
-radius = 0.035
-height = 0.07
-radial_segments = 5
-rings = 2
+radius = 0.3
+height = 1.45
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_arm"]
 radius = 0.2
 
 [node name="Player" type="CharacterBody3D"]
 collision_layer = 2
+collision_mask = 13
 floor_snap_length = 0.3
 script = ExtResource("1_player")
 
 [node name="Collision" type="CollisionShape3D" parent="."]
-position = Vector3(0, 0.875, 0)
+position = Vector3(0, 0.725, 0)
 shape = SubResource("CapsuleShape3D_body")
 
 [node name="Model" type="Node3D" parent="."]
-
-[node name="HipLeft" type="Node3D" parent="Model"]
-position = Vector3(-0.11, 0.72, 0)
-
-[node name="Leg" type="MeshInstance3D" parent="Model/HipLeft"]
-position = Vector3(0, -0.36, 0)
-mesh = SubResource("Mesh_leg")
-
-[node name="HipRight" type="Node3D" parent="Model"]
-position = Vector3(0.11, 0.72, 0)
-
-[node name="Leg" type="MeshInstance3D" parent="Model/HipRight"]
-position = Vector3(0, -0.36, 0)
-mesh = SubResource("Mesh_leg")
-
-[node name="Coat" type="MeshInstance3D" parent="Model"]
-position = Vector3(0, 1, 0)
-mesh = SubResource("Mesh_coat")
-
-[node name="ShoulderLeft" type="Node3D" parent="Model"]
-position = Vector3(-0.3, 1.33, 0)
-rotation = Vector3(0, 0, -0.14)
-
-[node name="Arm" type="MeshInstance3D" parent="Model/ShoulderLeft"]
-position = Vector3(0, -0.27, 0)
-mesh = SubResource("Mesh_arm")
-
-[node name="ShoulderRight" type="Node3D" parent="Model"]
-position = Vector3(0.3, 1.33, 0)
-rotation = Vector3(0, 0, 0.14)
-
-[node name="Arm" type="MeshInstance3D" parent="Model/ShoulderRight"]
-position = Vector3(0, -0.27, 0)
-mesh = SubResource("Mesh_arm")
-
-[node name="Scarf" type="MeshInstance3D" parent="Model"]
-position = Vector3(0, 1.42, 0)
-mesh = SubResource("Mesh_scarf")
-
-[node name="Head" type="MeshInstance3D" parent="Model"]
-position = Vector3(0, 1.6, 0)
-mesh = SubResource("Mesh_head")
-
-[node name="EyeLeft" type="MeshInstance3D" parent="Model/Head"]
-position = Vector3(-0.06, 0.02, -0.155)
-mesh = SubResource("Mesh_eye")
-
-[node name="EyeRight" type="MeshInstance3D" parent="Model/Head"]
-position = Vector3(0.06, 0.02, -0.155)
-mesh = SubResource("Mesh_eye")
-
-[node name="Nose" type="MeshInstance3D" parent="Model/Head"]
-position = Vector3(0, -0.03, -0.17)
-mesh = SubResource("Mesh_nose")
-
-[node name="Hat" type="MeshInstance3D" parent="Model"]
-position = Vector3(0, 1.74, 0)
-mesh = SubResource("Mesh_hat")
-
-[node name="Pompom" type="MeshInstance3D" parent="Model/Hat"]
-position = Vector3(0, 0.13, 0)
-mesh = SubResource("Mesh_pompom")
+script = ExtResource("2_model")
+appearance = ExtResource("3_look")
 
 [node name="CameraYaw" type="Node3D" parent="."]
-position = Vector3(0, 1.62, 0)
+position = Vector3(0, 1.16, 0)
 
 [node name="CameraPitch" type="Node3D" parent="CameraYaw"]
 
 [node name="SpringArm3D" type="SpringArm3D" parent="CameraYaw/CameraPitch"]
 shape = SubResource("SphereShape3D_arm")
-spring_length = 4.5
+spring_length = 4.0
 margin = 0.2
 
 [node name="Camera3D" type="Camera3D" parent="CameraYaw/CameraPitch/SpringArm3D"]

@@ -1,7 +1,7 @@
 ## Spielfigur zum Erkunden – umschaltbar zwischen Third- und First-Person.
 ##
 ## Aufbau (siehe scenes/player/player.tscn):
-##   Model       – die Low-Poly-Figur, dreht sich in Laufrichtung
+##   Model       – die Figur ([CharacterModel]), dreht sich in Laufrichtung
 ##   CameraYaw   – horizontale Blickrichtung (Maus X)
 ##     CameraPitch – vertikale Blickrichtung (Maus Y)
 ##       SpringArm3D – Kameraabstand; 0 m = First-Person (Augenhöhe)
@@ -26,7 +26,7 @@ const RESPAWN_DEPTH := -40.0
 
 @export_group("Kamera")
 @export var mouse_sensitivity := 0.0025
-@export var third_person_distance := 4.5
+@export var third_person_distance := 4.0
 @export var min_distance := 2.0
 @export var max_distance := 9.0
 @export var zoom_step := 0.6
@@ -42,13 +42,8 @@ var _target_distance := 4.5
 var _walk_phase := 0.0
 var _spawn_point := Vector3.ZERO
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
-var _model_meshes: Array[MeshInstance3D] = []
 
-@onready var _model: Node3D = $Model
-@onready var _hip_left: Node3D = $Model/HipLeft
-@onready var _hip_right: Node3D = $Model/HipRight
-@onready var _shoulder_left: Node3D = $Model/ShoulderLeft
-@onready var _shoulder_right: Node3D = $Model/ShoulderRight
+@onready var _model: CharacterModel = $Model
 @onready var _camera_yaw: Node3D = $CameraYaw
 @onready var _camera_pitch: Node3D = $CameraYaw/CameraPitch
 @onready var _spring_arm: SpringArm3D = $CameraYaw/CameraPitch/SpringArm3D
@@ -57,8 +52,6 @@ var _model_meshes: Array[MeshInstance3D] = []
 
 func _ready() -> void:
 	add_to_group(GameDefs.GROUP_SAVEABLE)
-	for node in _model.find_children("*", "MeshInstance3D", true, false):
-		_model_meshes.append(node as MeshInstance3D)
 	_target_distance = third_person_distance
 	_spring_arm.spring_length = _target_distance
 	_spring_arm.add_excluded_object(get_rid())
@@ -171,10 +164,7 @@ func load_state(data: Dictionary) -> void:
 
 func _apply_perspective() -> void:
 	# In First-Person wird die Figur unsichtbar, wirft aber weiter ihren Schatten.
-	var shadow_mode := GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY if first_person \
-		else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	for mesh in _model_meshes:
-		mesh.cast_shadow = shadow_mode
+	_model.set_shadows_only(first_person)
 	_camera.fov = first_person_fov if first_person else third_person_fov
 	_set_pitch(_pitch)
 
@@ -194,14 +184,9 @@ func _turn_model(direction: Vector3, delta: float) -> void:
 	_model.rotation.y = lerp_angle(_model.rotation.y, target_yaw, 1.0 - exp(-turn_speed * delta))
 
 
-## Einfache prozedurale Laufanimation: Beine und Arme pendeln, Körper wippt.
+## Laufanimation abhängig von der Geschwindigkeit (kurze Beinchen = schnellere Schritte).
 func _animate_walk(delta: float) -> void:
 	var speed := Vector2(velocity.x, velocity.z).length()
 	var amount := clampf(speed / walk_speed, 0.0, 1.0) if is_on_floor() else 0.3
-	_walk_phase += delta * speed * 2.4
-	var swing := sin(_walk_phase) * 0.55 * amount
-	_hip_left.rotation.x = swing
-	_hip_right.rotation.x = -swing
-	_shoulder_left.rotation.x = -swing * 0.8
-	_shoulder_right.rotation.x = swing * 0.8
-	_model.position.y = absf(sin(_walk_phase)) * 0.05 * amount
+	_walk_phase += delta * speed * 3.2
+	_model.animate(amount, _walk_phase)

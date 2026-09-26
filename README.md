@@ -3,7 +3,8 @@
 Ein gemütliches Low-Poly Eisenbahn- und Dorfbau-Spiel im Winter.
 Engine: **Godot 4.7** (GDScript, Renderer Forward+).
 
-Aktueller Stand: **Etappe 1 – Foundation** (Terrain, Spielfigur, Vogelperspektive, Tag/Nacht, Speichern).
+Aktueller Stand: **Etappe 2 – Railway Build System** (Gleisbau mit Vorschau, Kurven, Einrasten, Entfernen, Undo).
+Das Spiel startet in der Vogelperspektive.
 
 ## Starten
 
@@ -33,7 +34,16 @@ Voraussetzung: Eine Grafikkarte mit aktuellem Vulkan-Treiber (Forward+).
 | Mausrad | Zoom |
 | Mittlere Maustaste ziehen | Drehen & Neigen |
 | Rechte Maustaste ziehen | Ansicht ziehen |
+| B | Build-Mode ein/aus |
 | Tab | Zurück zur Figur |
+
+| Build-Mode | |
+|---|---|
+| 1 / 2 | Werkzeug Schiene / Entfernen (oder Klick auf die Buttons unten links) |
+| Linksklick | Startpunkt setzen, nächster Klick baut das Gleis – danach geht es direkt weiter |
+| Rechtsklick / Esc | Aktuelles Gleis abbrechen (zweites Esc beendet den Build-Mode) |
+| Alt (halten) | Freier Winkel statt 15°-Raster |
+| Strg+Z / Strg+Y | Rückgängig / Wiederholen |
 
 | Allgemein | |
 |---|---|

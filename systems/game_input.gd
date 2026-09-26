@@ -24,6 +24,17 @@ const KEY_BINDINGS := {
 	&"toggle_help": [KEY_F1],
 	&"toggle_fullscreen": [KEY_F11],
 	&"release_mouse": [KEY_ESCAPE],
+	&"build_mode": [KEY_B],
+	&"build_tool_rail": [KEY_1],
+	&"build_tool_remove": [KEY_2],
+	&"build_cancel": [KEY_ESCAPE],
+}
+
+## Tastenkürzel mit Strg. Diese nutzen die Tastenbeschriftung statt der
+## Position, damit Strg+Z auch auf QWERTZ-Tastaturen auf dem "Z" liegt.
+const CTRL_SHORTCUTS := {
+	&"undo": [KEY_Z],
+	&"redo": [KEY_Y],
 }
 
 const MOUSE_BINDINGS := {
@@ -42,6 +53,15 @@ func _enter_tree() -> void:
 		for keycode: int in KEY_BINDINGS[action]:
 			var event := InputEventKey.new()
 			event.physical_keycode = keycode as Key
+			InputMap.action_add_event(action, event)
+
+	for action: StringName in CTRL_SHORTCUTS:
+		if not _prepare_action(action):
+			continue
+		for keycode: int in CTRL_SHORTCUTS[action]:
+			var event := InputEventKey.new()
+			event.keycode = keycode as Key
+			event.command_or_control_autoremap = true
 			InputMap.action_add_event(action, event)
 
 	for action: StringName in MOUSE_BINDINGS:

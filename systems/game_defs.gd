@@ -17,6 +17,12 @@ enum ViewMode {
 ## Mitglieder implementieren get_save_id(), save_state() und load_state().
 const GROUP_SAVEABLE := &"saveable"
 
+## Physik-Ebenen als Bitmasken (siehe Projekteinstellungen → Layer Names).
+const LAYER_WORLD := 1      ## Ebene 1: Terrain, Eis
+const LAYER_PLAYER := 2     ## Ebene 2: Spielfigur
+const LAYER_OBJECTS := 4    ## Ebene 3: Bäume, Steine, Laternen, Bahnsteige … (blockieren Gleisbau)
+const LAYER_RAILS := 8      ## Ebene 4: Gleise
+
 ## Sonnenaufgang und -untergang in Spielstunden (kurze Wintertage).
 const SUNRISE_HOUR := 7.0
 const SUNSET_HOUR := 17.0

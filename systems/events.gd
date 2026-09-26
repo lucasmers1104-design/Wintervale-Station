@@ -15,3 +15,12 @@ signal notification_requested(text: String)
 signal game_saved(slot: String)
 ## Ein Spielstand wurde geladen und auf die Welt angewendet.
 signal game_loaded(slot: String)
+
+## Der Build-Mode wurde ein- oder ausgeschaltet.
+signal build_mode_changed(active: bool)
+## Im Build-Mode wurde ein anderes Werkzeug gewählt (z.B. &"rail", &"remove").
+signal build_tool_changed(tool_id: StringName)
+## Die UI möchte ein Werkzeug wählen (z.B. per Klick auf einen Button).
+signal build_tool_requested(tool_id: StringName)
+## Hinweis des aktiven Werkzeugs, z.B. warum eine Platzierung ungültig ist ("" = alles gut).
+signal build_status_changed(text: String)

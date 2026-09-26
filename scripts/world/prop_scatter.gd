@@ -49,6 +49,7 @@ func scatter() -> void:
 
 	var colliders := StaticBody3D.new()
 	colliders.name = "Colliders"
+	colliders.collision_layer = GameDefs.LAYER_OBJECTS
 	add_child(colliders)
 
 	_scatter_trees(rng, forest_noise, colliders)

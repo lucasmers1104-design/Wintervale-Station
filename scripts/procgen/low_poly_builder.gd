@@ -62,18 +62,59 @@ static func add_cylinder(st: SurfaceTool, base: Vector3, radius_bottom: float, r
 
 
 static func add_box(st: SurfaceTool, center: Vector3, size: Vector3, color: Color) -> void:
+	add_oriented_box(st, Transform3D(Basis.IDENTITY, center), size, color)
+
+
+## Quader mit beliebiger Lage: [param xform] gibt Mittelpunkt und Ausrichtung vor.
+static func add_oriented_box(st: SurfaceTool, xform: Transform3D, size: Vector3, color: Color) -> void:
 	for n: Vector3 in [Vector3.RIGHT, Vector3.LEFT, Vector3.UP, Vector3.DOWN, Vector3.BACK, Vector3.FORWARD]:
 		var u := Vector3(n.y, n.z, n.x)
 		var v := n.cross(u)
-		var face_center := center + n * size * 0.5
+		var face_center := n * size * 0.5
 		var hu := u * size * 0.5
 		var hv := v * size * 0.5
-		var p0 := face_center - hu - hv
-		var p1 := face_center + hu - hv
-		var p2 := face_center + hu + hv
-		var p3 := face_center - hu + hv
-		add_triangle_facing(st, p0, p1, p2, color, n)
-		add_triangle_facing(st, p0, p2, p3, color, n)
+		var p0 := xform * (face_center - hu - hv)
+		var p1 := xform * (face_center + hu - hv)
+		var p2 := xform * (face_center + hu + hv)
+		var p3 := xform * (face_center - hu + hv)
+		var outward := xform.basis * n
+		add_triangle_facing(st, p0, p1, p2, color, outward)
+		add_triangle_facing(st, p0, p2, p3, color, outward)
+
+
+## Vierkant-Balken von [param a] nach [param b] (z.B. Streben).
+static func add_beam(st: SurfaceTool, a: Vector3, b: Vector3, thickness: float, color: Color) -> void:
+	var axis := b - a
+	var forward := axis.normalized()
+	var helper := Vector3.UP if absf(forward.y) < 0.95 else Vector3.RIGHT
+	var right := helper.cross(forward).normalized()
+	var up := forward.cross(right)
+	var basis := Basis(right, up, forward)
+	add_oriented_box(st, Transform3D(basis, (a + b) * 0.5), Vector3(thickness, thickness, axis.length()), color)
+
+
+## Zylinder entlang einer beliebigen Achse von [param a] nach [param b].
+static func add_cylinder_between(st: SurfaceTool, a: Vector3, b: Vector3, radius: float,
+		segments: int, color: Color) -> void:
+	var forward := (b - a).normalized()
+	var helper := Vector3.UP if absf(forward.y) < 0.95 else Vector3.RIGHT
+	var u := helper.cross(forward).normalized()
+	var v := forward.cross(u)
+	for i in segments:
+		var o0 := (u * cos(TAU * i / segments) + v * sin(TAU * i / segments)) * radius
+		var o1 := (u * cos(TAU * (i + 1) / segments) + v * sin(TAU * (i + 1) / segments)) * radius
+		var outward := (o0 + o1) * 0.5
+		add_triangle_facing(st, a + o0, a + o1, b + o1, color, outward)
+		add_triangle_facing(st, a + o0, b + o1, b + o0, color, outward)
+		add_triangle_facing(st, a, a + o0, a + o1, color, -forward)
+		add_triangle_facing(st, b, b + o0, b + o1, color, forward)
+
+
+## Viereck aus zwei Dreiecken; die Vorderseite zeigt nach [param outward].
+static func add_quad_facing(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3,
+		color: Color, outward: Vector3) -> void:
+	add_triangle_facing(st, a, b, c, color, outward)
+	add_triangle_facing(st, a, c, d, color, outward)
 
 
 ## Unregelmäßiger Stein: eine grobe Kugel mit verrauschten Radien.

@@ -1,0 +1,7 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[resource]
+resource_name = "GhostValid"
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.35, 0.95, 0.55, 0.45)
