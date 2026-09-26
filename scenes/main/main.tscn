@@ -1,0 +1,129 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/main/main.gd" id="1_main"]
+[ext_resource type="Shader" path="res://assets/materials/sky.gdshader" id="2_sky"]
+[ext_resource type="Script" path="res://scripts/world/day_night_cycle.gd" id="3_cycle"]
+[ext_resource type="Script" path="res://scripts/world/low_poly_terrain.gd" id="4_terrain"]
+[ext_resource type="Material" path="res://assets/materials/nature_vertex_color.tres" id="5_nature"]
+[ext_resource type="Material" path="res://assets/materials/ice.tres" id="6_ice"]
+[ext_resource type="Script" path="res://scripts/world/prop_scatter.gd" id="7_scatter"]
+[ext_resource type="Script" path="res://scripts/world/ground_snapper.gd" id="8_snapper"]
+[ext_resource type="PackedScene" path="res://scenes/props/lantern.tscn" id="9_lantern"]
+[ext_resource type="PackedScene" path="res://scenes/props/crate.tscn" id="10_crate"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="11_player"]
+[ext_resource type="PackedScene" path="res://scenes/camera/bird_eye_camera.tscn" id="12_bird"]
+[ext_resource type="Script" path="res://scripts/main/view_mode_controller.gd" id="13_view"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="14_hud"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
+shader = ExtResource("2_sky")
+
+[sub_resource type="Sky" id="Sky_main"]
+sky_material = SubResource("ShaderMaterial_sky")
+process_mode = 2
+
+[sub_resource type="Environment" id="Environment_main"]
+background_mode = 2
+sky = SubResource("Sky_main")
+ambient_light_source = 2
+ambient_light_color = Color(0.62, 0.67, 0.78, 1)
+ambient_light_energy = 0.6
+reflected_light_source = 2
+tonemap_mode = 3
+ssao_enabled = true
+ssao_radius = 1.2
+ssao_intensity = 1.6
+glow_enabled = true
+glow_intensity = 0.7
+glow_bloom = 0.04
+glow_hdr_threshold = 1.1
+fog_enabled = true
+fog_light_color = Color(0.8, 0.84, 0.9, 1)
+fog_density = 0.005
+fog_sky_affect = 0.3
+
+[node name="Main" type="Node3D" node_paths=PackedStringArray("terrain", "player")]
+script = ExtResource("1_main")
+terrain = NodePath("World/Terrain")
+player = NodePath("Player")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_main")
+
+[node name="DayNightCycle" type="Node3D" parent="." node_paths=PackedStringArray("sun", "moon", "world_environment")]
+script = ExtResource("3_cycle")
+sun = NodePath("Sun")
+moon = NodePath("Moon")
+world_environment = NodePath("../WorldEnvironment")
+
+[node name="Sun" type="DirectionalLight3D" parent="DayNightCycle"]
+light_color = Color(1, 0.86, 0.68, 1)
+light_angular_distance = 0.8
+shadow_enabled = true
+directional_shadow_max_distance = 120.0
+
+[node name="Moon" type="DirectionalLight3D" parent="DayNightCycle"]
+light_color = Color(0.62, 0.72, 1, 1)
+light_energy = 0.0
+shadow_enabled = true
+directional_shadow_max_distance = 80.0
+
+[node name="World" type="Node3D" parent="."]
+
+[node name="Terrain" type="StaticBody3D" parent="World"]
+script = ExtResource("4_terrain")
+terrain_material = ExtResource("5_nature")
+ice_material = ExtResource("6_ice")
+
+[node name="Nature" type="Node3D" parent="World" node_paths=PackedStringArray("terrain")]
+script = ExtResource("7_scatter")
+terrain = NodePath("../Terrain")
+prop_material = ExtResource("5_nature")
+
+[node name="TestArea" type="Node3D" parent="World" node_paths=PackedStringArray("terrain")]
+script = ExtResource("8_snapper")
+terrain = NodePath("../Terrain")
+
+[node name="LanternA" parent="World/TestArea" instance=ExtResource("9_lantern")]
+position = Vector3(-3.5, 0, -4)
+
+[node name="LanternB" parent="World/TestArea" instance=ExtResource("9_lantern")]
+position = Vector3(3.5, 0, -4)
+
+[node name="LanternC" parent="World/TestArea" instance=ExtResource("9_lantern")]
+position = Vector3(-3.5, 0, -14)
+
+[node name="LanternD" parent="World/TestArea" instance=ExtResource("9_lantern")]
+position = Vector3(3.5, 0, -14)
+
+[node name="CrateA" parent="World/TestArea" instance=ExtResource("10_crate")]
+position = Vector3(7, 0, 1)
+rotation = Vector3(0, 0.3, 0)
+
+[node name="CrateB" parent="World/TestArea" instance=ExtResource("10_crate")]
+position = Vector3(8.3, 0, 1.4)
+rotation = Vector3(0, 0.75, 0)
+
+[node name="CrateC" parent="World/TestArea" instance=ExtResource("10_crate")]
+position = Vector3(7.6, 1.0, 1.15)
+rotation = Vector3(0, 0.5, 0)
+
+[node name="CrateD" parent="World/TestArea" instance=ExtResource("10_crate")]
+position = Vector3(-8, 0, -1)
+rotation = Vector3(0, -0.4, 0)
+
+[node name="Player" parent="." instance=ExtResource("11_player")]
+
+[node name="BirdEyeCamera" parent="." node_paths=PackedStringArray("terrain") instance=ExtResource("12_bird")]
+terrain = NodePath("../World/Terrain")
+
+[node name="TransitionCamera" type="Camera3D" parent="."]
+far = 800.0
+
+[node name="ViewModeController" type="Node" parent="." node_paths=PackedStringArray("player", "bird_eye", "transition_camera")]
+script = ExtResource("13_view")
+player = NodePath("../Player")
+bird_eye = NodePath("../BirdEyeCamera")
+transition_camera = NodePath("../TransitionCamera")
+
+[node name="HUD" parent="." instance=ExtResource("14_hud")]
