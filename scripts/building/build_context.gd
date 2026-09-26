@@ -1,7 +1,7 @@
 ## Alles, was Bauwerkzeuge von der Welt brauchen – an einer Stelle gebündelt.
 ##
-## Werkzeuge greifen nur über diesen Kontext auf Kamera, Terrain, Gleisnetz
-## und Undo zu. Neue Werkzeuge (Weichen, Signale, Gebäude …) nutzen denselben Kontext.
+## Werkzeuge greifen nur über diesen Kontext auf Kamera, Terrain, Gleisnetz,
+## Stellwerk und Undo zu. Neue Werkzeuge nutzen denselben Kontext.
 class_name BuildContext
 extends RefCounted
 
@@ -9,6 +9,8 @@ var camera: Camera3D
 var terrain: LowPolyTerrain
 var rail_network: RailNetwork
 var rail_view: RailNetworkView
+var interlocking: RailInterlocking
+var terrain_adapter: RailTerrainAdapter
 var undo_redo: UndoRedo
 
 

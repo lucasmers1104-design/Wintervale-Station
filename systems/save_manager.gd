@@ -13,7 +13,7 @@ extends Node
 const SAVE_DIR := "user://saves/"
 const DEFAULT_SLOT := "quicksave"
 ## Wird erhöht, sobald sich das Format ändert (siehe _migrate()).
-const SAVE_VERSION := 1
+const SAVE_VERSION := 2
 
 
 func save_game(slot: String = DEFAULT_SLOT) -> bool:
@@ -79,6 +79,8 @@ func get_save_path(slot: String) -> String:
 
 ## Hebt ältere Spielstände auf das aktuelle Format an.
 ## Neue Formatversionen bekommen hier einen eigenen Schritt.
+## Version 1 → 2: Gleise ohne Höhenprofil laufen linear weiter, Signale und
+## Weichen fehlen einfach – beides lädt ohne Umrechnung.
 func _migrate(data: Dictionary) -> Dictionary:
 	var version := int(data.get("version", 0))
 	if version > SAVE_VERSION:

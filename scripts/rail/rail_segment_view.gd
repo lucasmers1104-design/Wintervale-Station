@@ -4,12 +4,15 @@ extends StaticBody3D
 
 var segment_id := -1
 
+var _curve: Curve3D
 var _meshes: Array[MeshInstance3D] = []
 var _materials: Array[Material] = []
+var _overlay: MeshInstance3D
 
 
 func build(segment: RailSegment, ballast_material: Material, rail_material: Material) -> void:
 	segment_id = segment.id
+	_curve = segment.curve
 	name = "Segment%d" % segment.id
 	collision_layer = GameDefs.LAYER_RAILS
 	collision_mask = 0
@@ -30,6 +33,26 @@ func build(segment: RailSegment, ballast_material: Material, rail_material: Mate
 func set_highlight(material: Material) -> void:
 	for i in _meshes.size():
 		_meshes[i].material_override = material if material else _materials[i]
+
+
+## Farbige Einblendung für Belegung/Reservierung (null = aus).
+func set_overlay(material: Material) -> void:
+	if material == null:
+		if _overlay:
+			_overlay.visible = false
+		return
+	if _overlay == null:
+		_overlay = MeshInstance3D.new()
+		_overlay.mesh = RailMeshes.create_ghost(_curve)
+		_overlay.position.y = 0.04
+		_overlay.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_overlay)
+	_overlay.material_override = material
+	_overlay.visible = true
+
+
+func get_overlay_material() -> Material:
+	return _overlay.material_override if _overlay and _overlay.visible else null
 
 
 func _add_mesh(mesh: Mesh, material: Material) -> void:

@@ -24,6 +24,11 @@
 [ext_resource type="Material" path="res://assets/materials/ghost_valid.tres" id="22_ghost_valid"]
 [ext_resource type="Material" path="res://assets/materials/ghost_invalid.tres" id="23_ghost_invalid"]
 [ext_resource type="Material" path="res://assets/materials/build_marker.tres" id="24_marker"]
+[ext_resource type="Script" path="res://scripts/rail/rail_interlocking.gd" id="25_interlocking"]
+[ext_resource type="Script" path="res://scripts/rail/rail_terrain_adapter.gd" id="26_adapter"]
+[ext_resource type="Script" path="res://scripts/building/switch_tool.gd" id="27_switch"]
+[ext_resource type="Script" path="res://scripts/building/signal_tool.gd" id="28_signal"]
+[ext_resource type="Script" path="res://scripts/building/simulation_tool.gd" id="29_simulation"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("2_sky")
@@ -95,11 +100,23 @@ prop_material = ExtResource("5_nature")
 [node name="RailNetwork" type="Node" parent="World/Railway"]
 script = ExtResource("16_network")
 
-[node name="RailNetworkView" type="Node3D" parent="World/Railway" node_paths=PackedStringArray("network")]
+[node name="RailInterlocking" type="Node" parent="World/Railway" node_paths=PackedStringArray("network")]
+script = ExtResource("25_interlocking")
+network = NodePath("../RailNetwork")
+
+[node name="RailTerrainAdapter" type="Node" parent="World/Railway" node_paths=PackedStringArray("network", "terrain")]
+script = ExtResource("26_adapter")
+network = NodePath("../RailNetwork")
+terrain = NodePath("../../Terrain")
+
+[node name="RailNetworkView" type="Node3D" parent="World/Railway" node_paths=PackedStringArray("network", "interlocking")]
 script = ExtResource("17_network_view")
 network = NodePath("../RailNetwork")
+interlocking = NodePath("../RailInterlocking")
 ballast_material = ExtResource("5_nature")
 rail_material = ExtResource("18_steel")
+occupied_material = ExtResource("23_ghost_invalid")
+reserved_material = ExtResource("22_ghost_valid")
 
 [node name="TestArea" type="Node3D" parent="World" node_paths=PackedStringArray("terrain")]
 script = ExtResource("8_snapper")
@@ -150,13 +167,15 @@ player = NodePath("../Player")
 bird_eye = NodePath("../BirdEyeCamera")
 transition_camera = NodePath("../TransitionCamera")
 
-[node name="BuildMode" type="Node" parent="." node_paths=PackedStringArray("view_mode_controller", "bird_eye", "terrain", "rail_network", "rail_view")]
+[node name="BuildMode" type="Node" parent="." node_paths=PackedStringArray("view_mode_controller", "bird_eye", "terrain", "rail_network", "rail_view", "interlocking", "terrain_adapter")]
 script = ExtResource("19_build")
 view_mode_controller = NodePath("../ViewModeController")
 bird_eye = NodePath("../BirdEyeCamera")
 terrain = NodePath("../World/Terrain")
 rail_network = NodePath("../World/Railway/RailNetwork")
 rail_view = NodePath("../World/Railway/RailNetworkView")
+interlocking = NodePath("../World/Railway/RailInterlocking")
+terrain_adapter = NodePath("../World/Railway/RailTerrainAdapter")
 
 [node name="RailPlaceTool" type="Node3D" parent="BuildMode"]
 script = ExtResource("20_place")
@@ -165,9 +184,26 @@ valid_material = ExtResource("22_ghost_valid")
 invalid_material = ExtResource("23_ghost_invalid")
 marker_material = ExtResource("24_marker")
 
+[node name="SwitchTool" type="Node3D" parent="BuildMode"]
+script = ExtResource("27_switch")
+tool_id = &"switch"
+valid_material = ExtResource("22_ghost_valid")
+invalid_material = ExtResource("23_ghost_invalid")
+marker_material = ExtResource("24_marker")
+
+[node name="SignalTool" type="Node3D" parent="BuildMode"]
+script = ExtResource("28_signal")
+tool_id = &"signal"
+valid_material = ExtResource("22_ghost_valid")
+invalid_material = ExtResource("23_ghost_invalid")
+
 [node name="RailRemoveTool" type="Node3D" parent="BuildMode"]
 script = ExtResource("21_remove")
 tool_id = &"remove"
 highlight_material = ExtResource("23_ghost_invalid")
+
+[node name="SimulationTool" type="Node3D" parent="BuildMode"]
+script = ExtResource("29_simulation")
+tool_id = &"test"
 
 [node name="HUD" parent="." instance=ExtResource("14_hud")]

@@ -2,189 +2,153 @@
 
 ## Grundprinzipien
 
-- **Systeme** (`systems/`) sind globale Autoloads ohne Grafik-Wissen: Zeit, Eingabe, Speichern, Events.
+- **Systeme** (`systems/`) sind globale Autoloads ohne Grafik-Wissen: Zeit, Eingabe, Einstellungen, Speichern, Events.
 - **Szenen-Skripte** (`scripts/`) gehören zu Nodes in Szenen und kennen nur, was ihnen per `@export` zugewiesen wird.
-- Kommunikation über **Signale**: entweder direkt (`WorldClock.darkness_changed`) oder über den Event-Bus `Events`.
-- **Daten und Darstellung getrennt**: `RailNetwork` enthält nur Daten, `RailNetworkView` zeichnet sie.
-- **Alle Assets prozedural oder selbst gebaut**: Terrain, Bäume, Steine, Gleise, Prellböcke und Bahnsteig per Code; Figuren aus Primitiven mit eigenem Karo-Shader; Himmel als eigener Sky-Shader.
-- Welt-Generatoren sind `@tool`-Skripte: Terrain, Natur, Bahnsteig und Figuren sind auch im Editor sichtbar.
+- Kommunikation über **Signale**: direkt (`RailNetwork.topology_changed`) oder über den Event-Bus `Events`.
+- **Daten, Logik und Darstellung getrennt**: `RailNetwork` (Daten) → `RailInterlocking` (Sicherungslogik) → `RailNetworkView` (Optik).
+- **Alle Assets prozedural oder selbst gebaut**: Terrain, Natur, Gleise, Weichen, Signale, Prellböcke, Bahnsteig per Code; Figuren aus Primitiven mit Karo-Shader; Himmel als Sky-Shader.
 
 ## Szenenbaum (`scenes/main/main.tscn`)
 
 ```
-Main (main.gd)                   – Spawn, Zeitraffer, Schnellspeichern
-├─ WorldEnvironment              – Sky-Shader, Nebel, Glow, SSAO, ACES
-├─ DayNightCycle                 – bewegt Sonne/Mond, färbt Himmel & Licht
+Main (main.gd)                    – Spawn, Zeitraffer, Schnellspeichern
+├─ WorldEnvironment               – Sky-Shader, Nebel, Glow, SSAO, ACES
+├─ DayNightCycle                  – Sonne/Mond, Himmel & Licht
 ├─ World
-│  ├─ Terrain (LowPolyTerrain)    – Gelände, Kollision, zugefrorener See
-│  ├─ Nature (PropScatter)        – Tannen & Steine als MultiMesh
+│  ├─ Terrain (LowPolyTerrain)     – Gelände in 8×8 Kacheln, formbar durch Gleise
+│  ├─ Nature (PropScatter)         – Tannen & Steine, folgen Geländeänderungen
 │  ├─ Railway
-│  │  ├─ RailNetwork              – Gleisnetz als Graph (Daten)
-│  │  └─ RailNetworkView          – Gleismodelle + Prellböcke (Darstellung)
-│  └─ TestArea (GroundSnapper)    – Bahnsteig, 4 Laternen, 4 Kisten
-├─ Player (PlayerController)     – Figur (CharacterModel) + Kamera
-├─ BirdEyeCamera                 – Kamera für Bauen & Management
-├─ TransitionCamera              – fliegt beim Ansichtswechsel weich hinüber
-├─ ViewModeController            – Ansicht, Eingabe, Mausfang; Start in Vogelperspektive
-├─ BuildMode                     – Bauwerkzeuge + Undo/Redo
-│  ├─ RailPlaceTool   (&"rail")
-│  └─ RailRemoveTool  (&"remove")
-└─ HUD                           – Uhr, Hinweise, Tastenhilfe, Build-Panel
+│  │  ├─ RailNetwork               – Gleisnetz als Graph (Daten)
+│  │  ├─ RailInterlocking          – Stellwerk: Blöcke, Fahrwege, Signalbilder
+│  │  ├─ RailTerrainAdapter        – Gleise formen das Gelände
+│  │  └─ RailNetworkView           – Gleise, Prellböcke, Weichen, Signale (Optik)
+│  └─ TestArea (GroundSnapper)     – Bahnsteig, Laternen, Kisten
+├─ Player / BirdEyeCamera / TransitionCamera / ViewModeController
+├─ BuildMode                      – Werkzeuge + Undo/Redo
+│  ├─ RailPlaceTool  (&"rail")     1  Schiene
+│  ├─ SwitchTool     (&"switch")   2  Weiche
+│  ├─ SignalTool     (&"signal")   3  Signal
+│  ├─ RailRemoveTool (&"remove")   4  Entfernen
+│  └─ SimulationTool (&"test")     5  Testsimulation
+└─ HUD                            – Uhr, Hinweise, Werkzeugleiste, Tastenlegende
 ```
 
 ## Autoloads (`systems/`)
 
 | Name | Aufgabe |
 |---|---|
-| `Events` | Event-Bus: Ansicht, Hinweise, Speichern/Laden, Build-Mode (`build_mode_changed`, `build_tool_changed`, `build_tool_requested`, `build_status_changed`) |
-| `GameInput` | Legt alle Eingabe-Aktionen an (physische Tasten; Strg-Kürzel nach Beschriftung), Mausfang, Vollbild |
-| `WorldClock` | Tageszeit, Tage, Zeitraffer; Signale `minute_changed`, `hour_changed`, `darkness_changed` … |
-| `SaveManager` | Speichert alle Nodes der Gruppe `saveable` als JSON nach `user://saves/` |
+| `Events` | Event-Bus: Ansicht, Hinweise, Speichern/Laden, Build-Mode |
+| `GameSettings` | Dauerhafte Einstellungen (Legende ein/aus, Vollbild) in `user://settings.cfg` |
+| `GameInput` | Trägt die Tasten aus `InputConfig` in die Input Map ein; Mausfang, Vollbild |
+| `WorldClock` | Tageszeit, Tage, Zeitraffer |
+| `SaveManager` | Speichert alle Nodes der Gruppe `saveable` als JSON nach `user://saves/` (Format-Version 2) |
 
-Dazu die Klassen `GameDefs` (Enums, Physik-Ebenen, Konstanten) und `SaveUtils` (JSON-Helfer).
+Dazu: `InputConfig` (alle Tasten, Werkzeuge und Legenden an einer Stelle), `GameDefs` (Enums, Physik-Ebenen), `SaveUtils`.
 
-## Gleisnetz (Rail Network)
+## Gleisnetz
 
-Das Netz ist ein **Graph aus Knoten und Gleisstücken** (`scripts/rail/`).
+Graph aus **Knoten** und **Gleisstücken**, dazu Weichen, Signale und Blöcke.
 
 ```
-   RailNode 1 ──── RailSegment 1 ──── RailNode 2 ──── RailSegment 2 ──── RailNode 3
-   (END: Prellbock)  (STRAIGHT, 20 m)   (JOINT)        (CURVE, 10 m)      (END: Prellbock)
+ Prellbock    Signal 1                Weiche                          Signal 2
+   (END) ────── ● ────────────────────── ◆ ─────── gerader Ast ────────── ● ────── (END)
+       Block A  │  Block B (Signal bis Signal, inkl. Weiche und Abzweig)  │ Block C
+                                         ╲
+                                          ╲ abzweigender Ast ── (END)
 ```
 
-**RailSegment** (ein Gleisstück) besitzt:
+**RailSegment** (ein Gleisstück):
 
 | Feld | Bedeutung |
 |---|---|
-| `id` | eindeutige ID (bleibt auch nach Undo/Laden gleich) |
-| `start_node_id` / `end_node_id` | Knoten an Anfang und Ende; Fahrtrichtung läuft immer von Start nach Ende |
+| `id` | eindeutige ID (bleibt nach Undo/Laden gleich) |
+| `control_points` + `heights` | geometrischer Verlauf: Grundriss als Bézierkurve + Höhenprofil alle ~2 m |
+| `curve` | fertige `Curve3D` – Züge fahren später per Bogenlänge daran entlang |
 | `get_start_position()` / `get_end_position()` | Start- und Endpunkt |
-| `get_start_direction()` / `get_end_direction()` | Richtung (Tangente) an beiden Enden |
-| `length` | Länge entlang der Kurve in Metern |
-| `start_neighbors` / `end_neighbors` / `get_neighbors()` | Nachbar-Gleise |
-| `start_connection` / `end_connection` | Verbindungstyp: `END` (offen), `JOINT` (Stoß), `SWITCH` (Weiche, später) |
-| `kind` | `STRAIGHT` oder `CURVE` |
-| `curve` | Godot-`Curve3D` (kubische Bézierkurve) – Züge können später per Bogenlänge daran entlangfahren |
+| `length` | Länge in Metern |
+| `start_node_id` / `end_node_id`, `start_connection` / `end_connection` | Anschlüsse: offenes Ende, Stoß oder Weiche |
+| `start_neighbors` / `end_neighbors` | benachbarte Gleise |
+| `block_id` | zugehöriger Gleisabschnitt |
 
-**RailNode** (Verbindungspunkt) hat `id`, `position` und die `segment_ids` aller angeschlossenen Gleise.
-Der Verbindungstyp ergibt sich aus der Anzahl: 1 = offenes Ende, 2 = Stoß, 3+ = Weiche.
+**RailNode**: Position + angeschlossene Gleise. 1 Gleis = `END`, 2 = `JOINT`, 3 = `SWITCH`.
 
-**RailNetwork** verwaltet beides:
+**RailSwitch**: Stammgleis, zwei Äste (0 = gerade, 1 = abzweigend), Stellung `state`.
 
-- Abfragen: `get_segment()`, `get_rail_node()`, `get_neighbors()`, `find_open_node_near()`, `find_segment_near()`, `get_outward_direction()`
-- Änderungen nur über `restore_segment(data)` und `remove_segment(id)`. Beide arbeiten mit Dictionaries, dadurch sind sie
-  **rückgängig machbar** (Godot `UndoRedo`) und direkt **speicherbar**.
-- Signale: `segment_added`, `segment_removed`, `topology_changed` → die Darstellung und die Bau-Marker aktualisieren sich selbst.
+**RailSignal**: steht an einem Knoten und sichert die Einfahrt in ein Gleis (`segment_id`). Modus `AUTO` oder `HALT`, Signalbild `STOP`/`CLEAR` (wird nicht gespeichert, sondern immer berechnet).
 
-**Geometrie:**
+**Wichtige Abfragen**: `get_next_segments(von_gleis, knoten, weichen_beachten)` liefert die Weiterfahrt – mit Weichenstellung (für Fahrwege und Züge) oder alle Möglichkeiten (für spätere Wegsuche). `get_block_segments()`, `find_*_near()`, `get_signal_transform()`.
 
-- `RailPlanner` berechnet die Form: Gerade (15°-Raster), tangentialer **Kreisbogen** beim Weiterbauen, Hermite-Kurve beim Verbinden zweier Enden.
-- `RailPlacementValidator` prüft der Reihe nach: Länge (3–60 m), Radius (≥ 12 m), Richtungsänderung (≤ 90°), Steigung (≤ 5 %), Gelände, See, Kartenrand, Abstand zu anderen Gleisen (≥ 3,9 m) und Hindernisse (Physik-Abfrage auf Ebene „Objekte“).
-- Alle Maße und Regeln stehen zentral in `RailConfig`.
+**Änderungen** laufen nur über Methoden mit Dictionaries → rückgängig machbar und speicherbar:
+`restore_segment`, `remove_segment`, `plan_split`/`apply_split`/`revert_split`, `build_switch`/`unbuild_switch`, `add_signal`/`remove_signal`, `build_signal`/`unbuild_signal`. Zusammengesetzte Aktionen (Gleis teilen + Abzweig bauen) sind eine einzige Undo-Aktion.
 
-**Erweiterung in späteren Etappen:** Weichen hängen einen dritten Gleisstrang an einen Knoten (`SWITCH`), Signale hängen an Knoten oder Positionen auf Segmenten, und die Zug-KI sucht Wege über `get_neighbors()` und fährt an `curve` entlang.
+## Stellwerk (`RailInterlocking`)
 
-## Bausystem (`scripts/building/`)
+- **Belegung**: `set_segment_occupied()` – heute von der Testsimulation, später von Zügen. Ein Block ist belegt, wenn eines seiner Gleise belegt ist.
+- **Fahrweg**: Ein Automatik-Signal bildet einen Fahrweg bis zum nächsten Signal in Fahrtrichtung (oder bis zum Prellbock), folgt der Weichenstellung und reserviert alle berührten **Blöcke exklusiv**.
+- **Signalbild**: Grün nur, wenn der Fahrweg reserviert und alle seine Blöcke frei sind. Ein Block kann nie zwei Fahrwegen gehören → ein grünes Signal kann nie einen Konflikt mit einem anderen Fahrweg erlauben (automatisch mit 400 Zufallsschritten getestet).
+- **Befahren**: Wird der Fahrweg belegt, fällt das Signal auf Rot; ist er danach frei, wird er aufgelöst.
+- **Weichenverschluss**: Umstellen ist verboten, wenn der Block der Weiche belegt ist oder ein befahrener Fahrweg darüber führt. Unbefahrene Automatik-Fahrwege werden beim Umstellen aufgelöst und neu gebildet.
 
-- `BuildMode` schaltet mit **B** ein und aus (wechselt dabei in die Vogelperspektive), registriert alle Kind-Nodes vom Typ `BuildTool` und verwaltet `UndoRedo`.
-- `BuildTool` ist die Basisklasse: `activate()`, `deactivate()`, `cancel()`, `handle_input()`, `update_tool()`, `set_status()`.
-- `BuildContext` bündelt, was Werkzeuge brauchen: Kamera, Terrain, Netz, Darstellung, Undo, Maus → Bodenpunkt.
-- Neues Werkzeug (z.B. Weiche): Skript von `BuildTool` ableiten, `tool_id` setzen, als Kind unter `BuildMode` hängen, fertig.
+## Geländeanpassung
 
-## Figuren (`scripts/characters/`)
+- `RailProfile` legt die Gleishöhe fest: Gelände abtasten → glätten → Steigung auf 5 % begrenzen. Angeschlossene Enden übernehmen Höhe und Steigung des Nachbargleises (keine Knicke).
+- `RailTerrainAdapter` meldet jedes Gleis als **Korridor** an das Terrain (`TerrainDeformer`): im Kern (±2,8 m) eingeebnet, daneben Böschung 1:2 bis ins natürliche Gelände. Wo sich Korridore überlagern, bestimmt das nähere Gleis.
+- Das Terrain baut nur die betroffenen Kacheln neu; Bäume und Steine werden auf die neue Höhe gesetzt.
+- **Speichern**: Die Anpassung wird aus den gespeicherten Gleisen (inkl. Höhenprofil) exakt rekonstruiert – nach Laden, Entfernen und Undo stimmt das Gelände dadurch automatisch.
+- **Bauregeln** (`RailConfig`, `RailPlacementValidator`): Länge 3–60 m, Radius ≥ 12 m, ≤ 90° pro Stück, Steigung ≤ 5 %, Damm/Einschnitt ≤ 3 m, Abstand zum See, Gleisabstand ≥ 3,9 m, Höhenunterschied zu Nachbargleisen, Hindernisse (Physik-Ebene „Objekte“).
 
-- `CharacterAppearance` (Resource) beschreibt das Aussehen: Haut, Karohemd (3 Farben), Hose, Schuhe, Mütze, Frisur, Brille.
-- `CharacterModel` baut daraus die Figur im Stil der Referenz: großer runder Kopf, Knopfaugen, Wangen, Mütze mit Umschlag, Karohemd (`plaid.gdshader`), kurze Beinchen. Die Laufanimation ist prozedural.
-- Vorlagen: `assets/characters/player_appearance.tres`, `assets/characters/villager_glasses.tres` (für spätere Bewohner).
+## Eingabe & Tastenlegende
 
-## Speichersystem
-
-Ein Node wird speicherbar, indem er
-
-1. sich in `_ready()` zur Gruppe `GameDefs.GROUP_SAVEABLE` hinzufügt und
-2. `get_save_id()`, `save_state() -> Dictionary` und `load_state(data)` implementiert.
-
-Der Spielstand hat eine `version`. Formatänderungen werden in `SaveManager._migrate()` behandelt.
-Aktuell gespeichert: Uhrzeit, Spielfigur, Vogelperspektive-Kamera, aktive Ansicht, Gleisnetz.
-Speicherort unter Windows: `%APPDATA%\Godot\app_userdata\Wintervale Station\saves\`.
-
-## Tag-/Nacht-Zyklus
-
-- Ein Spieltag dauert 24 Echtzeit-Minuten (`WorldClock.day_length_minutes`). Start: Tag 1, 15:00 Uhr.
-- Kurze Wintertage: Sonnenaufgang 7:00, Untergang 17:00 (`GameDefs`). Die Sonne steht maximal 30° hoch.
-- Die Farbstimmungen stehen als Stützpunkte (Stunde → Farbe) in `DayNightCycle._build_gradients()`.
-- Laternen schalten sich über `WorldClock.darkness_changed` ab 16:15 Uhr ein und nach 7:45 Uhr aus. Nur Pfosten und Sockel werfen Schatten.
-
-## Terrain
-
-- 256 m × 256 m, flache Mitte (Radius ca. 38 m), Berge am Rand, zugefrorener See im Nordosten.
-- `get_height(x, z)` liefert die Höhe überall; `intersect_ray()` findet den Bodenpunkt unter der Maus.
+`InputConfig` enthält Tastenbelegung, Werkzeugliste und Legenden je Modus. Die Legende (`KeyLegend`, unten rechts) liest die Tastennamen aus der Input Map – sie zeigt also immer die echte Belegung, auch nach Änderungen. Sie wechselt automatisch zwischen Erkunden, Vogelperspektive und jedem Bauwerkzeug; F1 klappt sie ein (Einstellung bleibt gespeichert).
 
 ## Physik-Ebenen
 
-| Ebene | Name | Wer | Konstante |
-|---|---|---|---|
-| 1 | Welt | Terrain, Eis | `GameDefs.LAYER_WORLD` |
-| 2 | Spieler | Spielfigur (kollidiert mit 1, 3, 4) | `GameDefs.LAYER_PLAYER` |
-| 3 | Objekte | Bäume, Steine, Laternen, Kisten, Bahnsteig – blockieren den Gleisbau | `GameDefs.LAYER_OBJECTS` |
-| 4 | Gleise | Schotterbett, Prellböcke (begehbar) | `GameDefs.LAYER_RAILS` |
+| Ebene | Name | Wer |
+|---|---|---|
+| 1 | Welt | Terrain-Kacheln, Eis |
+| 2 | Spieler | Spielfigur (kollidiert mit 1, 3, 4) |
+| 3 | Objekte | Bäume, Steine, Laternen, Kisten, Bahnsteig, Signalmasten – blockieren den Gleisbau |
+| 4 | Gleise | Schotterbett, Prellböcke |
 
-## Dateien
+## Neue und geänderte Dateien in Etappe 2 + 3
 
 ```
-project.godot                          Projekteinstellungen, Autoloads, Jolt Physics, MSAA
-systems/
-  events.gd                            Event-Bus
-  game_input.gd                        Eingabe-Aktionen, Mausfang, Vollbild
-  world_clock.gd                       Weltzeit & Zeitraffer
-  save_manager.gd                      Speichern/Laden (JSON)
-  game_defs.gd                         Enums, Physik-Ebenen, Konstanten
-  save_utils.gd                        Vector3 <-> JSON
-scripts/
-  main/main.gd                         Einstieg der Spielwelt
-  main/view_mode_controller.gd         Wechsel Erkunden <-> Vogelperspektive
-  player/player_controller.gd          Bewegung, Kamera
-  camera/bird_eye_camera.gd            Orbit-/Pan-Kamera für Bauen
-  characters/character_appearance.gd   Aussehen einer Figur (Resource)
-  characters/character_model.gd        Figur-Generator + Laufanimation (@tool)
-  rail/rail_config.gd                  Maße & Bauregeln
-  rail/rail_geometry.gd                Kurven-Hilfen (Bézier, Tangenten, Radius)
-  rail/rail_node.gd                    Knoten im Gleisnetz
-  rail/rail_segment.gd                 Gleisstück im Gleisnetz
-  rail/rail_network.gd                 Gleisnetz (Graph, undo-fähig, speicherbar)
-  rail/rail_candidate.gd               geplantes, noch nicht gebautes Gleis
-  rail/rail_planner.gd                 berechnet Gerade / Bogen / Übergang
-  rail/rail_placement_validator.gd     Bauregeln
-  rail/rail_segment_view.gd            Modell + Kollision eines Gleisstücks
-  rail/rail_network_view.gd            Darstellung des Netzes + Prellböcke
-  rail/railway_platform.gd             Bahnsteig (@tool)
-  building/build_mode.gd               Build-Mode, Werkzeugwahl, Undo/Redo
-  building/build_context.gd            gemeinsamer Zugriff für Werkzeuge
-  building/build_tool.gd               Basisklasse für Werkzeuge
-  building/rail_place_tool.gd          Werkzeug "Schiene" (Ghost, Einrasten, Kette)
-  building/rail_remove_tool.gd         Werkzeug "Entfernen"
-  world/…                              Terrain, Natur, Tag/Nacht, GroundSnapper
-  procgen/low_poly_builder.gd          Mesh-Bausteine (Dreieck, Quader, Balken, Zylinder …)
-  procgen/nature_meshes.gd             Tanne & Stein
-  procgen/rail_meshes.gd               Schotter, Schwellen, Schienen, Laschen, Prellbock, Ghost
-  procgen/station_meshes.gd            Bahnsteig, Bank, Stationsschild
-  props/lantern.gd                     Laterne mit Dämmerungsschaltung
-  ui/hud.gd                            HUD inkl. Build-Panel
-scenes/
-  main/main.tscn                       Hauptszene
-  player/player.tscn                   Spielfigur
-  camera/bird_eye_camera.tscn          Vogelperspektive
-  rail/railway_platform.tscn           Bahnsteig
-  props/lantern.tscn, props/crate.tscn Testobjekte
-  ui/hud.tscn                          HUD-Layout
-assets/
-  characters/*.tres                    Figuren-Vorlagen
-  materials/sky.gdshader               Himmel
-  materials/flat_shaded.gdshader       Facetten-Look für beliebige Meshes
-  materials/plaid.gdshader             Karostoff für Hemden
-  materials/rail_steel.tres            Schienenstahl
-  materials/ghost_*.tres, build_marker.tres  Vorschau grün/rot, Einrast-Marker
-  materials/*.tres                     Natur, Eis, Laternenglas, Eisen, Schnee, Holz
-  ui/hud_theme.tres                    Schrift, Panels, Buttons
-tests/smoke_test.*                     Headless-Funktionstest (66 Prüfungen)
+systems/input_config.gd              NEU  Tasten, Werkzeuge, Legenden – zentral
+systems/game_settings.gd             NEU  dauerhafte Einstellungen
+systems/game_input.gd                     nutzt InputConfig
+systems/save_manager.gd                   Format-Version 2
+scripts/world/terrain_deformer.gd    NEU  Gleiskorridore im Gelände
+scripts/world/low_poly_terrain.gd         Kacheln, natürliche/angepasste Höhe, Live-Vorschau
+scripts/world/prop_scatter.gd             Bäume/Steine folgen dem Gelände
+scripts/rail/rail_profile.gd         NEU  Höhenprofil über Hügel
+scripts/rail/rail_switch.gd          NEU  Weiche (Daten)
+scripts/rail/rail_signal.gd          NEU  Signal (Daten)
+scripts/rail/rail_route.gd           NEU  Fahrweg
+scripts/rail/rail_interlocking.gd    NEU  Stellwerk
+scripts/rail/rail_terrain_adapter.gd NEU  Gleisnetz → Gelände
+scripts/rail/rail_switch_view.gd     NEU  Weiche mit Stellanimation
+scripts/rail/rail_signal_view.gd     NEU  Hauptsignal mit Lichtwechsel
+scripts/rail/rail_network.gd              Weichen, Signale, Blöcke, Teilen, Weiterfahrt
+scripts/rail/rail_segment.gd              Höhenprofil, Block, Richtungs-Helfer
+scripts/rail/rail_geometry.gd             Höhenprofil-Kurven, Bézier teilen
+scripts/rail/rail_candidate.gd            Profil, Abzweig-Infos
+scripts/rail/rail_placement_validator.gd  neue Bauregeln
+scripts/rail/rail_config.gd               neue Maße
+scripts/rail/rail_network_view.gd         Weichen, Signale, Einblendungen
+scripts/rail/rail_segment_view.gd         Einblendung für Belegung/Fahrweg
+scripts/procgen/rail_meshes.gd            Weichenzunge, Antrieb, Laterne, Signalmast
+scripts/building/switch_tool.gd      NEU  Werkzeug Weiche
+scripts/building/signal_tool.gd      NEU  Werkzeug Signal
+scripts/building/simulation_tool.gd  NEU  Werkzeug Test (Simulation)
+scripts/building/rail_place_tool.gd       Profil, Geländevorschau, Maße am Cursor, Meter-Raster
+scripts/building/rail_remove_tool.gd      entfernt auch Signale
+scripts/building/build_mode.gd            5 Werkzeuge, Weichen per Klick
+scripts/building/build_context.gd         Stellwerk + Geländeanbindung
+scripts/camera/bird_eye_camera.gd         Zoom zur Mausposition
+scripts/ui/key_legend.gd             NEU  Tastenlegende
+scripts/ui/hud.gd, scenes/ui/hud.tscn     Legende, Werkzeugleiste
+assets/ui/hud_theme.tres                  Stile für Tastenkappen und Legende
+scenes/main/main.tscn                     neue Nodes
+project.godot                             Autoload GameSettings
+tests/railway_test.*                 NEU  93 Prüfungen für Etappe 2 + 3
 ```

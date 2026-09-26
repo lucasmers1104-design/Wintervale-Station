@@ -11,6 +11,30 @@ corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_legend"]
+content_margin_left = 14.0
+content_margin_top = 10.0
+content_margin_right = 14.0
+content_margin_bottom = 10.0
+bg_color = Color(0.08, 0.07, 0.09, 0.5)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_keycap"]
+content_margin_left = 6.0
+content_margin_top = 1.0
+content_margin_right = 6.0
+content_margin_bottom = 2.0
+bg_color = Color(0.96, 0.93, 0.86, 0.92)
+border_width_bottom = 2
+border_color = Color(0.62, 0.55, 0.46, 0.95)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button"]
 content_margin_left = 14.0
 content_margin_top = 5.0
@@ -59,8 +83,19 @@ Button/styles/hover = SubResource("StyleBoxFlat_button_hover")
 Button/styles/hover_pressed = SubResource("StyleBoxFlat_button_pressed")
 Button/styles/normal = SubResource("StyleBoxFlat_button")
 Button/styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+KeyCap/base_type = &"PanelContainer"
+KeyCap/styles/panel = SubResource("StyleBoxFlat_keycap")
+KeyCapText/base_type = &"Label"
+KeyCapText/colors/font_color = Color(0.14, 0.11, 0.08, 1)
+KeyCapText/colors/font_shadow_color = Color(0, 0, 0, 0)
+KeyCapText/font_sizes/font_size = 13
 Label/colors/font_color = Color(0.98, 0.94, 0.86, 1)
 Label/colors/font_shadow_color = Color(0, 0, 0, 0.45)
 Label/constants/shadow_offset_x = 1
 Label/constants/shadow_offset_y = 1
+LegendPanel/base_type = &"PanelContainer"
+LegendPanel/styles/panel = SubResource("StyleBoxFlat_legend")
+LegendText/base_type = &"Label"
+LegendText/colors/font_color = Color(0.93, 0.9, 0.84, 1)
+LegendText/font_sizes/font_size = 14
 PanelContainer/styles/panel = SubResource("StyleBoxFlat_panel")

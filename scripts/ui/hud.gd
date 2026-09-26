@@ -1,40 +1,24 @@
-## Schlankes HUD: Uhrzeit, kurze Hinweise, ausblendbare Tastenhilfe und
-## im Build-Mode ein kleines Werkzeug-Panel unten links.
+## Schlankes HUD: Uhrzeit, kurze Hinweise, dauerhafte Tastenlegende (unten
+## rechts) und im Build-Mode eine kleine Werkzeugleiste (unten links).
 ##
-## Das HUD hört nur auf Signale (WorldClock, Events) und kennt keine
-## anderen Spielsysteme direkt. Werkzeugwahl per Klick läuft über
+## Das HUD hört nur auf Signale (WorldClock, Events) und kennt keine anderen
+## Spielsysteme direkt. Werkzeugwahl per Klick läuft über
 ## Events.build_tool_requested.
 class_name GameHUD
 extends CanvasLayer
 
-const HELP_EXPLORE := "WASD  Gehen     Shift  Laufen     Leertaste  Springen\n" \
-	+ "Maus  Umsehen     Mausrad  Abstand     V  Ich-/Verfolgerperspektive\n" \
-	+ "Tab  Vogelperspektive"
-const HELP_BIRD_EYE := "WASD  Verschieben     Q / E  Drehen     Mausrad  Zoom\n" \
-	+ "Mittlere Maustaste  Drehen & Neigen     Rechte Maustaste  Ziehen\n" \
-	+ "B  Bauen     Tab  Zur Spielfigur"
-const HELP_BUILD := "Linksklick  Start setzen / Gleis bauen     Rechtsklick / Esc  Abbrechen\n" \
-	+ "1  Schiene     2  Entfernen     Strg+Z  Rückgängig     Strg+Y  Wiederholen\n" \
-	+ "Alt  Freier Winkel     B / Esc  Bauen beenden"
-const HELP_GLOBAL := "T  Zeitraffer     F5  Speichern     F9  Laden     F1  Hilfe     F11  Vollbild     Esc  Maus frei"
-
-## So lange bleibt die Hilfe nach dem Start sichtbar (Sekunden).
-@export var help_visible_seconds := 14.0
-
-var _help_visible := true
 var _view_mode := GameDefs.ViewMode.EXPLORE
 var _build_active := false
-var _help_tween: Tween
+var _build_tool: StringName = &"rail"
+var _tool_buttons: Dictionary[StringName, Button] = {}
 var _toast_tween: Tween
 
 @onready var _clock_label: Label = %ClockLabel
 @onready var _speed_label: Label = %SpeedLabel
-@onready var _help_panel: PanelContainer = %HelpPanel
-@onready var _help_label: Label = %HelpLabel
 @onready var _build_panel: PanelContainer = %BuildPanel
-@onready var _rail_button: Button = %RailButton
-@onready var _remove_button: Button = %RemoveButton
+@onready var _tool_row: HBoxContainer = %ToolRow
 @onready var _status_label: Label = %StatusLabel
+@onready var _legend: KeyLegend = %Legend
 @onready var _toast_label: Label = %ToastLabel
 
 
@@ -51,21 +35,28 @@ func _ready() -> void:
 	Events.build_status_changed.connect(_on_build_status_changed)
 
 	var tool_group := ButtonGroup.new()
-	_rail_button.button_group = tool_group
-	_remove_button.button_group = tool_group
-	_rail_button.pressed.connect(Events.build_tool_requested.emit.bind(&"rail"))
-	_remove_button.pressed.connect(Events.build_tool_requested.emit.bind(&"remove"))
+	for entry: Dictionary in InputConfig.BUILD_TOOLS:
+		var button := Button.new()
+		button.text = entry["label"]
+		button.toggle_mode = true
+		button.focus_mode = Control.FOCUS_NONE
+		button.button_group = tool_group
+		button.tooltip_text = "Taste %s" % InputConfig.get_action_label(entry["action"])
+		button.pressed.connect(Events.build_tool_requested.emit.bind(entry["id"]))
+		_tool_row.add_child(button)
+		_tool_buttons[entry["id"]] = button
 
 	_toast_label.modulate.a = 0.0
 	_update_clock()
 	_on_time_scale_changed(WorldClock.time_scale)
-	_update_help_text()
-	get_tree().create_timer(help_visible_seconds).timeout.connect(_set_help_visible.bind(false))
+	_legend.set_expanded(GameSettings.legend_expanded)
+	_update_legend()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"toggle_help"):
-		_set_help_visible(not _help_visible)
+		_legend.set_expanded(not _legend.is_expanded())
+		GameSettings.set_legend_expanded(_legend.is_expanded())
 		get_viewport().set_input_as_handled()
 
 
@@ -80,24 +71,18 @@ func show_toast(text: String) -> void:
 	_toast_tween.tween_property(_toast_label, "modulate:a", 0.0, 0.6)
 
 
-func _set_help_visible(value: bool) -> void:
-	_help_visible = value
-	if _help_tween and _help_tween.is_valid():
-		_help_tween.kill()
-	_help_panel.visible = true
-	_help_tween = create_tween()
-	_help_tween.tween_property(_help_panel, "modulate:a", 1.0 if value else 0.0, 0.4)
-	if not value:
-		_help_tween.tween_callback(_help_panel.hide)
+func get_legend() -> KeyLegend:
+	return _legend
 
 
-func _update_help_text() -> void:
-	var mode_help := HELP_EXPLORE
+## Legende passend zum aktuellen Modus (Erkunden, Vogelperspektive, Werkzeug).
+func _update_legend() -> void:
 	if _build_active:
-		mode_help = HELP_BUILD
+		_legend.show_mode(StringName("build_" + String(_build_tool)))
 	elif _view_mode == GameDefs.ViewMode.BIRD_EYE:
-		mode_help = HELP_BIRD_EYE
-	_help_label.text = mode_help + "\n\n" + HELP_GLOBAL
+		_legend.show_mode(&"bird_eye")
+	else:
+		_legend.show_mode(&"explore")
 
 
 func _update_clock() -> void:
@@ -119,7 +104,7 @@ func _on_time_scale_changed(time_scale: float) -> void:
 
 func _on_view_mode_changed(mode: GameDefs.ViewMode) -> void:
 	_view_mode = mode
-	_update_help_text()
+	_update_legend()
 
 
 func _on_build_mode_changed(active: bool) -> void:
@@ -127,12 +112,14 @@ func _on_build_mode_changed(active: bool) -> void:
 	_build_panel.visible = active
 	if not active:
 		_on_build_status_changed("")
-	_update_help_text()
+	_update_legend()
 
 
 func _on_build_tool_changed(tool_id: StringName) -> void:
-	_rail_button.set_pressed_no_signal(tool_id == &"rail")
-	_remove_button.set_pressed_no_signal(tool_id == &"remove")
+	_build_tool = tool_id
+	for id: StringName in _tool_buttons:
+		_tool_buttons[id].set_pressed_no_signal(id == tool_id)
+	_update_legend()
 
 
 func _on_build_status_changed(text: String) -> void:

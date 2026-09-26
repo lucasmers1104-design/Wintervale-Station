@@ -22,6 +22,10 @@ const RUST := Color(0.42, 0.28, 0.21)
 const IRON_DARK := Color(0.18, 0.18, 0.20)
 const BUFFER_RED := Color(0.70, 0.14, 0.11)
 const BUFFER_WHITE := Color(0.92, 0.91, 0.88)
+const CONCRETE := Color(0.62, 0.61, 0.59)
+const MOTOR_GREY := Color(0.36, 0.40, 0.42)
+const SIGNAL_GREY := Color(0.45, 0.47, 0.48)
+const SIGNAL_BLACK := Color(0.07, 0.07, 0.08)
 
 ## Querschnitt Schotterbett (x, y) – links nach rechts. Der Rand reicht in
 ## den Boden, damit kleine Geländeunebenheiten nie Lücken zeigen.
@@ -112,6 +116,103 @@ static func create_buffer_stop() -> ArrayMesh:
 	for x in [-0.72, -0.24, 0.24, 0.72]:
 		LowPolyBuilder.add_box(st, Vector3(x, beam_y, 0.3), Vector3(0.16, 0.33, 0.23), BUFFER_WHITE)
 	LowPolyBuilder.add_box(st, Vector3(0.0, beam_y + 0.185, 0.3), Vector3(2.2, 0.05, 0.2), SNOW)
+	return st.commit()
+
+
+# --- Weichen -------------------------------------------------------------------
+
+## Länge der Weichenzunge (vom Drehpunkt bis zur Spitze).
+const BLADE_LENGTH := 3.2
+
+## Weichenzunge: schlanke, spitz zulaufende Schiene. Drehpunkt (Zungenwurzel)
+## im Ursprung, die Spitze zeigt nach +Z.
+static func create_switch_blade() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var h := RailConfig.RAIL_HEIGHT * 0.9
+	var heel := 0.035
+	var tip := 0.008
+	var corners := [
+		Vector3(-heel, 0.0, 0.0), Vector3(heel, 0.0, 0.0), Vector3(heel, h, 0.0), Vector3(-heel, h, 0.0),
+		Vector3(-tip, 0.0, BLADE_LENGTH), Vector3(tip, 0.0, BLADE_LENGTH), Vector3(tip, h * 0.7, BLADE_LENGTH),
+		Vector3(-tip, h * 0.7, BLADE_LENGTH),
+	]
+	var center := Vector3(0.0, h * 0.5, BLADE_LENGTH * 0.5)
+	var faces := [[0, 1, 2, 3], [4, 5, 6, 7], [0, 4, 7, 3], [1, 5, 6, 2], [3, 2, 6, 7], [0, 1, 5, 4]]
+	for face: Array in faces:
+		var a: Vector3 = corners[face[0]]
+		var b: Vector3 = corners[face[1]]
+		var c: Vector3 = corners[face[2]]
+		var d: Vector3 = corners[face[3]]
+		var color := STEEL_TOP if face == [3, 2, 6, 7] else STEEL_SIDE
+		LowPolyBuilder.add_quad_facing(st, a, b, c, d, color, (a + b + c + d) * 0.25 - center)
+	return st.commit()
+
+
+## Weichenantrieb: Betonsockel, Stahlgehäuse mit Deckel und Kabelkasten.
+## Lokal: Mitte des Gehäuses im Ursprung (Bodenhöhe), Stellstange zeigt nach +X.
+static func create_switch_motor() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	LowPolyBuilder.add_box(st, Vector3(0.0, 0.08, 0.0), Vector3(0.9, 0.2, 0.7), CONCRETE)
+	LowPolyBuilder.add_box(st, Vector3(0.0, 0.34, 0.0), Vector3(0.72, 0.32, 0.5), MOTOR_GREY)
+	LowPolyBuilder.add_box(st, Vector3(0.0, 0.52, 0.0), Vector3(0.78, 0.05, 0.56), MOTOR_GREY.darkened(0.2))
+	LowPolyBuilder.add_box(st, Vector3(0.0, 0.555, 0.0), Vector3(0.7, 0.03, 0.48), SNOW)
+	LowPolyBuilder.add_box(st, Vector3(-0.3, 0.3, 0.31), Vector3(0.12, 0.18, 0.1), IRON_DARK)
+	LowPolyBuilder.add_box(st, Vector3(0.4, 0.3, 0.0), Vector3(0.12, 0.1, 0.12), IRON_DARK)
+	# Pfosten für die Weichenlaterne
+	LowPolyBuilder.add_box(st, Vector3(-0.2, 0.85, 0.0), Vector3(0.06, 0.6, 0.06), IRON_DARK)
+	return st.commit()
+
+
+## Weichenlaterne: kleiner Kasten mit weißem Streifen, dreht sich beim Umstellen.
+static func create_switch_lantern() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	LowPolyBuilder.add_box(st, Vector3.ZERO, Vector3(0.22, 0.22, 0.22), IRON_DARK)
+	LowPolyBuilder.add_box(st, Vector3(0.0, 0.0, -0.112), Vector3(0.05, 0.17, 0.01), BUFFER_WHITE)
+	LowPolyBuilder.add_box(st, Vector3(0.0, 0.0, 0.112), Vector3(0.05, 0.17, 0.01), BUFFER_WHITE)
+	LowPolyBuilder.add_box(st, Vector3(0.0, 0.14, 0.0), Vector3(0.26, 0.05, 0.26), IRON_DARK)
+	LowPolyBuilder.add_box(st, Vector3(0.0, 0.175, 0.0), Vector3(0.2, 0.025, 0.2), SNOW)
+	return st.commit()
+
+
+# --- Signale -------------------------------------------------------------------
+
+## Höhe der Signallampen über dem Boden (oben grün, unten rot).
+const SIGNAL_GREEN_Y := 3.62
+const SIGNAL_RED_Y := 3.22
+## Die Lampen sitzen knapp vor dem Signalschirm (-Z = Blickrichtung der Züge).
+const SIGNAL_LAMP_Z := -0.075
+
+## Hauptsignal: Fundament, Mast mit Leiter und Mastschild, schwarzer Schirm
+## mit Blenden über den Lampen. Lokal: Mastfuß im Ursprung, -Z zeigt zum Zug.
+static func create_signal_mast() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# Fundament und Mast
+	LowPolyBuilder.add_box(st, Vector3(0.0, 0.1, 0.0), Vector3(0.6, 0.3, 0.6), CONCRETE)
+	LowPolyBuilder.add_cylinder(st, Vector3(0.0, 0.25, 0.0), 0.08, 0.06, 3.8, 8, SIGNAL_GREY)
+	# Leiter hinter dem Mast
+	for x in [-0.15, 0.15]:
+		LowPolyBuilder.add_box(st, Vector3(x, 1.8, 0.2), Vector3(0.03, 2.9, 0.03), SIGNAL_GREY)
+	for i in 10:
+		LowPolyBuilder.add_box(st, Vector3(0.0, 0.55 + i * 0.3, 0.2), Vector3(0.3, 0.025, 0.025), SIGNAL_GREY)
+	LowPolyBuilder.add_box(st, Vector3(0.0, 1.8, 0.11), Vector3(0.05, 0.05, 0.16), SIGNAL_GREY)
+	# Mastschild: weiß-rot-weiß
+	for i in 5:
+		var color := BUFFER_WHITE if i % 2 == 0 else BUFFER_RED
+		LowPolyBuilder.add_box(st, Vector3(0.0, 2.35 + i * 0.09, -0.085), Vector3(0.2, 0.09, 0.02), color)
+	# Signalschirm mit Blenden
+	var head_y := (SIGNAL_GREEN_Y + SIGNAL_RED_Y) * 0.5
+	LowPolyBuilder.add_box(st, Vector3(0.0, head_y, 0.0), Vector3(0.5, 0.95, 0.1), SIGNAL_BLACK)
+	LowPolyBuilder.add_box(st, Vector3(0.0, head_y, 0.06), Vector3(0.3, 0.7, 0.05), SIGNAL_GREY)
+	for lamp_y in [SIGNAL_GREEN_Y, SIGNAL_RED_Y]:
+		LowPolyBuilder.add_box(st, Vector3(0.0, lamp_y + 0.13, -0.16), Vector3(0.26, 0.03, 0.22), SIGNAL_BLACK)
+		for x in [-0.125, 0.125]:
+			LowPolyBuilder.add_box(st, Vector3(x, lamp_y + 0.04, -0.14), Vector3(0.02, 0.16, 0.18), SIGNAL_BLACK)
+	# Schneehaube auf dem Schirm
+	LowPolyBuilder.add_box(st, Vector3(0.0, head_y + 0.49, 0.0), Vector3(0.46, 0.04, 0.12), SNOW)
 	return st.commit()
 
 

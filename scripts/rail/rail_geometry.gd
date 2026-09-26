@@ -1,18 +1,51 @@
 @tool
 ## Geometrie-Hilfen für Gleiskurven.
 ##
-## Jedes Gleisstück ist eine kubische Bézierkurve (4 Kontrollpunkte),
-## gespeichert als Godot-[Curve3D]. Curve3D liefert Bogenlängen-Abtastung –
-## die Grundlage für Modelle und später für fahrende Züge.
+## Der Grundriss eines Gleisstücks ist eine kubische Bézierkurve (4 Kontroll-
+## punkte). Die Höhe kommt aus einem separaten Höhenprofil (alle ~2 m ein Wert,
+## siehe [RailProfile]). Beides zusammen ergibt eine Godot-[Curve3D] mit
+## Bogenlängen-Abtastung – die Grundlage für Modelle und später für Züge.
 class_name RailGeometry
 extends RefCounted
 
 
-static func make_curve(points: PackedVector3Array) -> Curve3D:
+## Kurve aus Grundriss-Kontrollpunkten und optionalem Höhenprofil.
+## Ohne Profil steigt die Höhe linear zwischen Anfang und Ende.
+static func make_curve(points: PackedVector3Array, heights := PackedFloat32Array()) -> Curve3D:
+	if heights.size() < 2:
+		var linear := Curve3D.new()
+		linear.bake_interval = 0.25
+		linear.add_point(points[0], Vector3.ZERO, points[1] - points[0])
+		linear.add_point(points[3], points[2] - points[3], Vector3.ZERO)
+		return linear
+
+	var planar := make_planar_curve(points)
+	var length := planar.get_baked_length()
+	var n := heights.size() - 1
+	var ds := length / n
 	var curve := Curve3D.new()
 	curve.bake_interval = 0.25
-	curve.add_point(points[0], Vector3.ZERO, points[1] - points[0])
-	curve.add_point(points[3], points[2] - points[3], Vector3.ZERO)
+	for i in n + 1:
+		var position := planar.sample_baked(ds * i, true)
+		position.y = heights[i]
+		var before := maxi(i - 1, 0)
+		var after := mini(i + 1, n)
+		var slope := (heights[after] - heights[before]) / (ds * (after - before))
+		var horizontal := tangent_at(planar, ds * i)
+		var handle := (horizontal + Vector3.UP * slope) * ds / 3.0
+		curve.add_point(position, -handle if i > 0 else Vector3.ZERO, handle if i < n else Vector3.ZERO)
+	return curve
+
+
+## Grundriss (Höhe 0) der Bézierkurve.
+static func make_planar_curve(points: PackedVector3Array) -> Curve3D:
+	var flat_points := PackedVector3Array()
+	for p in points:
+		flat_points.append(flat(p))
+	var curve := Curve3D.new()
+	curve.bake_interval = 0.25
+	curve.add_point(flat_points[0], Vector3.ZERO, flat_points[1] - flat_points[0])
+	curve.add_point(flat_points[3], flat_points[2] - flat_points[3], Vector3.ZERO)
 	return curve
 
 
@@ -66,6 +99,67 @@ static func min_radius(curve: Curve3D) -> float:
 			continue
 		smallest = minf(smallest, a.distance_to(b) * b.distance_to(c) * c.distance_to(a) / (4.0 * area))
 	return smallest
+
+
+## Größte Steigung entlang der Kurve (Höhenänderung je Meter Grundriss).
+static func max_grade(curve: Curve3D) -> float:
+	var points := polyline(curve, 2.0)
+	var steepest := 0.0
+	for i in points.size() - 1:
+		var run := flat(points[i + 1] - points[i]).length()
+		if run > 0.01:
+			steepest = maxf(steepest, absf(points[i + 1].y - points[i].y) / run)
+	return steepest
+
+
+## Punkt der Bézierkurve bei Parameter t (0..1).
+static func bezier_point(points: PackedVector3Array, t: float) -> Vector3:
+	var u := 1.0 - t
+	return points[0] * u * u * u + points[1] * 3.0 * u * u * t + points[2] * 3.0 * u * t * t + points[3] * t * t * t
+
+
+## Parameter t, an dem der gegebene Anteil der Grundriss-Länge erreicht ist.
+static func bezier_param_at_fraction(points: PackedVector3Array, fraction: float) -> float:
+	var steps := 200
+	var lengths := PackedFloat32Array([0.0])
+	var previous := flat(points[0])
+	for i in range(1, steps + 1):
+		var p := flat(bezier_point(points, float(i) / steps))
+		lengths.append(lengths[-1] + previous.distance_to(p))
+		previous = p
+	var target := clampf(fraction, 0.0, 1.0) * lengths[-1]
+	for i in range(1, steps + 1):
+		if lengths[i] >= target:
+			var span := lengths[i] - lengths[i - 1]
+			var local := (target - lengths[i - 1]) / span if span > 0.0 else 0.0
+			return (i - 1 + local) / steps
+	return 1.0
+
+
+## Teilt eine Bézierkurve bei t exakt in zwei Bézierkurven (De-Casteljau).
+static func split_bezier(points: PackedVector3Array, t: float) -> Array[PackedVector3Array]:
+	var p01 := points[0].lerp(points[1], t)
+	var p12 := points[1].lerp(points[2], t)
+	var p23 := points[2].lerp(points[3], t)
+	var p012 := p01.lerp(p12, t)
+	var p123 := p12.lerp(p23, t)
+	var middle := p012.lerp(p123, t)
+	return [
+		PackedVector3Array([points[0], p01, p012, middle]),
+		PackedVector3Array([middle, p123, p23, points[3]]),
+	]
+
+
+## Tastet ein Höhenprofil zwischen zwei Anteilen neu ab (lineare Interpolation).
+static func resample_heights(heights: PackedFloat32Array, from_fraction: float, to_fraction: float,
+		count: int) -> PackedFloat32Array:
+	var result := PackedFloat32Array()
+	var n := heights.size() - 1
+	for i in count + 1:
+		var f := lerpf(from_fraction, to_fraction, float(i) / count) * n
+		var index := clampi(floori(f), 0, n - 1)
+		result.append(lerpf(heights[index], heights[index + 1], f - index))
+	return result
 
 
 ## Vektor ohne Höhenanteil.

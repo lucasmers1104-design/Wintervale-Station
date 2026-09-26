@@ -1,10 +1,12 @@
 ## Build-Mode (Taste B): verwaltet Bauwerkzeuge und Undo/Redo.
 ##
 ## Alle Kind-Nodes vom Typ [BuildTool] werden automatisch als Werkzeuge
-## registriert. Der Build-Mode läuft nur in der Vogelperspektive – beim
-## Einschalten wird dorthin gewechselt, beim Verlassen der Ansicht endet er.
+## registriert; Tasten und Reihenfolge stehen in [InputConfig].BUILD_TOOLS.
+## Der Build-Mode läuft nur in der Vogelperspektive – beim Einschalten wird
+## dorthin gewechselt, beim Verlassen der Ansicht endet er.
 ##
-## Tasten: B an/aus, 1 Schiene, 2 Entfernen, Strg+Z / Strg+Y, Esc abbrechen/beenden.
+## Auch ohne Build-Mode lassen sich in der Vogelperspektive Weichen per
+## Linksklick umstellen.
 class_name BuildMode
 extends Node
 
@@ -13,7 +15,11 @@ extends Node
 @export var terrain: LowPolyTerrain
 @export var rail_network: RailNetwork
 @export var rail_view: RailNetworkView
+@export var interlocking: RailInterlocking
+@export var terrain_adapter: RailTerrainAdapter
 @export var default_tool: StringName = &"rail"
+## So nah muss ein Klick an einer Weiche liegen, um sie umzustellen.
+@export var switch_pick_radius := 2.5
 
 var active := false
 var undo_redo := UndoRedo.new()
@@ -28,6 +34,8 @@ func _ready() -> void:
 	context.terrain = terrain
 	context.rail_network = rail_network
 	context.rail_view = rail_view
+	context.interlocking = interlocking
+	context.terrain_adapter = terrain_adapter
 	context.undo_redo = undo_redo
 
 	for child in get_children():
@@ -50,18 +58,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"build_mode"):
 		toggle()
 	elif not active:
-		return
+		if not _try_toggle_switch_outside_build(event):
+			return
 	elif event.is_action_pressed(&"undo"):
 		undo()
 	elif event.is_action_pressed(&"redo"):
 		redo()
-	elif event.is_action_pressed(&"build_tool_rail"):
-		select_tool(&"rail")
-	elif event.is_action_pressed(&"build_tool_remove"):
-		select_tool(&"remove")
 	elif event.is_action_pressed(&"build_cancel"):
 		if not (_current and _current.cancel()):
 			set_active(false)
+	elif _select_tool_by_key(event):
+		pass
 	elif not (_current and _current.handle_input(event)):
 		return
 	get_viewport().set_input_as_handled()
@@ -120,6 +127,29 @@ func undo() -> void:
 func redo() -> void:
 	if undo_redo.has_redo():
 		undo_redo.redo()
+
+
+func _select_tool_by_key(event: InputEvent) -> bool:
+	for entry: Dictionary in InputConfig.BUILD_TOOLS:
+		if event.is_action_pressed(entry["action"]):
+			select_tool(entry["id"])
+			return true
+	return false
+
+
+## In der normalen Vogelperspektive: Klick auf eine Weiche stellt sie um.
+func _try_toggle_switch_outside_build(event: InputEvent) -> bool:
+	if view_mode_controller.mode != GameDefs.ViewMode.BIRD_EYE or not event.is_action_pressed(&"interact_primary"):
+		return false
+	var point := context.get_mouse_ground_point()
+	if point == Vector3.INF:
+		return false
+	var switch := rail_network.find_switch_near(point, switch_pick_radius)
+	if switch == null:
+		return false
+	var refused := interlocking.request_switch_toggle(switch.node_id)
+	Events.notification_requested.emit(refused if refused != "" else "Weiche umgestellt")
+	return true
 
 
 func _on_view_mode_changed(mode: GameDefs.ViewMode) -> void:

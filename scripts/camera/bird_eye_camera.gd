@@ -23,6 +23,8 @@ const SAVE_ID := "bird_eye_camera"
 @export var min_distance := 12.0
 @export var max_distance := 110.0
 @export var zoom_factor := 1.15
+## Beim Zoomen zur Mausposition hin statt zur Bildmitte.
+@export var zoom_to_cursor := true
 
 @export_group("Neigung")
 @export_range(10.0, 89.0) var min_pitch_degrees := 25.0
@@ -54,9 +56,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not active:
 		return
 	if event.is_action_pressed(&"zoom_in"):
-		_target_distance = maxf(min_distance, _target_distance / zoom_factor)
+		_zoom_towards_cursor(maxf(min_distance, _target_distance / zoom_factor))
 	elif event.is_action_pressed(&"zoom_out"):
-		_target_distance = minf(max_distance, _target_distance * zoom_factor)
+		_zoom_towards_cursor(minf(max_distance, _target_distance * zoom_factor))
 	elif event.is_action(&"camera_drag_rotate"):
 		_drag_rotating = event.is_pressed()
 	elif event.is_action(&"camera_drag_pan"):
@@ -153,6 +155,18 @@ func _update_camera_transform() -> void:
 	camera_position.y = maxf(camera_position.y, _ground_height(camera_position.x, camera_position.z) + 3.0)
 	global_position = _focus
 	camera.global_transform = Transform3D(Basis.looking_at(_focus - camera_position, Vector3.UP), camera_position)
+
+
+## Zoomt so, dass der Punkt unter dem Mauszeiger an seiner Stelle bleibt –
+## man zoomt also dorthin, wo man hinschaut.
+func _zoom_towards_cursor(new_distance: float) -> void:
+	if terrain and zoom_to_cursor and camera.is_inside_tree():
+		var mouse := camera.get_viewport().get_mouse_position()
+		var hit := terrain.intersect_ray(camera.project_ray_origin(mouse), camera.project_ray_normal(mouse), 800.0)
+		if hit != Vector3.INF:
+			var pull := 1.0 - new_distance / _target_distance
+			_target_focus += RailGeometry.flat(hit - _target_focus) * pull
+	_target_distance = new_distance
 
 
 func _ground_height(x: float, z: float) -> float:

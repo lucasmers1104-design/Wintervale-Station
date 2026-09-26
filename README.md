@@ -3,8 +3,8 @@
 Ein gemütliches Low-Poly Eisenbahn- und Dorfbau-Spiel im Winter.
 Engine: **Godot 4.7** (GDScript, Renderer Forward+).
 
-Aktueller Stand: **Etappe 2 – Railway Build System** (Gleisbau mit Vorschau, Kurven, Einrasten, Entfernen, Undo).
-Das Spiel startet in der Vogelperspektive.
+Aktueller Stand: **Etappe 2 + 3 – Gleisbau, Geländeanpassung, Weichen und Signale**.
+Das Spiel startet in der Vogelperspektive. Unten rechts zeigt eine Legende immer die passenden Tasten.
 
 ## Starten
 
@@ -31,37 +31,41 @@ Voraussetzung: Eine Grafikkarte mit aktuellem Vulkan-Treiber (Forward+).
 |---|---|
 | WASD | Verschieben |
 | Q / E | Drehen |
-| Mausrad | Zoom |
+| Mausrad | Zoom (zur Mausposition hin) |
 | Mittlere Maustaste ziehen | Drehen & Neigen |
 | Rechte Maustaste ziehen | Ansicht ziehen |
+| Linksklick auf Weiche | Weiche umstellen |
 | B | Build-Mode ein/aus |
 | Tab | Zurück zur Figur |
 
 | Build-Mode | |
 |---|---|
-| 1 / 2 | Werkzeug Schiene / Entfernen (oder Klick auf die Buttons unten links) |
-| Linksklick | Startpunkt setzen, nächster Klick baut das Gleis – danach geht es direkt weiter |
-| Rechtsklick / Esc | Aktuelles Gleis abbrechen (zweites Esc beendet den Build-Mode) |
-| Alt (halten) | Freier Winkel statt 15°-Raster |
+| 1 Schiene | Klick: Start, Klick: Gleis bauen – danach geht es direkt weiter. Rastet an Gleisenden ein. |
+| 2 Weiche | Klick auf ein Gleis setzt eine Weiche, dann den Abzweig zur Seite ziehen. Klick auf eine Weiche stellt sie um. |
+| 3 Signal | Klick neben ein Gleis. Die Seite bestimmt die Fahrtrichtung (Signal steht rechts vom Zug). |
+| 4 Entfernen | Klick auf Gleis oder Signal |
+| 5 Test | Klick auf Gleis: belegen/freigeben · auf Signal: Automatik/Halt · auf Weiche: umstellen |
+| Alt (halten) | Freier Winkel und freie Länge statt 15°-/Meter-Raster |
 | Strg+Z / Strg+Y | Rückgängig / Wiederholen |
+| Rechtsklick / Esc | Abbrechen (zweites Esc beendet den Build-Mode) |
 
 | Allgemein | |
 |---|---|
 | T | Zeitraffer (×1 → ×10 → ×60) |
 | F5 / F9 | Schnellspeichern / Schnellladen |
-| F1 | Tastenhilfe ein/aus |
+| F1 | Tastenlegende ein-/ausklappen |
 | F11 | Vollbild |
-| Esc | Maus freigeben (Klick fängt sie wieder) |
 
-## Automatischer Test
+## Automatische Tests
 
 ```
 godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn
+godot --headless --path . --fixed-fps 60 res://tests/railway_test.tscn
 ```
 
 Exit-Code 0 = alle Prüfungen bestanden.
 
 ## Weitere Doku
 
-- [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md) – Aufbau, Systeme, Dateien
+- [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md) – Aufbau, Gleisnetz, Stellwerk, Geländeanpassung, Dateien
 - [CLAUDE.md](CLAUDE.md) – Projektregeln & Vision
