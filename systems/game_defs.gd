@@ -24,6 +24,7 @@ const LAYER_OBJECTS := 4    ## Ebene 3: Bäume, Steine, Laternen, Bahnsteige …
 const LAYER_RAILS := 8      ## Ebene 4: Gleise
 const LAYER_NATURE := 16    ## Ebene 5: Bäume, Steine (werden beim Gleisbau gerodet)
 const LAYER_TRAINS := 32    ## Ebene 6: Züge (anklickbar, die Spielfigur prallt ab)
+const LAYER_CHARACTERS := 64 ## Ebene 7: Bewohner (die Spielfigur weicht ihnen aus)
 
 ## Sonnenaufgang und -untergang in Spielstunden (kurze Wintertage).
 const SUNRISE_HOUR := 7.0

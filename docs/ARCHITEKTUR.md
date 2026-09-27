@@ -176,3 +176,20 @@ Ausführlich in [ZUEGE.md](ZUEGE.md). Kurz:
 - **Licht** (`DayNightCycle._build_gradients`, `Environment` in `main.tscn`): goldenes Sonnenlicht, cremiger Horizont und Nebel, kühle Lavendel-Schatten („gelbes Licht, kalter Schnee“). Nachts ruhiges, entsättigtes Blau – Mond neutraler, damit Laternen, Bahnsteiglampen und Zugfenster warm herausleuchten. Weniger Bloom-Schleier, leicht angehobene Sättigung.
 - **Farben**: Fels und Erde wärmer (Gelände, Tunnelberg, Steine), Tannen in frischerem Grün, Portalmauer aus warmem Sandstein. Zugfenster matter, tagsüber mit einem Hauch Innenlicht (`TrainDispatcher.day_window_glow`). Laternen etwas heller und weiter.
 - `tests/train_test.*`: 8 neue Prüfungen (Berg auf der Mauer, Röhre überdeckt, Gleis frei, Kollision) – jetzt 105.
+
+## Etappe 4: Figuren und Bahnhofsleben
+
+Ausführlich in [NPCS.md](NPCS.md). Kurz:
+
+- **Figuren überarbeitet** (`CharacterModel`, `CharacterAppearance`): weichere Proportionen, runde Hände/Fäustlinge, gerollte Mützen, drei Oberteile (Karohemd, Pulli, Mantel), sechs Frisuren, vier Mützen, Bart, Schal, Statur (auch Kinder), Winter-/Sommer-Outfit, ruhige Haltungen (Sitzen, Uhr ansehen, Armbanduhr, Winken), Atmen und Umschauen im Stehen. Schnittstelle unverändert – Spieler und Bewohner nutzen dasselbe Modell.
+- **Spielfigur:** Schrittgeräusche (Schnee/Stein), gemütlicheres Tempo (Gehen 2,8 m/s, Laufen 5,4 m/s), sanftere Drehung. Die Kamera hängt nicht mehr starr an der Figur, sondern folgt weich; Mausbewegungen minimal geglättet.
+- **Vogelperspektive:** Tastatur-Verschieben und -Drehen fahren sanft an und rollen aus, Zoom gleitet ruhiger, nah herangezoomt neigt sich die Kamera etwas flacher (min. 8 m).
+- **Bewohner:** `NpcDirector` + `Npc` + Steckbriefe in `assets/npcs/`; Fußwegenetz `WalkGraph`; Plätze `StationSpot`; Wohnhaus-Platzhalter `NpcHome`.
+- **Bahnhofsdetails** (`StationProp`): 6 Bänke, 2 Mülleimer, 3 Blumenkästen, 2 Wegweiser, Fahrplanaushang, Bohlenübergang über Gleis 2, drei Dorflaternen. Die alte, fest eingebaute Bahnsteigbank ist abgeschaltet (`with_bench = false`).
+- **Erweiterungen bestehender Systeme (nichts neu geschrieben):**
+  - `Train`: `doors_open()`, `get_door_points()`, `hold_doors()`/`release_doors()` (Fahrgäste halten kurz die Tür auf).
+  - `TrainCar`: `get_door_centers()`; `TrainMeshes.FLOOR_HEIGHT`.
+  - `SoundLibrary`: Schritte `step_snow_0..2`, `step_stone_0..2`.
+  - `main.gd`: richtet auch Bohlenübergänge auf die Gleishöhe aus.
+  - Physik-Ebene 7 „Bewohner“ (`GameDefs.LAYER_CHARACTERS`); die Spielfigur stößt an Bewohner.
+- `tests/npc_test.*`: 72 Prüfungen.

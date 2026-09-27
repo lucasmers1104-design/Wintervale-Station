@@ -105,3 +105,7 @@ assets/timetables/wintervale.tres   Fahrplan
 assets/materials/train_*.tres       Lack (glänzend) und Glas (spiegelnd, nachts warm beleuchtet)
 tests/train_test.*                  105 Prüfungen inkl. Sicherheitsüberwachung jedes Frames
 ```
+
+## Fahrgäste (ab Etappe 4)
+
+Bewohner und Reisende steigen an offenen Türen ein und aus (siehe [NPCS.md](NPCS.md)). Dafür bietet `Train` `doors_open()`, `get_door_points()` und `hold_doors()`/`release_doors()`: Solange jemand ein- oder aussteigt, bleiben die Türen offen – höchstens `MAX_DOOR_HOLD` = 5 Simulationssekunden (≈ 2,5 Spielminuten) über die Abfahrtszeit hinaus.

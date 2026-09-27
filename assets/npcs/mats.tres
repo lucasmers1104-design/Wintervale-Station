@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="NpcProfile" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/npc/npc_profile.gd" id="1_profile"]
+[ext_resource type="Script" path="res://scripts/npc/npc_routine.gd" id="2_routine"]
+[ext_resource type="Resource" path="res://assets/characters/mats.tres" id="3_look"]
+
+[sub_resource type="Resource" id="Routine_1"]
+script = ExtResource("2_routine")
+activity = 0
+start = "14:30"
+until = "16:30"
+
+[resource]
+resource_name = "Mats Hofer"
+script = ExtResource("1_profile")
+display_name = "Mats Hofer"
+appearance = ExtResource("3_look")
+home_name = "Hofer"
+walk_speed = 1.25
+routines = Array[ExtResource("2_routine")]([SubResource("Routine_1")])
+likes_sitting = 0.3
+likes_standing = 0.5
+likes_strolling = 0.8
+likes_clock = 0.6
+likes_board = 0.2

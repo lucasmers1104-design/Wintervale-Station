@@ -3,7 +3,7 @@
 Ein gemütliches Low-Poly Eisenbahn- und Dorfbau-Spiel im Winter.
 Engine: **Godot 4.7** (GDScript, Renderer Forward+).
 
-Aktueller Stand: **Etappe 3 – Living Railway**: Personen- und Güterzüge fahren nach Fahrplan zwischen Nordtal und Südtal und halten in Wintervale.
+Aktueller Stand: **Etappe 4 – Cozy Characters & Living Station**: Bewohner gehen nach ihrem Tagesablauf zum Bahnhof, sitzen, warten, steigen in die Züge ein und aus; Reisende kommen aus dem Dorf. Züge fahren nach Fahrplan zwischen Nordtal und Südtal.
 Das Spiel startet in der Vogelperspektive über dem Bahnhof. Unten rechts zeigt eine Legende immer die passenden Tasten.
 
 ## Starten
@@ -63,6 +63,7 @@ Voraussetzung: Eine Grafikkarte mit aktuellem Vulkan-Treiber (Forward+).
 godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn
 godot --headless --path . --fixed-fps 60 res://tests/railway_test.tscn
 godot --headless --path . --fixed-fps 60 res://tests/train_test.tscn
+godot --headless --path . --fixed-fps 60 res://tests/npc_test.tscn
 ```
 
 Exit-Code 0 = alle Prüfungen bestanden.
@@ -71,4 +72,5 @@ Exit-Code 0 = alle Prüfungen bestanden.
 
 - [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md) – Aufbau, Gleisnetz, Stellwerk, Geländeanpassung, Dateien
 - [docs/ZUEGE.md](docs/ZUEGE.md) – Züge, Fahrplan, Bahnhofsbetrieb, neue Züge erstellen
+- [docs/NPCS.md](docs/NPCS.md) – Figuren, Bewohner, Tagesablauf, neue Bewohner erstellen
 - [CLAUDE.md](CLAUDE.md) – Projektregeln & Vision

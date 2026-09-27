@@ -28,6 +28,8 @@ const SPECS := {
 const COUPLING_GAP := 0.84
 const WHEEL_RADIUS := 0.42
 const BUFFER_HEIGHT := 1.05
+## Oberkante des Wagenbodens an den Türen (über Schienenoberkante).
+const FLOOR_HEIGHT := 1.08
 
 const UNDER := Color(0.16, 0.16, 0.18)
 const FRAME := Color(0.2, 0.2, 0.22)

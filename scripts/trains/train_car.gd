@@ -139,6 +139,27 @@ func set_doors(amount: float, side: float) -> void:
 		node.position = door["closed"] + outward + slide
 
 
+## Mitten der Türöffnungen auf Seite [param side] (±1) in Weltkoordinaten,
+## auf Höhe des Wagenbodens. Zwei Türflügel bilden eine Öffnung.
+func get_door_centers(side: float) -> Array[Vector3]:
+	var openings: Array[Vector3] = []
+	for door in _doors:
+		if float(door["side"]) != side:
+			continue
+		var closed: Vector3 = door["closed"]
+		var merged := false
+		for i in openings.size():
+			if absf(openings[i].z - closed.z) < 0.8:
+				openings[i].z = (openings[i].z + closed.z) * 0.5
+				merged = true
+		if not merged:
+			openings.append(Vector3(closed.x, TrainMeshes.FLOOR_HEIGHT, closed.z))
+	var result: Array[Vector3] = []
+	for opening in openings:
+		result.append(global_transform * opening)
+	return result
+
+
 func has_doors() -> bool:
 	return not _doors.is_empty()
 

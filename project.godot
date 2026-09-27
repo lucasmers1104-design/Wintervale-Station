@@ -42,6 +42,7 @@ window/stretch/aspect="expand"
 3d_physics/layer_4="Gleise"
 3d_physics/layer_5="Natur"
 3d_physics/layer_6="Züge"
+3d_physics/layer_7="Bewohner"
 
 [physics]
 

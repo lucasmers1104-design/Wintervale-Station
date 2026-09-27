@@ -18,6 +18,7 @@ func _ready() -> void:
 	var spawn := Vector3(player_spawn.x, terrain.get_height(player_spawn.x, player_spawn.z) + 0.2, player_spawn.z)
 	player.global_position = spawn
 	player.set_spawn_point(spawn)
+	player.snap_camera()
 
 	if starter_railway:
 		starter_railway.build_if_empty()
@@ -42,7 +43,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 
-## Tunnelportale auf die Höhe ihres Gleises setzen.
+## Tunnelportale und Bohlenübergänge auf die Höhe ihres Gleises setzen.
 func _align_portals() -> void:
 	for portal in get_tree().get_nodes_in_group(TrainPortal.GROUP):
 		(portal as TrainPortal).align_to_track(network)
+	for prop in get_tree().get_nodes_in_group(StationProp.RAIL_ALIGNED_GROUP):
+		(prop as StationProp).align_to_track(network)

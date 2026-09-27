@@ -18,11 +18,11 @@ const SAVE_ID := "player"
 const RESPAWN_DEPTH := -40.0
 
 @export_group("Bewegung")
-@export var walk_speed := 3.2
-@export var sprint_speed := 6.0
+@export var walk_speed := 2.8
+@export var sprint_speed := 5.4
 @export var acceleration := 10.0
 @export var jump_velocity := 4.6
-@export var turn_speed := 10.0
+@export var turn_speed := 8.0
 
 @export_group("Kamera")
 @export var mouse_sensitivity := 0.0025
@@ -32,13 +32,20 @@ const RESPAWN_DEPTH := -40.0
 @export var zoom_step := 0.6
 @export var third_person_fov := 68.0
 @export var first_person_fov := 75.0
+## Wie weich die Kamera der Figur folgt (kleiner = mehr Verzögerung).
+@export var camera_follow := 9.0
+## Wie weich die Kamera der Maus folgt (groß = direkter).
+@export var look_smoothing := 22.0
 
 ## Wenn false, reagiert die Figur nicht auf Eingaben (z.B. in der Vogelperspektive).
 var input_enabled := true
 var first_person := false
 
 var _pitch := -0.3
+var _yaw := 0.0
+var _smoothed_pitch := -0.3
 var _target_distance := 4.5
+var _footsteps: FootstepPlayer
 var _walk_phase := 0.0
 var _spawn_point := Vector3.ZERO
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
@@ -57,6 +64,12 @@ func _ready() -> void:
 	_spring_arm.add_excluded_object(get_rid())
 	_camera_pitch.rotation.x = _pitch
 	_spawn_point = global_position
+	# Die Kamera hängt nicht starr an der Figur, sondern folgt ihr weich (siehe _process).
+	_camera_yaw.top_level = true
+	snap_camera()
+	_footsteps = FootstepPlayer.new()
+	add_child(_footsteps)
+	_model.footstep.connect(_footsteps.play_step)
 	_apply_perspective()
 
 
@@ -65,7 +78,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseMotion and GameInput.is_mouse_captured():
 		var motion := (event as InputEventMouseMotion).screen_relative
-		_camera_yaw.rotate_y(-motion.x * mouse_sensitivity)
+		_yaw -= motion.x * mouse_sensitivity
 		_set_pitch(_pitch - motion.y * mouse_sensitivity)
 	elif event.is_action_pressed(&"toggle_perspective"):
 		set_first_person(not first_person)
@@ -104,6 +117,17 @@ func _physics_process(delta: float) -> void:
 func _process(delta: float) -> void:
 	var arm_target := 0.0 if first_person else _target_distance
 	_spring_arm.spring_length = lerpf(_spring_arm.spring_length, arm_target, 1.0 - exp(-8.0 * delta))
+	# Blickrichtung: minimal geglättet, damit nichts ruckelt, aber direkt genug zum Umschauen.
+	var look := 1.0 - exp(-look_smoothing * delta)
+	_camera_yaw.rotation.y = lerp_angle(_camera_yaw.rotation.y, _yaw, look)
+	_smoothed_pitch = lerpf(_smoothed_pitch, _pitch, look)
+	_camera_pitch.rotation.x = _smoothed_pitch
+	# Position: in der Ich-Perspektive fest am Kopf, sonst mit leichter Verzögerung.
+	var anchor := _camera_anchor()
+	if first_person:
+		_camera_yaw.global_position = anchor
+	else:
+		_camera_yaw.global_position = _camera_yaw.global_position.lerp(anchor, 1.0 - exp(-camera_follow * delta))
 	_animate_walk(delta)
 
 
@@ -120,9 +144,22 @@ func set_spawn_point(point: Vector3) -> void:
 	_spawn_point = point
 
 
+## Kamera ohne Nachziehen direkt an die Figur setzen (Spawn, Laden, Zurücksetzen).
+func snap_camera() -> void:
+	_camera_yaw.global_position = _camera_anchor()
+	_camera_yaw.rotation.y = _yaw
+	_smoothed_pitch = _pitch
+	_camera_pitch.rotation.x = _pitch
+
+
+func _camera_anchor() -> Vector3:
+	return global_position + Vector3(0.0, CharacterModel.EYE_HEIGHT, 0.0)
+
+
 func respawn() -> void:
 	global_position = _spawn_point + Vector3.UP
 	velocity = Vector3.ZERO
+	snap_camera()
 
 
 func set_first_person(enabled: bool) -> void:
@@ -143,7 +180,7 @@ func save_state() -> Dictionary:
 	return {
 		"position": SaveUtils.vec3_to_array(global_position),
 		"model_yaw": _model.rotation.y,
-		"camera_yaw": _camera_yaw.rotation.y,
+		"camera_yaw": _yaw,
 		"camera_pitch": _pitch,
 		"camera_distance": _target_distance,
 		"first_person": first_person,
@@ -154,10 +191,12 @@ func load_state(data: Dictionary) -> void:
 	global_position = SaveUtils.array_to_vec3(data.get("position"), global_position)
 	velocity = Vector3.ZERO
 	_model.rotation.y = float(data.get("model_yaw", _model.rotation.y))
-	_camera_yaw.rotation.y = float(data.get("camera_yaw", _camera_yaw.rotation.y))
+	_yaw = float(data.get("camera_yaw", _yaw))
+	_camera_yaw.rotation.y = _yaw
 	_target_distance = clampf(float(data.get("camera_distance", _target_distance)), min_distance, max_distance)
 	set_first_person(bool(data.get("first_person", first_person)))
 	_set_pitch(float(data.get("camera_pitch", _pitch)))
+	snap_camera()
 
 
 # --- Intern ----------------------------------------------------------------
@@ -172,7 +211,6 @@ func _apply_perspective() -> void:
 func _set_pitch(value: float) -> void:
 	var limits := Vector2(-1.45, 1.45) if first_person else Vector2(-1.2, 0.45)
 	_pitch = clampf(value, limits.x, limits.y)
-	_camera_pitch.rotation.x = _pitch
 
 
 func _turn_model(direction: Vector3, delta: float) -> void:
@@ -188,5 +226,5 @@ func _turn_model(direction: Vector3, delta: float) -> void:
 func _animate_walk(delta: float) -> void:
 	var speed := Vector2(velocity.x, velocity.z).length()
 	var amount := clampf(speed / walk_speed, 0.0, 1.0) if is_on_floor() else 0.3
-	_walk_phase += delta * speed * 3.2
+	_walk_phase += delta * speed * 4.0
 	_model.animate(amount, _walk_phase)

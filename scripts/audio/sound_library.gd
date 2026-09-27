@@ -4,7 +4,8 @@
 ## Hüllkurven berechnet und danach zwischengespeichert. Alle Klänge sind
 ## bewusst leise und weich gehalten (gemütlich statt laut).
 ##
-## Verfügbar: rolling (Schleife), clack, brake, door_open, door_close, chime, horn
+## Verfügbar: rolling (Schleife), clack, brake, door_open, door_close, chime, horn,
+## step_snow_0..2 und step_stone_0..2 (Schritte)
 class_name SoundLibrary
 extends RefCounted
 
@@ -17,6 +18,12 @@ static func get_sound(sound_name: String) -> AudioStreamWAV:
 	if _cache.has(sound_name):
 		return _cache[sound_name]
 	var stream: AudioStreamWAV
+	if sound_name.begins_with("step_"):
+		# step_snow_0 … step_snow_2, step_stone_0 … step_stone_2
+		var parts := sound_name.split("_")
+		stream = _step(parts[1] == "snow", int(parts[2]) if parts.size() > 2 else 0)
+		_cache[sound_name] = stream
+		return stream
 	match sound_name:
 		"rolling":
 			stream = _rolling()
@@ -167,6 +174,37 @@ static func _chime() -> AudioStreamWAV:
 				+ 0.06 * sin(TAU * frequency * 5.4 * t) * exp(-t * 9.0)
 			samples[i] += tone * attack
 	_normalize(samples, 0.42)
+	return _to_wav(samples)
+
+
+## Schritt: im Schnee ein weiches Knirschen aus vielen kleinen Körnern,
+## auf Stein ein kurzes, dumpfes Klopfen. [param variant] 0–2 klingt jeweils etwas anders.
+static func _step(snow: bool, variant: int) -> AudioStreamWAV:
+	var rng := _rng(71 + variant * 13 + (0 if snow else 5))
+	var duration := 0.24 if snow else 0.15
+	var samples := _silence(duration)
+	var low := 0.0
+	var band := 0.0
+	var grain := 0.0
+	for i in samples.size():
+		var t := float(i) / MIX_RATE
+		var white := rng.randf_range(-1.0, 1.0)
+		low += 0.06 * (white - low)
+		band += 0.4 * (white - band)
+		if snow:
+			# Knirschen: zufällige Körner, die in den ersten ~120 ms dicht fallen
+			if rng.randf() < 0.012 * exp(-t * 14.0) * (1.0 + variant * 0.2):
+				grain = rng.randf_range(0.5, 1.0) * (1.0 if rng.randf() < 0.5 else -1.0)
+			grain *= 0.93
+			var envelope := smoothstep(0.0, 0.012, t) * exp(-t * 16.0)
+			var body := (band - low) * 0.5 + grain * 0.8
+			var thump := sin(TAU * (70.0 + variant * 6.0) * t) * exp(-t * 38.0) * 0.35
+			samples[i] = body * envelope + thump
+		else:
+			var envelope := smoothstep(0.0, 0.004, t) * exp(-t * 45.0)
+			var knock := sin(TAU * (135.0 + variant * 12.0) * t) * exp(-t * 55.0) * 0.8
+			samples[i] = (white - band) * envelope * 0.35 + knock
+	_normalize(samples, 0.32 if snow else 0.28)
 	return _to_wav(samples)
 
 

@@ -39,6 +39,11 @@
 [ext_resource type="Script" path="res://scripts/props/station_clock.gd" id="37_clock"]
 [ext_resource type="Script" path="res://scripts/props/departure_board.gd" id="38_board"]
 [ext_resource type="Script" path="res://scripts/world/snowfall.gd" id="39_snow"]
+[ext_resource type="Script" path="res://scripts/props/station_prop.gd" id="40_prop"]
+[ext_resource type="Script" path="res://scripts/npc/station_spot.gd" id="41_spot"]
+[ext_resource type="Script" path="res://scripts/npc/walk_graph.gd" id="42_graph"]
+[ext_resource type="Script" path="res://scripts/npc/npc_home.gd" id="43_home"]
+[ext_resource type="Script" path="res://scripts/npc/npc_director.gd" id="44_director"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("2_sky")
@@ -181,6 +186,7 @@ terrain = NodePath("../Terrain")
 position = Vector3(0, 0, -9)
 length = 44.0
 canopy_length = 14.0
+with_bench = false
 
 [node name="HangingClock" type="Node3D" parent="World/TestArea"]
 position = Vector3(0, 0.55, -12)
@@ -224,6 +230,321 @@ rotation = Vector3(0, 0.5, 0)
 [node name="CrateD" parent="World/TestArea" instance=ExtResource("10_crate")]
 position = Vector3(-10.5, 0, -3)
 rotation = Vector3(0, -0.4, 0)
+
+
+[node name="BenchW1" type="StaticBody3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, 1, 0, 1, 0, -1, 0, -3.67321e-06, -0.33, 0.55, 7.5)
+script = ExtResource("40_prop")
+kind = 0
+material = ExtResource("5_nature")
+variation_seed = 11
+
+[node name="BenchO1" type="StaticBody3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, -1, 0, 1, 0, 1, 0, -3.67321e-06, 0.33, 0.55, 7.5)
+script = ExtResource("40_prop")
+kind = 0
+material = ExtResource("5_nature")
+variation_seed = 12
+
+[node name="BenchW2" type="StaticBody3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, 1, 0, 1, 0, -1, 0, -3.67321e-06, -0.33, 0.55, -6)
+script = ExtResource("40_prop")
+kind = 0
+material = ExtResource("5_nature")
+variation_seed = 13
+
+[node name="BenchO2" type="StaticBody3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, -1, 0, 1, 0, 1, 0, -3.67321e-06, 0.33, 0.55, -6)
+script = ExtResource("40_prop")
+kind = 0
+material = ExtResource("5_nature")
+variation_seed = 14
+
+[node name="BenchW3" type="StaticBody3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, 1, 0, 1, 0, -1, 0, -3.67321e-06, -0.33, 0.55, -12)
+script = ExtResource("40_prop")
+kind = 0
+material = ExtResource("5_nature")
+variation_seed = 15
+
+[node name="BenchO3" type="StaticBody3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, -1, 0, 1, 0, 1, 0, -3.67321e-06, 0.33, 0.55, -12)
+script = ExtResource("40_prop")
+kind = 0
+material = ExtResource("5_nature")
+variation_seed = 16
+
+[node name="BinA" type="StaticBody3D" parent="World/TestArea"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, 0, 0.55, -0.4)
+script = ExtResource("40_prop")
+kind = 1
+material = ExtResource("5_nature")
+
+[node name="BinB" type="StaticBody3D" parent="World/TestArea"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, 0, 0.55, -16)
+script = ExtResource("40_prop")
+kind = 1
+material = ExtResource("5_nature")
+
+[node name="FlowerBoxA" type="StaticBody3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, 1, 0, 1, 0, -1, 0, -3.67321e-06, 0, 0.55, 3.5)
+script = ExtResource("40_prop")
+kind = 2
+material = ExtResource("5_nature")
+variation_seed = 21
+
+[node name="FlowerBoxB" type="StaticBody3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, 1, 0, 1, 0, -1, 0, -3.67321e-06, 0, 0.55, -22.9)
+script = ExtResource("40_prop")
+kind = 2
+material = ExtResource("5_nature")
+variation_seed = 22
+
+[node name="FlowerBoxC" type="StaticBody3D" parent="World/TestArea"]
+transform = Transform3D(0.955336, 0, 0.29552, 0, 1, 0, -0.29552, 0, 0.955336, -9.8, 0, 15.2)
+script = ExtResource("40_prop")
+kind = 2
+material = ExtResource("5_nature")
+variation_seed = 23
+box_length = 1.4
+
+[node name="SignpostCrossing" type="StaticBody3D" parent="World/TestArea"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -9.6, 0, 19.8)
+script = ExtResource("40_prop")
+kind = 3
+material = ExtResource("5_nature")
+arrows = PackedStringArray("Bahnsteig 1 · 2|0", "Dorf|180", "Südtal|-90")
+
+[node name="SignpostVillage" type="StaticBody3D" parent="World/TestArea"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -26, 0, 9.4)
+script = ExtResource("40_prop")
+kind = 3
+material = ExtResource("5_nature")
+arrows = PackedStringArray("Bahnhof|0", "Dorfrand|180")
+
+[node name="TimetableCase" type="StaticBody3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, 1, 0, 1, 0, -1, 0, -3.67321e-06, 0, 0.55, -26.2)
+script = ExtResource("40_prop")
+kind = 4
+material = ExtResource("5_nature")
+timetable = ExtResource("32_timetable")
+
+[node name="Crossing" type="StaticBody3D" parent="World/TestArea"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -3.8, 0.05, 17.5)
+script = ExtResource("40_prop")
+kind = 5
+material = ExtResource("5_nature")
+variation_seed = 31
+
+[node name="StandW_65" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, 1, 0, 1, 0, -1, 0, -3.67321e-06, -1.55, 0.55, 6.5)
+script = ExtResource("41_spot")
+kind = 1
+
+[node name="StandO_65" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, -1, 0, 1, 0, 1, 0, -3.67321e-06, 1.55, 0.55, 6.5)
+script = ExtResource("41_spot")
+kind = 1
+
+[node name="StandW_45" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, 1, 0, 1, 0, -1, 0, -3.67321e-06, -1.55, 0.55, -4.5)
+script = ExtResource("41_spot")
+kind = 1
+
+[node name="StandO_45" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, -1, 0, 1, 0, 1, 0, -3.67321e-06, 1.55, 0.55, -4.5)
+script = ExtResource("41_spot")
+kind = 1
+
+[node name="StandW_95" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, 1, 0, 1, 0, -1, 0, -3.67321e-06, -1.55, 0.55, -9.5)
+script = ExtResource("41_spot")
+kind = 1
+
+[node name="StandO_95" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, -1, 0, 1, 0, 1, 0, -3.67321e-06, 1.55, 0.55, -9.5)
+script = ExtResource("41_spot")
+kind = 1
+
+[node name="StandW_14" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, 1, 0, 1, 0, -1, 0, -3.67321e-06, -1.55, 0.55, -14)
+script = ExtResource("41_spot")
+kind = 1
+
+[node name="StandO_14" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, -1, 0, 1, 0, 1, 0, -3.67321e-06, 1.55, 0.55, -14)
+script = ExtResource("41_spot")
+kind = 1
+
+[node name="StandW_235" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, 1, 0, 1, 0, -1, 0, -3.67321e-06, -1.55, 0.55, -23.5)
+script = ExtResource("41_spot")
+kind = 1
+
+[node name="StandO_235" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, -1, 0, 1, 0, 1, 0, -3.67321e-06, 1.55, 0.55, -23.5)
+script = ExtResource("41_spot")
+kind = 1
+
+[node name="ClockW1" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-0.723738, 0, -0.690075, 0, 1, 0, 0.690075, 0, -0.723738, -1.35, 0.55, -13.4)
+script = ExtResource("41_spot")
+kind = 2
+
+[node name="ClockO1" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-0.723738, 0, 0.690075, 0, 1, 0, -0.690075, 0, -0.723738, 1.35, 0.55, -13.4)
+script = ExtResource("41_spot")
+kind = 2
+
+[node name="ClockW2" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-0.658786, 0, -0.752331, 0, 1, 0, 0.752331, 0, -0.658786, -1.35, 0.55, 4.3)
+script = ExtResource("41_spot")
+kind = 2
+
+[node name="ClockO2" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-0.658786, 0, 0.752331, 0, 1, 0, -0.752331, 0, -0.658786, 1.35, 0.55, 4.3)
+script = ExtResource("41_spot")
+kind = 2
+
+[node name="BoardW" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, -1, 0, 1, 0, 1, 0, -3.67321e-06, -1.3, 0.55, -20)
+script = ExtResource("41_spot")
+kind = 3
+
+[node name="BoardO" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, 1, 0, 1, 0, -1, 0, -3.67321e-06, 1.3, 0.55, -20)
+script = ExtResource("41_spot")
+kind = 3
+
+[node name="BoardTimetable" type="Marker3D" parent="World/TestArea"]
+transform = Transform3D(-3.67321e-06, 0, -1, 0, 1, 0, 1, 0, -3.67321e-06, -1.2, 0.55, -26.2)
+script = ExtResource("41_spot")
+kind = 3
+
+[node name="LanternVillageA" parent="World/TestArea" instance=ExtResource("9_lantern")]
+position = Vector3(-12.5, 0, 10.3)
+
+[node name="LanternVillageB" parent="World/TestArea" instance=ExtResource("9_lantern")]
+position = Vector3(-30, 0, 13.9)
+
+[node name="LanternCrossing" parent="World/TestArea" instance=ExtResource("9_lantern")]
+position = Vector3(-7.6, 0, 15.4)
+
+[node name="Village" type="Node3D" parent="World" node_paths=PackedStringArray("terrain")]
+script = ExtResource("8_snapper")
+terrain = NodePath("../Terrain")
+
+[node name="HomeBerger" type="Node3D" parent="World/Village"]
+transform = Transform3D(-1, 0, 2.65359e-06, 0, 1, 0, -2.65359e-06, 0, -1, -20, 0, 6.5)
+script = ExtResource("43_home")
+home_name = "Berger"
+material = ExtResource("5_nature")
+
+[node name="HomeKellner" type="Node3D" parent="World/Village"]
+transform = Transform3D(-1, 0, 2.65359e-06, 0, 1, 0, -2.65359e-06, 0, -1, -28, 0, 6.5)
+script = ExtResource("43_home")
+home_name = "Kellner"
+material = ExtResource("5_nature")
+
+[node name="HomeSommer" type="Node3D" parent="World/Village"]
+transform = Transform3D(-1, 0, 2.65359e-06, 0, 1, 0, -2.65359e-06, 0, -1, -36, 0, 6.5)
+script = ExtResource("43_home")
+home_name = "Sommer"
+material = ExtResource("5_nature")
+
+[node name="HomeWinter" type="Node3D" parent="World/Village"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -24, 0, 18)
+script = ExtResource("43_home")
+home_name = "Winter"
+material = ExtResource("5_nature")
+
+[node name="HomeHofer" type="Node3D" parent="World/Village"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -32, 0, 18)
+script = ExtResource("43_home")
+home_name = "Hofer"
+material = ExtResource("5_nature")
+
+[node name="WalkGraph" type="Node3D" parent="World"]
+script = ExtResource("42_graph")
+links = PackedStringArray("Dorfausgang-DorfstrasseWest", "DorfstrasseWest-Dorfplatz", "Dorfplatz-DorfstrasseOst", "DorfstrasseOst-Wegkreuz", "Wegkreuz-UebergangWest", "UebergangWest-UebergangOst", "UebergangOst-RampeSued", "RampeSued-RampeSuedW", "RampeSued-RampeSuedO", "RampeSuedW-BahnsteigW1", "RampeSuedO-BahnsteigO1", "BahnsteigW1-BahnsteigW2", "BahnsteigO1-BahnsteigO2", "BahnsteigW2-BahnsteigW3", "BahnsteigO2-BahnsteigO3", "BahnsteigW3-BahnsteigW4", "BahnsteigO3-BahnsteigO4", "BahnsteigW4-BahnsteigW5", "BahnsteigO4-BahnsteigO5", "BahnsteigW5-BahnsteigW6", "BahnsteigO5-BahnsteigO6", "BahnsteigW6-BahnsteigW7", "BahnsteigO6-BahnsteigO7", "BahnsteigW7-BahnsteigW8", "BahnsteigO7-BahnsteigO8", "BahnsteigW3-BahnsteigO3", "BahnsteigW6-BahnsteigO6")
+
+[node name="Dorfausgang" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(-46, 0, 12)
+
+[node name="DorfstrasseWest" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(-36, 0, 12)
+
+[node name="Dorfplatz" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(-28, 0, 12)
+
+[node name="DorfstrasseOst" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(-19, 0, 12)
+
+[node name="Wegkreuz" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(-11, 0, 14.5)
+
+[node name="UebergangWest" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(-8.2, 0, 17.5)
+
+[node name="UebergangOst" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(0.3, 0, 17.5)
+
+[node name="RampeSued" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(0, 0, 13.6)
+
+[node name="RampeSuedW" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(-1, 0, 11.4)
+
+[node name="RampeSuedO" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(1, 0, 11.4)
+
+[node name="BahnsteigW1" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(-1.1, 0, 8)
+
+[node name="BahnsteigO1" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(1.2, 0, 8)
+
+[node name="BahnsteigW2" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(-1.1, 0, 2.5)
+
+[node name="BahnsteigO2" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(1.2, 0, 2.5)
+
+[node name="BahnsteigW3" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(-1.1, 0, -1.7)
+
+[node name="BahnsteigO3" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(1.2, 0, -1.7)
+
+[node name="BahnsteigW4" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(-1.1, 0, -7.5)
+
+[node name="BahnsteigO4" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(1.2, 0, -7.5)
+
+[node name="BahnsteigW5" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(-1.1, 0, -12.5)
+
+[node name="BahnsteigO5" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(1.2, 0, -12.5)
+
+[node name="BahnsteigW6" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(-1.1, 0, -17.3)
+
+[node name="BahnsteigO6" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(1.2, 0, -17.3)
+
+[node name="BahnsteigW7" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(-1.1, 0, -22)
+
+[node name="BahnsteigO7" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(1.2, 0, -22)
+
+[node name="BahnsteigW8" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(-1.1, 0, -27)
+
+[node name="BahnsteigO8" type="Marker3D" parent="World/WalkGraph"]
+position = Vector3(1.2, 0, -27)
 
 [node name="Snowfall" type="GPUParticles3D" parent="."]
 script = ExtResource("39_snow")
@@ -282,3 +603,10 @@ script = ExtResource("29_simulation")
 tool_id = &"test"
 
 [node name="HUD" parent="." instance=ExtResource("14_hud")]
+
+[node name="NpcDirector" type="Node3D" parent="." node_paths=PackedStringArray("dispatcher", "walk_graph", "terrain", "player")]
+script = ExtResource("44_director")
+dispatcher = NodePath("../World/Railway/TrainDispatcher")
+walk_graph = NodePath("../World/WalkGraph")
+terrain = NodePath("../World/Terrain")
+player = NodePath("../Player")

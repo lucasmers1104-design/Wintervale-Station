@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CharacterAppearance" format=3]
+
+[ext_resource type="Script" path="res://scripts/characters/character_appearance.gd" id="1_look"]
+
+[resource]
+resource_name = "Ida"
+script = ExtResource("1_look")
+skin_color = Color(0.93, 0.76, 0.63, 1)
+top_style = 2
+shirt_color = Color(0.3, 0.44, 0.36, 1)
+accent_color = Color(0.92, 0.84, 0.68, 1)
+pants_color = Color(0.28, 0.24, 0.24, 1)
+shoe_color = Color(0.36, 0.22, 0.16, 1)
+hat_style = 1
+hat_color = Color(0.8, 0.52, 0.52, 1)
+hair_style = 5
+hair_color = Color(0.86, 0.68, 0.4, 1)
+glasses = true
+glasses_color = Color(0.14, 0.13, 0.15, 1)
+scarf_color = Color(0.93, 0.86, 0.74, 1)

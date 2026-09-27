@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="NpcProfile" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/npc/npc_profile.gd" id="1_profile"]
+[ext_resource type="Script" path="res://scripts/npc/npc_routine.gd" id="2_routine"]
+[ext_resource type="Resource" path="res://assets/characters/emil.tres" id="3_look"]
+
+[sub_resource type="Resource" id="Routine_1"]
+script = ExtResource("2_routine")
+activity = 0
+start = "10:00"
+until = "13:00"
+
+[sub_resource type="Resource" id="Routine_2"]
+script = ExtResource("2_routine")
+activity = 0
+start = "15:00"
+until = "17:30"
+
+[resource]
+resource_name = "Emil Hofer"
+script = ExtResource("1_profile")
+display_name = "Emil Hofer"
+appearance = ExtResource("3_look")
+home_name = "Hofer"
+walk_speed = 0.85
+routines = Array[ExtResource("2_routine")]([SubResource("Routine_1"), SubResource("Routine_2")])
+likes_sitting = 0.8
+likes_standing = 0.4
+likes_strolling = 0.15
+likes_clock = 0.3
+likes_board = 0.6

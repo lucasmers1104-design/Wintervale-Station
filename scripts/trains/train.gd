@@ -28,6 +28,9 @@ const LATERAL_ACCEL := 0.9
 const LIMIT_STEP := 4.0
 const CREEP_SPEED := 0.6
 const DOOR_TIME := 1.8
+## So lange (Simulationssekunden, 2 s = 1 Spielminute) halten ein- und aussteigende
+## Fahrgäste die Türen höchstens über die Abfahrtszeit hinaus auf.
+const MAX_DOOR_HOLD := 5.0
 
 var train_id := 0
 var entry: TimetableEntry
@@ -72,6 +75,9 @@ var _visual_head := 0.0
 var _replan_cooldown := 0.0
 var _rolling: AudioStreamPlayer3D
 var _voice: AudioStreamPlayer3D
+## Fahrgäste, die gerade ein- oder aussteigen (Kennung → true).
+var _door_holds: Dictionary[int, bool] = {}
+var _hold_time := 0.0
 
 
 ## Richtet den Zug ein und baut seine Fahrzeuge.
@@ -328,7 +334,7 @@ func _update_dwell(dt: float) -> void:
 				_waited = 0.0
 		Dwell.WAITING:
 			_waited += dt
-			if _waited >= train_type.min_dwell_seconds and _departure_due():
+			if _waited >= train_type.min_dwell_seconds and _departure_due() and not _doors_held(dt):
 				dwell_phase = Dwell.CLOSING
 				_phase_time = 0.0
 				for car in cars:
@@ -343,6 +349,50 @@ func _update_dwell(dt: float) -> void:
 				_horn_pending = true
 				_brake_played = false
 				departed.emit(self)
+
+
+## Sind die Türen zum Bahnsteig so weit offen, dass man ein- und aussteigen kann?
+func doors_open() -> bool:
+	if state != State.DWELLING or platform_stop == null:
+		return false
+	return dwell_phase == Dwell.WAITING or (dwell_phase == Dwell.OPENING and _phase_time > DOOR_TIME * 0.6)
+
+
+## Mitten aller Türen auf der Bahnsteigseite (Weltkoordinaten, auf Wagenbodenhöhe).
+func get_door_points() -> Array[Vector3]:
+	var points: Array[Vector3] = []
+	if state != State.DWELLING:
+		return points
+	for car in cars:
+		points.append_array(car.get_door_centers(_door_side))
+	return points
+
+
+## Richtung vom Gleis zum Bahnsteig (Draufsicht), oder ZERO ohne Bahnsteig.
+func get_platform_direction() -> Vector3:
+	return platform_stop.get_platform_direction() if platform_stop else Vector3.ZERO
+
+
+## Ein Fahrgast steigt ein oder aus: Die Türen bleiben offen, bis er
+## [method release_doors] ruft (höchstens [constant MAX_DOOR_HOLD] Sekunden).
+func hold_doors(passenger_id: int) -> void:
+	_door_holds[passenger_id] = true
+
+
+func release_doors(passenger_id: int) -> void:
+	_door_holds.erase(passenger_id)
+
+
+func is_held() -> bool:
+	return not _door_holds.is_empty()
+
+
+func _doors_held(dt: float) -> bool:
+	if _door_holds.is_empty():
+		_hold_time = 0.0
+		return false
+	_hold_time += dt
+	return _hold_time < MAX_DOOR_HOLD
 
 
 func _departure_due() -> bool:

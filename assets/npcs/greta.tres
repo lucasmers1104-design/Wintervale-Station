@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="NpcProfile" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/npc/npc_profile.gd" id="1_profile"]
+[ext_resource type="Script" path="res://scripts/npc/npc_routine.gd" id="2_routine"]
+[ext_resource type="Resource" path="res://assets/characters/greta.tres" id="3_look"]
+
+[sub_resource type="Resource" id="Routine_1"]
+script = ExtResource("2_routine")
+activity = 0
+start = "09:00"
+until = "11:30"
+
+[sub_resource type="Resource" id="Routine_2"]
+script = ExtResource("2_routine")
+activity = 1
+start = "14:30"
+until = "16:50"
+destination = "Nordtal"
+return_after = "19:30"
+
+[resource]
+resource_name = "Greta Berger"
+script = ExtResource("1_profile")
+display_name = "Greta Berger"
+appearance = ExtResource("3_look")
+home_name = "Berger"
+walk_speed = 0.9
+routines = Array[ExtResource("2_routine")]([SubResource("Routine_1"), SubResource("Routine_2")])
+likes_sitting = 0.9
+likes_standing = 0.2
+likes_strolling = 0.1
+likes_clock = 0.4
+likes_board = 0.3

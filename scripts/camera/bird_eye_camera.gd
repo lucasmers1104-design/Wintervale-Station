@@ -18,9 +18,13 @@ const SAVE_ID := "bird_eye_camera"
 @export var rotate_speed := 1.6
 @export var drag_sensitivity := 0.005
 @export var smoothing := 8.0
+## Tastatur-Verschieben und -Drehen beschleunigen und bremsen weich (kleiner = träger).
+@export var key_acceleration := 6.0
+## Zoom gleitet etwas langsamer als der Rest – wirkt ruhiger.
+@export var zoom_smoothing := 5.0
 
 @export_group("Zoom")
-@export var min_distance := 12.0
+@export var min_distance := 8.0
 @export var max_distance := 110.0
 @export var zoom_factor := 1.15
 ## Beim Zoomen zur Mausposition hin statt zur Bildmitte.
@@ -29,6 +33,8 @@ const SAVE_ID := "bird_eye_camera"
 @export_group("Neigung")
 @export_range(10.0, 89.0) var min_pitch_degrees := 25.0
 @export_range(10.0, 89.0) var max_pitch_degrees := 80.0
+## Ganz nah herangezoomt wird die Kamera um so viel flacher (schöner Blick auf Figuren).
+@export_range(0.0, 30.0) var zoom_tilt_degrees := 12.0
 
 ## Nur wenn aktiv, reagiert die Kamera auf Eingaben.
 var active := false
@@ -47,6 +53,8 @@ var _distance := 45.0
 var _target_distance := 45.0
 var _drag_rotating := false
 var _drag_panning := false
+var _pan_velocity := Vector2.ZERO
+var _rotate_velocity := 0.0
 
 @onready var camera: Camera3D = $Camera3D
 
@@ -80,13 +88,20 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
+	var input_vector := Vector2.ZERO
+	var rotate_input := 0.0
 	if active:
-		var input_vector := Input.get_vector(&"move_left", &"move_right", &"move_forward", &"move_back")
+		input_vector = Input.get_vector(&"move_left", &"move_right", &"move_forward", &"move_back")
+		rotate_input = Input.get_axis(&"camera_rotate_right", &"camera_rotate_left")
 		if follow_target and (input_vector != Vector2.ZERO or _drag_panning):
 			stop_following()
-		_target_focus += Basis(Vector3.UP, _target_yaw) * Vector3(input_vector.x, 0.0, input_vector.y) \
-			* _distance * pan_speed * delta
-		_target_yaw += Input.get_axis(&"camera_rotate_right", &"camera_rotate_left") * rotate_speed * delta
+	# Tastatur: sanft anfahren und ausrollen statt abrupt starten/stoppen
+	var key_weight := 1.0 - exp(-key_acceleration * delta)
+	_pan_velocity = _pan_velocity.lerp(input_vector, key_weight)
+	_rotate_velocity = lerpf(_rotate_velocity, rotate_input, key_weight)
+	_target_focus += Basis(Vector3.UP, _target_yaw) * Vector3(_pan_velocity.x, 0.0, _pan_velocity.y) \
+		* _distance * pan_speed * delta
+	_target_yaw += _rotate_velocity * rotate_speed * delta
 
 	# Einem Zug folgen: der Fokus gleitet ruhig mit
 	var focus_weight := 1.0 - exp(-smoothing * delta)
@@ -110,7 +125,7 @@ func _process(delta: float) -> void:
 	_focus.y = lerpf(_focus.y, _ground_height(_focus.x, _focus.z), weight)
 	_yaw = lerpf(_yaw, _target_yaw, weight)
 	_pitch = lerpf(_pitch, _target_pitch, weight)
-	_distance = lerpf(_distance, _target_distance, weight)
+	_distance = lerpf(_distance, _target_distance, 1.0 - exp(-zoom_smoothing * delta))
 	_update_camera_transform()
 
 
@@ -180,7 +195,10 @@ func load_state(data: Dictionary) -> void:
 func _update_camera_transform() -> void:
 	if camera == null:
 		return
-	var offset := Basis(Vector3.UP, _yaw) * (Vector3(0.0, sin(_pitch), cos(_pitch)) * _distance)
+	# Nah herangezoomt etwas flacher – man schaut den Figuren eher ins Gesicht.
+	var closeness := 1.0 - clampf(inverse_lerp(min_distance, min_distance * 3.0, _distance), 0.0, 1.0)
+	var pitch := maxf(deg_to_rad(min_pitch_degrees), _pitch - deg_to_rad(zoom_tilt_degrees) * closeness)
+	var offset := Basis(Vector3.UP, _yaw) * (Vector3(0.0, sin(pitch), cos(pitch)) * _distance)
 	var camera_position := _focus + offset
 	# Nie unter das Gelände tauchen (z.B. vor Bergen).
 	camera_position.y = maxf(camera_position.y, _ground_height(camera_position.x, camera_position.z) + 3.0)
