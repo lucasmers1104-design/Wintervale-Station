@@ -14,7 +14,8 @@ signal arrived(train: Train)
 signal departed(train: Train)
 
 enum State { RUNNING, DWELLING, DONE }
-enum Dwell { OPENING, WAITING, CLOSING }
+## Reihenfolge am Bahnsteig: UNLOCKING → STEP_OUT → OPENING → WAITING → CLOSING → STEP_IN.
+enum Dwell { OPENING, WAITING, CLOSING, UNLOCKING, STEP_OUT, STEP_IN }
 
 ## So weit schaut der Zug voraus (Meter).
 const LOOKAHEAD := 240.0
@@ -28,9 +29,17 @@ const LATERAL_ACCEL := 0.9
 const LIMIT_STEP := 4.0
 const CREEP_SPEED := 0.6
 const DOOR_TIME := 1.8
+## Türen entriegeln (kurzes Zischen) und Trittstufe aus- bzw. einfahren (Sekunden).
+const UNLOCK_TIME := 0.6
+const STEP_TIME := 1.2
+## Auf den letzten Metern vor einem Halt bremst der Zug nur noch sanft und rollt aus.
+const ROLL_OUT_DISTANCE := 10.0
+const ROLL_OUT_BRAKING := 0.3
+## So lange (Sekunden) steigert der Zug beim Anfahren seine Beschleunigung weich.
+const START_RAMP_TIME := 4.0
 ## So lange (Simulationssekunden, 2 s = 1 Spielminute) halten ein- und aussteigende
 ## Fahrgäste die Türen höchstens über die Abfahrtszeit hinaus auf.
-const MAX_DOOR_HOLD := 5.0
+const MAX_DOOR_HOLD := 8.0
 
 var train_id := 0
 var entry: TimetableEntry
@@ -78,6 +87,8 @@ var _voice: AudioStreamPlayer3D
 ## Fahrgäste, die gerade ein- oder aussteigen (Kennung → true).
 var _door_holds: Dictionary[int, bool] = {}
 var _hold_time := 0.0
+var _drive_time := 0.0
+var _squeal_played := false
 
 
 ## Richtet den Zug ein und baut seine Fahrzeuge.
@@ -137,7 +148,10 @@ func simulate(dt: float) -> void:
 		return
 
 	var target := _target_speed()
-	var rate := train_type.acceleration if target > speed else train_type.braking * 1.8
+	# Anfahren: die Zugkraft setzt weich ein statt schlagartig
+	_drive_time = _drive_time + dt if speed > 0.05 or target > speed else 0.0
+	var start_ramp := 0.3 + 0.7 * smoothstep(0.0, START_RAMP_TIME, _drive_time)
+	var rate := train_type.acceleration * start_ramp if target > speed else train_type.braking * 1.8
 	speed = move_toward(speed, target, rate * dt)
 	var next_head := head + speed * dt
 	if next_head >= _stop_point:
@@ -227,10 +241,17 @@ func _target_speed() -> float:
 func _approach_speed(distance: float, braking: float) -> float:
 	if distance <= 0.0:
 		return 0.0
-	var allowed := sqrt(2.0 * braking * maxf(distance - 0.1, 0.0))
+	# Zweistufige Bremskurve: normal bremsen, auf den letzten Metern sanft ausrollen.
+	var soft := braking * ROLL_OUT_BRAKING
+	var d := maxf(distance - 0.1, 0.0)
+	var allowed: float
+	if d <= ROLL_OUT_DISTANCE:
+		allowed = sqrt(2.0 * soft * d)
+	else:
+		allowed = sqrt(2.0 * soft * ROLL_OUT_DISTANCE + 2.0 * braking * (d - ROLL_OUT_DISTANCE))
 	if distance > 0.4:
-		return maxf(allowed, CREEP_SPEED)
-	return maxf(0.15, distance * 1.5)
+		return maxf(allowed, CREEP_SPEED * 0.5)
+	return maxf(0.12, distance * 1.2)
 
 
 ## Nächster Punkt, an dem der Zug halten muss (Bahnsteig, Signal, belegtes Gleis, Wegende).
@@ -310,23 +331,35 @@ func update_occupancy() -> void:
 
 # --- Bahnhofshalt -------------------------------------------------------------------
 
+## Halt am Bahnsteig. Ablauf: entriegeln → Trittstufe fährt aus → Türen öffnen →
+## ein-/aussteigen → Türen schließen → Trittstufe fährt ein → sanft anfahren.
 func _arrive() -> void:
 	state = State.DWELLING
-	dwell_phase = Dwell.OPENING
+	dwell_phase = Dwell.UNLOCKING
 	_phase_time = 0.0
 	stop_at = -1.0
 	speed = 0.0
 	arrived_at = WorldClock.time_of_day
 	_door_side = _platform_side()
-	for car in cars:
-		if car.has_doors():
-			car.play_door_sound(true)
+	_play_on_door_cars("door_unlock")
 	arrived.emit(self)
 
 
 func _update_dwell(dt: float) -> void:
 	_phase_time += dt
 	match dwell_phase:
+		Dwell.UNLOCKING:
+			if _phase_time >= UNLOCK_TIME:
+				_next_dwell_phase(Dwell.STEP_OUT)
+				_play_on_door_cars("stairs_out")
+		Dwell.STEP_OUT:
+			_set_steps(_phase_time / STEP_TIME)
+			if _phase_time >= STEP_TIME:
+				_set_steps(1.0)
+				_next_dwell_phase(Dwell.OPENING)
+				for car in cars:
+					if car.has_doors():
+						car.play_door_sound(true)
 		Dwell.OPENING:
 			_set_doors(_phase_time / DOOR_TIME)
 			if _phase_time >= DOOR_TIME:
@@ -335,8 +368,7 @@ func _update_dwell(dt: float) -> void:
 		Dwell.WAITING:
 			_waited += dt
 			if _waited >= train_type.min_dwell_seconds and _departure_due() and not _doors_held(dt):
-				dwell_phase = Dwell.CLOSING
-				_phase_time = 0.0
+				_next_dwell_phase(Dwell.CLOSING)
 				for car in cars:
 					if car.has_doors():
 						car.play_door_sound(false)
@@ -344,11 +376,36 @@ func _update_dwell(dt: float) -> void:
 			_set_doors(1.0 - _phase_time / DOOR_TIME)
 			if _phase_time >= DOOR_TIME:
 				_set_doors(0.0)
+				_next_dwell_phase(Dwell.STEP_IN)
+				_play_on_door_cars("stairs_in")
+		Dwell.STEP_IN:
+			_set_steps(1.0 - _phase_time / STEP_TIME)
+			if _phase_time >= STEP_TIME:
+				_set_steps(0.0)
 				state = State.RUNNING
 				departed_at = WorldClock.time_of_day
 				_horn_pending = true
 				_brake_played = false
+				_drive_time = 0.0
+				_squeal_played = false
 				departed.emit(self)
+
+
+func _next_dwell_phase(phase: Dwell) -> void:
+	dwell_phase = phase
+	_phase_time = 0.0
+
+
+func _set_steps(amount: float) -> void:
+	for car in cars:
+		if car.has_doors():
+			car.set_steps(amount, _door_side)
+
+
+func _play_on_door_cars(sound_name: String) -> void:
+	for car in cars:
+		if car.has_doors():
+			car.play_mechanism_sound(sound_name)
 
 
 ## Sind die Türen zum Bahnsteig so weit offen, dass man ein- und aussteigen kann?
@@ -368,6 +425,30 @@ func get_door_points() -> Array[Vector3]:
 	return points
 
 
+## Wege durch alle Türen auf der Bahnsteigseite über die Trittstufen (siehe
+## [method TrainCar.get_boarding_paths]); dazu "along" = Richtung entlang des Zuges.
+func get_door_paths() -> Array[Dictionary]:
+	var paths: Array[Dictionary] = []
+	if state != State.DWELLING:
+		return paths
+	for car in cars:
+		if not car.has_doors():
+			continue
+		var along := RailGeometry.flat(car.global_basis.z).normalized()
+		for door in car.get_boarding_paths(_door_side):
+			door["along"] = along
+			paths.append(door)
+	return paths
+
+
+## Wie weit die Trittstufen ausgefahren sind (0..1, erster Wagen mit Türen).
+func get_step_amount() -> float:
+	for car in cars:
+		if car.has_doors():
+			return car.get_step_amount()
+	return 0.0
+
+
 ## Richtung vom Gleis zum Bahnsteig (Draufsicht), oder ZERO ohne Bahnsteig.
 func get_platform_direction() -> Vector3:
 	return platform_stop.get_platform_direction() if platform_stop else Vector3.ZERO
@@ -385,6 +466,11 @@ func release_doors(passenger_id: int) -> void:
 
 func is_held() -> bool:
 	return not _door_holds.is_empty()
+
+
+## Wie lange Fahrgäste die Türen schon über die Abfahrtszeit hinaus aufhalten (Simulationssekunden).
+func get_hold_time() -> float:
+	return _hold_time
 
 
 func _doors_held(dt: float) -> bool:
@@ -420,7 +506,7 @@ func _update_sounds(target: float) -> void:
 	var level := clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0)
 	if speed > 0.3:
 		if not _rolling.playing:
-			_rolling.play()
+			SoundLibrary.play(_rolling)
 		_rolling.volume_db = -20.0 + level * 12.0
 		_rolling.pitch_scale = 0.75 + level * 0.45
 	elif _rolling.playing:
@@ -431,6 +517,10 @@ func _update_sounds(target: float) -> void:
 	if not _brake_played and speed > 2.0 and speed < 9.0 and target < speed - 0.3 and _stop_point - head < 35.0:
 		_brake_played = true
 		_play_voice("brake", -12.0, randf_range(0.95, 1.05))
+	# Ganz zum Schluss ein leises, kurzes Quietschen der Bremsen
+	if not _squeal_played and speed > 0.15 and speed < 1.3 and target < speed and _stop_point - head < 4.0:
+		_squeal_played = true
+		_play_voice("brake_squeal", -19.0, randf_range(0.96, 1.05))
 
 
 func _play_voice(sound_name: String, volume: float, pitch: float) -> void:
@@ -439,7 +529,7 @@ func _play_voice(sound_name: String, volume: float, pitch: float) -> void:
 	_voice.stream = SoundLibrary.get_sound(sound_name)
 	_voice.volume_db = volume
 	_voice.pitch_scale = pitch
-	_voice.play()
+	SoundLibrary.play(_voice)
 
 
 func _make_player(parent: Node3D, stream: AudioStream, volume: float, distance: float) -> AudioStreamPlayer3D:
@@ -449,4 +539,5 @@ func _make_player(parent: Node3D, stream: AudioStream, volume: float, distance: 
 	player.max_distance = distance
 	player.unit_size = 8.0
 	parent.add_child(player)
+	SoundLibrary.stop_on_exit(player)
 	return player

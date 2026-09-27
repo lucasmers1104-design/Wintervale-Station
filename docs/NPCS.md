@@ -62,19 +62,45 @@ Zwischen den Aufgaben wählt ein Bewohner – gewichtet nach seinen Vorlieben �
 
 | Beschäftigung | Platz (`StationSpot.Kind`) | Haltung |
 |---|---|---|
-| Sitzen (25–60 s) | SEAT (von jeder Bank automatisch 2) | Sitzen, Beinchen baumeln |
-| Stehen / auf den Zug warten (14–35 s) | STAND, Blick zum Gleis | Stehen, ab und zu Blick auf die Armbanduhr |
+| Sitzen (25–60 s) | SEAT (jede Bank 2, jede Sitzgruppe 4) | umdrehen, vorbeugen, hinsetzen; Beinchen baumeln |
+| Stehen / auf den Zug warten (14–35 s) | STAND, Blick zum Gleis | locker oder Hände hinter dem Rücken |
 | Uhr ansehen (4–7 s) | CLOCK | Kopf hebt sich zur Uhr |
 | Tafel/Aushang lesen (6–10 s) | BOARD | Kopf leicht angehoben |
+| Zusammenstehen (25–45 s) | CHAT, paarweise gegenüber | begrüßen, nicken, mit der Hand erzählen |
 | Spazieren | – | langsames Gehen zu einem Bahnsteigpunkt |
 
-Fährt ein Zug ein, winken freistehende Bewohner manchmal. Jeder Platz kann nur von einem belegt werden.
+**Kleine Leerlauf-Gesten** (alle 4–9 s zufällig, nie gleichzeitig): auf die Armbanduhr
+schauen, Hände wärmen (abends häufiger), sich strecken, Hände hinter den Rücken nehmen
+oder wieder lösen, sich ein wenig umdrehen und umsehen. Sitzend ab und zu ein Blick auf die Uhr.
 
-**Ein- und Aussteigen:** Hält ein passender Zug mit offenen Türen, geht der Bewohner zur
-nächsten Tür (Türen werden gleichmäßig verteilt), hüpft hinein und blendet aus.
-Aussteiger erscheinen in der Tür und hüpfen auf den Bahnsteig. Solange jemand ein- oder
-aussteigt, hält er die Tür auf – höchstens 5 Simulationssekunden (≈ 2,5 Spielminuten) über
-die Abfahrtszeit hinaus, damit der Fahrplan stabil bleibt.
+**Begrüßen:** Begegnen sich zwei Bewohner (unter 3 m), nicken oder winken sie einander
+kurz zu – höchstens einmal pro Spielstunde je Paar. Fährt ein Zug ein, winken
+freistehende Bewohner manchmal.
+
+**Gepäck:** Reisende tragen meist einen Koffer, Rucksack oder eine Einkaufstasche
+(Bewohner laut Steckbrief, `carry`). Beim Sitzen steht der Koffer neben ihnen auf der
+Bank, bei Gesten mit der Kofferhand wird er kurz abgestellt.
+
+## Passagier-System (Ein- und Aussteigen)
+
+Der `NpcDirector` führt für jede Tür eines haltenden Zuges eine Warteschlange:
+
+1. **Vorher:** Kündigt sich der eigene Zug an (letzte ~300 m), stellt man sich an die
+   Bahnsteigkante des richtigen Gleises, nahe der Zugmitte.
+2. **Türen offen:** Wer einsteigen will, wählt die nächste Tür mit der kürzesten
+   Schlange und stellt sich **links und rechts neben die Tür** – die Mitte bleibt für
+   Aussteigende frei.
+3. **Erst aussteigen:** Solange an einer Tür noch jemand aussteigen will, wartet die
+   Schlange. Aussteigende kommen **einzeln** aus der Tür und gehen die Trittstufe hinunter.
+4. **Verteilen:** Nach dem Aussteigen geht jeder ein paar Schritte in eine zufällige
+   Richtung auf dem Bahnsteig, schaut sich kurz um (strecken, Uhr, umsehen) und geht
+   dann ins Dorf bzw. nach Hause.
+5. **Dann einsteigen:** Der Erste der Schlange geht die Trittstufe hinauf in den Zug,
+   die anderen rücken nach. Immer nur eine Person pro Tür auf den Stufen – niemand
+   läuft durch den Zug oder durch andere hindurch.
+6. **Türen aufhalten:** Solange sich an einer Tür etwas tut, hält der Director die Türen
+   offen – höchstens 8 Simulationssekunden (≈ 4 Spielminuten) über die Abfahrtszeit
+   hinaus. Wer dann noch wartet, nimmt den nächsten Zug.
 
 **Rücksicht:** Steht die Spielfigur im Weg, wartet ein Bewohner kurz und geht dann
 seitlich vorbei – nur auf eine Seite mit gleich hohem Boden, also nie über die Bahnsteigkante.
@@ -121,7 +147,11 @@ Fertig – beim nächsten Start lädt der `NpcDirector` den Steckbrief automatis
 - Weiche, glatt schattierte Formen mit leichtem Randlicht (Spielzeug-/Vinyl-Look).
 - **Outfit:** `outfit = WINTER` (Mütze, Schal, Fäustlinge) oder `SUMMER` (ohne, Pulli und
   Mantel werden zum T-Shirt). Grundlage für das spätere Jahreszeiten-System.
-- **Haltungen:** `set_pose(Pose.SIT | LOOK_UP | CHECK_WATCH | WAVE | STAND)` blendet in ~0,3 s über.
+- **Fortbewegung:** `move(tempo, delta, sprint, beschleunigung, drehrate)` – die Figur
+  animiert sich aus der echten Bewegung (siehe „Animationen“ unten).
+- **Haltungen:** `set_pose(...)` blendet weich in eine Grundhaltung (Sitzen in ~0,6 s, sonst ~0,35 s),
+  `play_gesture(pose, dauer)` spielt eine kurze Geste und kehrt dann zurück.
+- **Gepäck:** `carry = SUITCASE | BACKPACK | SHOPPING_BAG`.
 - **Schritte:** das Signal `footstep` löst über `FootstepPlayer` ein Knirschen (Schnee)
   oder Klopfen (Bahnsteig, Holz) aus.
 - Materialien werden zwischen allen Figuren geteilt (Cache).
@@ -129,19 +159,49 @@ Fertig – beim nächsten Start lädt der `NpcDirector` den Steckbrief automatis
 ## Dateien
 
 ```
-scripts/characters/character_model.gd     Figur: Aufbau, Laufen, Atmen, Haltungen, Schritte, Ausblenden
+scripts/characters/character_model.gd     Figur: Aufbau, Gang, Gesten, Blinzeln, Gepäck, Schritte, Ausblenden
 scripts/characters/character_appearance.gd Aussehen (Resource): Oberteil, Frisur, Mütze, Winter, Statur
 scripts/characters/footstep_player.gd     Schrittgeräusche je nach Untergrund
 scripts/npc/npc_profile.gd                Steckbrief (Resource)
 scripts/npc/npc_routine.gd                Routine im Tagesablauf (Resource)
 scripts/npc/npc.gd                        Bewohner/Reisender: Verhalten und Bewegung
-scripts/npc/npc_director.gd               Regie: Laden, Reisende, Züge, Plätze, Boden
+scripts/npc/npc_director.gd               Regie: Reisende, Türwarteschlangen, Begrüßen, Plätze, Boden
 scripts/npc/walk_graph.gd                 Fußwegenetz (A*), rodet Bäume auf Wegen
-scripts/npc/station_spot.gd               Platz am Bahnsteig (reservierbar)
+scripts/npc/station_spot.gd               Platz am Bahnsteig (reservierbar), auch Gesprächspaare
 scripts/npc/npc_home.gd                   Wohnhaus-Platzhalter
-scripts/props/station_prop.gd             Bank, Mülleimer, Blumenkasten, Wegweiser, Aushang, Übergang
+scripts/props/station_prop.gd             Bank, Mülleimer, Blumenkasten, Wegweiser, Aushang, Übergang,
+                                          Gepäck, Fahrrad, Schneebank, Sitzgruppe
+scripts/audio/ambient_soundscape.gd       Wind, Bahnsteig-Gemurmel, ferne Vögel
 scripts/procgen/station_prop_meshes.gd    Meshes dieser Details
 assets/characters/*.tres                  Aussehen: Spieler + 6 Bewohner
 assets/npcs/*.tres                        Steckbriefe der 6 Bewohner
-tests/npc_test.*                          72 Prüfungen (Figuren, Wege, Tagesablauf, Ein-/Aussteigen, Kameras)
+tests/npc_test.*                          98 Prüfungen (Figuren, Animationen, Wege, Tagesablauf, Halt mit
+                                          Trittstufe, Warteschlangen, Klänge, Kameras)
 ```
+
+## Animationen (Etappe 5)
+
+Alle Animationen sind prozedural und werden weich überblendet – nichts springt.
+
+| Bewegung | Was passiert |
+|---|---|
+| Idle | Atmen, langsame Gewichtsverlagerung, Umschauen, Blinzeln (alle 2–5 s) |
+| Laufen | Schrittfrequenz wächst mit dem Tempo (kurze Beinchen trippeln), Knie heben sich leicht, Hüfte dreht mit, Kopf bleibt ruhig |
+| Sprinten | Vorlage des Oberkörpers, angewinkelte, kräftig pumpende Arme, mehr Wippen |
+| Beschleunigen | leichtes Vorlehnen in den ersten Schritten |
+| Abbremsen / Stoppen | kurzes Zurücklehnen, Schritte federn aus |
+| Drehen | in Kurven legt sich die Figur hinein; auf der Stelle kleine Trippelschritte |
+| Hinsetzen | zur Bank umdrehen, vorbeugen, Hände auf die Knie, rückwärts sinken |
+| Aufstehen | vorbeugen, abstützen, nach vorne hochkommen |
+| Umsehen | Kopf wandert, manchmal dreht sich die ganze Figur ein Stück |
+| Uhr anschauen | Arm hoch, Blick aufs Handgelenk |
+| Hände hinter dem Rücken | ruhige Wartehaltung (gemächliche Bewohner bevorzugen sie) |
+| Dehnen | Arme über den Kopf, leicht ins Hohlkreuz, auf die Zehen |
+| Hände wärmen | Hände vor der Brust aneinander reiben |
+| Begrüßen | Nicken (nah) oder Winken (weiter weg) |
+| Erzählen | eine Hand bewegt sich locker vor dem Körper, Kopf nickt mit |
+| Trittstufen | Schritt für Schritt hinauf/hinunter, Höhe wird früh im Schritt gewonnen |
+
+Jeder Bewohner geht etwas anders: `gait_energy` (aus Gehtempo und Zufall) macht den Gang
+gemütlicher oder munterer. Die Spielfigur macht nach einer Weile Stillstehen gelegentlich
+selbst eine kleine Geste (Hände wärmen, Uhr, strecken).

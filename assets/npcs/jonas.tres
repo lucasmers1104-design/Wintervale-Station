@@ -25,6 +25,7 @@ display_name = "Jonas Kellner"
 appearance = ExtResource("3_look")
 home_name = "Kellner"
 walk_speed = 1.3
+carry = 2
 routines = Array[ExtResource("2_routine")]([SubResource("Routine_1"), SubResource("Routine_2")])
 likes_sitting = 0.2
 likes_standing = 0.8

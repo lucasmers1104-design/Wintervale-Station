@@ -25,6 +25,7 @@ display_name = "Lotte Winter"
 appearance = ExtResource("3_look")
 home_name = "Winter"
 walk_speed = 1.15
+carry = 1
 routines = Array[ExtResource("2_routine")]([SubResource("Routine_1"), SubResource("Routine_2")])
 likes_sitting = 0.3
 likes_standing = 0.3

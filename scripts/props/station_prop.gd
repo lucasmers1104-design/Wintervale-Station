@@ -7,7 +7,7 @@
 class_name StationProp
 extends StaticBody3D
 
-enum Kind { BENCH, BIN, FLOWER_BOX, SIGNPOST, TIMETABLE, CROSSING }
+enum Kind { BENCH, BIN, FLOWER_BOX, SIGNPOST, TIMETABLE, CROSSING, LUGGAGE, BICYCLE, SNOW_BANK, SEATING_GROUP }
 
 ## Diese Details richten sich nach dem Gleisbau auf die Gleishöhe aus (siehe main.gd).
 const RAIL_ALIGNED_GROUP := &"rail_aligned"
@@ -19,7 +19,7 @@ const RAIL_ALIGNED_GROUP := &"rail_aligned"
 			rebuild()
 @export var material: Material
 @export var variation_seed := 1
-## Blumenkasten: Länge in Metern.
+## Blumenkasten und Schneebank: Länge in Metern.
 @export var box_length := 1.2
 ## Wegweiser: je Schild "Text|Winkel in Grad" (0° = Pfeil nach +X, 90° = nach -Z).
 @export var arrows: PackedStringArray = ["Wintervale|0"]
@@ -35,6 +35,7 @@ func _ready() -> void:
 	collision_mask = 0
 	if kind == Kind.CROSSING:
 		add_to_group(RAIL_ALIGNED_GROUP)
+	add_to_group(PropScatter.GROUP_CLEARING)
 	rebuild()
 
 
@@ -91,6 +92,26 @@ func rebuild() -> void:
 			var poster := StationPropMeshes.add_timetable_case(st)
 			_add_poster_text(poster)
 			_add_box_collision(Vector3(1.1, 1.9, 0.2), Vector3(0.0, 0.95, 0.0))
+		Kind.LUGGAGE:
+			StationPropMeshes.add_luggage(st, rng)
+			_add_box_collision(Vector3(1.1, 0.45, 0.7), Vector3(0.0, 0.22, 0.1))
+		Kind.BICYCLE:
+			StationPropMeshes.add_bicycle(st, rng)
+			_add_box_collision(Vector3(1.6, 1.0, 0.4), Vector3(0.0, 0.5, 0.0))
+		Kind.SNOW_BANK:
+			StationPropMeshes.add_snow_bank(st, rng, box_length)
+		Kind.SEATING_GROUP:
+			var seats := StationPropMeshes.add_seating_group(st, rng)
+			for side: float in [-1.0, 1.0]:
+				_add_box_collision(Vector3(1.7, 0.9, 0.5), Vector3(0.0, 0.45, side * 0.98))
+			_add_box_collision(Vector3(0.6, 0.65, 0.6), Vector3(0.0, 0.33, 0.0))
+			for i in seats.size():
+				var seat := StationSpot.new()
+				seat.name = "Seat%d" % i
+				seat.kind = StationSpot.Kind.SEAT
+				seat.station_name = station_name
+				seat.transform = seats[i]
+				_add_generated(seat)
 		Kind.CROSSING:
 			StationPropMeshes.add_crossing(st, rng)
 			var top := RailConfig.RAIL_BASE + RailConfig.RAIL_HEIGHT
@@ -101,6 +122,10 @@ func rebuild() -> void:
 	var mesh_instance := MeshInstance3D.new()
 	mesh_instance.mesh = st.commit()
 	mesh_instance.material_override = material
+	# Kleine Details aus großer Entfernung nicht mehr zeichnen (Leistung)
+	if kind in [Kind.LUGGAGE, Kind.BICYCLE, Kind.FLOWER_BOX, Kind.BIN, Kind.SNOW_BANK]:
+		mesh_instance.visibility_range_end = 110.0
+		mesh_instance.visibility_range_end_margin = 10.0
 	_add_generated(mesh_instance)
 
 
@@ -178,3 +203,10 @@ func _add_box_collision(size: Vector3, center: Vector3, basis := Basis.IDENTITY)
 func _add_generated(node: Node) -> void:
 	node.set_meta(&"generated", true)
 	add_child(node)
+
+
+## Keine Bäume in und direkt um das Detail (Bahnsteig-Details sind ohnehin gerodet).
+func clears(x: float, z: float) -> bool:
+	var radius := {Kind.SEATING_GROUP: 2.4, Kind.BICYCLE: 1.4, Kind.SNOW_BANK: box_length * 0.5 + 0.4,
+		Kind.LUGGAGE: 0.9, Kind.SIGNPOST: 1.0, Kind.FLOWER_BOX: 1.0}.get(kind, 0.8) as float
+	return Vector2(x, z).distance_to(Vector2(global_position.x, global_position.z)) < radius

@@ -29,9 +29,9 @@ TrainCar (je Fahrzeug)
 2. **Fahrt:** Der Zug beschleunigt sanft (0,45 m/s²), fährt Kurven langsamer (v = √(0,9 · Radius)) und schaut 240 m voraus.
 3. **Einfahrsignal:** Rechtzeitig fordert er beim Stellwerk den Fahrweg bis zum Bahnsteig an. Das Stellwerk stellt die Weiche und reserviert Einfahrt und Bahnsteiggleis. Der Bahnhofsgong ertönt.
    Ist Gleis 1 belegt, fährt der Zug automatisch auf Gleis 2 (die Anzeigetafel zeigt das neue Gleis).
-4. **Halt:** Der Zug bremst weich und bleibt mittig am Bahnsteig stehen. Die Türen auf der Bahnsteigseite öffnen sich.
+4. **Halt:** Der Zug bremst weich, rollt auf den letzten 10 m nur noch mit 30 % der Bremskraft aus (ganz zum Schluss ein leises Quietschen) und steht mittig am Bahnsteig. Dann: Türen entriegeln (leises Zischen) → die Trittstufe fährt unter jeder Tür heraus und klappt ihre untere Stufe herunter (Surren, Klacken) → die Türen öffnen sich (gedämpft) → erst aussteigen, dann einsteigen.
 5. **Aufenthalt:** Mindestens 10 Sekunden, und nie vor der planmäßigen Abfahrt.
-6. **Abfahrt:** Türen schließen (Warnton), das Ausfahrsignal wird angefordert, ein sanftes Horn, dann Anfahrt.
+6. **Abfahrt:** Türen schließen (Warnton), die Trittstufe klappt ein und fährt zurück, das Ausfahrsignal wird angefordert, ein sanftes Horn, dann Anfahrt – die Zugkraft setzt über ~4 s weich ein.
 7. **Ende:** Sobald der Zug vollständig im Südtal-Tunnel ist, verschwindet er.
 
 ## Sicherheit (automatisch getestet)
@@ -106,6 +106,12 @@ assets/materials/train_*.tres       Lack (glänzend) und Glas (spiegelnd, nachts
 tests/train_test.*                  105 Prüfungen inkl. Sicherheitsüberwachung jedes Frames
 ```
 
-## Fahrgäste (ab Etappe 4)
+## Fahrgäste und Trittstufen (ab Etappe 4/5)
 
-Bewohner und Reisende steigen an offenen Türen ein und aus (siehe [NPCS.md](NPCS.md)). Dafür bietet `Train` `doors_open()`, `get_door_points()` und `hold_doors()`/`release_doors()`: Solange jemand ein- oder aussteigt, bleiben die Türen offen – höchstens `MAX_DOOR_HOLD` = 5 Simulationssekunden (≈ 2,5 Spielminuten) über die Abfahrtszeit hinaus.
+Bewohner und Reisende steigen über die Trittstufen ein und aus (siehe [NPCS.md](NPCS.md), Passagier-System). Dafür bietet `Train`:
+
+- `dwell_phase`: `UNLOCKING → STEP_OUT → OPENING → WAITING → CLOSING → STEP_IN` (Dauern: `UNLOCK_TIME` 0,6 s, `STEP_TIME` 1,2 s, `DOOR_TIME` 1,8 s)
+- `doors_open()`, `get_door_paths()` (Weg je Tür: innen → Tür → obere Stufe → untere Stufe → Bahnsteig), `get_step_amount()`
+- `hold_doors()`/`release_doors()`: Solange sich an einer Tür etwas tut, bleiben die Türen offen – höchstens `MAX_DOOR_HOLD` = 8 Simulationssekunden (≈ 4 Spielminuten) über die Abfahrtszeit hinaus.
+
+Die Trittstufe (`TrainMeshes.create_step_upper/lower`, animiert in `TrainCar.set_steps`) besteht aus einer oberen Stufe mit Führungsschiene und einer über ein Scharnier klappbaren unteren Stufe, beide mit Riffelblech und gelber Sicherheitskante. Beim Ausfahren gleitet die Einheit erst heraus (55 %), dann klappt die untere Stufe herunter.

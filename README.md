@@ -3,7 +3,7 @@
 Ein gemütliches Low-Poly Eisenbahn- und Dorfbau-Spiel im Winter.
 Engine: **Godot 4.7** (GDScript, Renderer Forward+).
 
-Aktueller Stand: **Etappe 4 – Cozy Characters & Living Station**: Bewohner gehen nach ihrem Tagesablauf zum Bahnhof, sitzen, warten, steigen in die Züge ein und aus; Reisende kommen aus dem Dorf. Züge fahren nach Fahrplan zwischen Nordtal und Südtal.
+Aktueller Stand: **Etappe 5 – Living Passengers & Animation Polish**: Züge rollen sanft aus, fahren eine Trittstufe aus, Fahrgäste stellen sich an den Türen an und steigen nacheinander aus und ein; weiche, lebendige Animationen und eine dezente Klangkulisse aus Wind, Vögeln und Bahnsteig-Gemurmel.
 Das Spiel startet in der Vogelperspektive über dem Bahnhof. Unten rechts zeigt eine Legende immer die passenden Tasten.
 
 ## Starten

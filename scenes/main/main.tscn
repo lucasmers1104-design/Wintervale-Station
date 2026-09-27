@@ -44,6 +44,7 @@
 [ext_resource type="Script" path="res://scripts/npc/walk_graph.gd" id="42_graph"]
 [ext_resource type="Script" path="res://scripts/npc/npc_home.gd" id="43_home"]
 [ext_resource type="Script" path="res://scripts/npc/npc_director.gd" id="44_director"]
+[ext_resource type="Script" path="res://scripts/audio/ambient_soundscape.gd" id="45_ambient"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("2_sky")
@@ -546,6 +547,111 @@ position = Vector3(-1.1, 0, -27)
 [node name="BahnsteigO8" type="Marker3D" parent="World/WalkGraph"]
 position = Vector3(1.2, 0, -27)
 
+
+[node name="LuggagePlatform" type="StaticBody3D" parent="World/TestArea"]
+position = Vector3(0, 0.55, -27.25)
+rotation = Vector3(0, 1.5708, 0)
+script = ExtResource("40_prop")
+kind = 6
+material = ExtResource("5_nature")
+variation_seed = 41
+
+[node name="LuggageForecourt" type="StaticBody3D" parent="World/TestArea"]
+position = Vector3(-14.6, 0, 21.0)
+rotation = Vector3(0, 0.4, 0)
+script = ExtResource("40_prop")
+kind = 6
+material = ExtResource("5_nature")
+variation_seed = 42
+
+[node name="Bicycle" type="StaticBody3D" parent="World/TestArea"]
+position = Vector3(-12.4, 0, 23.9)
+rotation = Vector3(0, 0.15, 0)
+script = ExtResource("40_prop")
+kind = 7
+material = ExtResource("5_nature")
+variation_seed = 43
+
+[node name="SnowBankForecourt" type="StaticBody3D" parent="World/TestArea"]
+position = Vector3(-15.6, 0, 17.6)
+rotation = Vector3(0, 1.35, 0)
+script = ExtResource("40_prop")
+kind = 8
+material = ExtResource("5_nature")
+variation_seed = 44
+box_length = 3.2
+
+[node name="SnowBankStreetA" type="StaticBody3D" parent="World/TestArea"]
+position = Vector3(-22.5, 0, 9.4)
+rotation = Vector3(0, 0.05, 0)
+script = ExtResource("40_prop")
+kind = 8
+material = ExtResource("5_nature")
+variation_seed = 45
+box_length = 4.0
+
+[node name="SnowBankStreetB" type="StaticBody3D" parent="World/TestArea"]
+position = Vector3(-33.5, 0, 14.6)
+rotation = Vector3(0, -0.1, 0)
+script = ExtResource("40_prop")
+kind = 8
+material = ExtResource("5_nature")
+variation_seed = 46
+box_length = 3.4
+
+[node name="SnowBankCrossing" type="StaticBody3D" parent="World/TestArea"]
+position = Vector3(-6.2, 0, 21.2)
+rotation = Vector3(0, 0.3, 0)
+script = ExtResource("40_prop")
+kind = 8
+material = ExtResource("5_nature")
+variation_seed = 47
+box_length = 2.4
+
+[node name="SeatingForecourt" type="StaticBody3D" parent="World/TestArea"]
+position = Vector3(-12.8, 0, 21.4)
+rotation = Vector3(0, 0.2, 0)
+script = ExtResource("40_prop")
+kind = 9
+material = ExtResource("5_nature")
+variation_seed = 48
+
+[node name="SeatingVillage" type="StaticBody3D" parent="World/TestArea"]
+position = Vector3(-27.5, 0, 17.2)
+rotation = Vector3(0, 1.4, 0)
+script = ExtResource("40_prop")
+kind = 9
+material = ExtResource("5_nature")
+variation_seed = 49
+
+[node name="ChatA1" type="Marker3D" parent="World/TestArea" node_paths=PackedStringArray("partner")]
+position = Vector3(-12.2, 0, 18.2)
+rotation = Vector3(0, -2.18, 0)
+script = ExtResource("41_spot")
+kind = 4
+partner = NodePath("../ChatA2")
+
+[node name="ChatA2" type="Marker3D" parent="World/TestArea" node_paths=PackedStringArray("partner")]
+position = Vector3(-11.2, 0, 18.9)
+rotation = Vector3(0, 0.96, 0)
+script = ExtResource("41_spot")
+kind = 4
+partner = NodePath("../ChatA1")
+
+[node name="ChatC1" type="Marker3D" parent="World/TestArea" node_paths=PackedStringArray("partner")]
+position = Vector3(-20.5, 0, 15.0)
+rotation = Vector3(0, -2.356, 0)
+script = ExtResource("41_spot")
+kind = 4
+partner = NodePath("../ChatC2")
+
+[node name="ChatC2" type="Marker3D" parent="World/TestArea" node_paths=PackedStringArray("partner")]
+position = Vector3(-19.7, 0, 15.8)
+rotation = Vector3(0, 0.785, 0)
+script = ExtResource("41_spot")
+kind = 4
+partner = NodePath("../ChatC1")
+
 [node name="Snowfall" type="GPUParticles3D" parent="."]
 script = ExtResource("39_snow")
 
@@ -610,3 +716,8 @@ dispatcher = NodePath("../World/Railway/TrainDispatcher")
 walk_graph = NodePath("../World/WalkGraph")
 terrain = NodePath("../World/Terrain")
 player = NodePath("../Player")
+
+[node name="AmbientSoundscape" type="Node3D" parent="." node_paths=PackedStringArray("npc_director", "snowfall")]
+script = ExtResource("45_ambient")
+npc_director = NodePath("../NpcDirector")
+snowfall = NodePath("../Snowfall")

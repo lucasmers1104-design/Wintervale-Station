@@ -28,6 +28,7 @@ func _ready() -> void:
 	_chime.unit_size = 10.0
 	_chime.position = Vector3(0.0, board_height, 0.0)
 	add_child(_chime)
+	SoundLibrary.stop_on_exit(_chime)
 	WorldClock.minute_changed.connect(func(_h: int, _m: int) -> void: refresh())
 	if dispatcher:
 		dispatcher.trains_changed.connect(refresh)
@@ -68,7 +69,7 @@ func get_row_texts() -> Array[String]:
 ## Gong – ein Zug fährt gleich ein.
 func announce(_train: Node) -> void:
 	if WorldClock.time_scale <= 2.0:
-		_chime.play()
+		SoundLibrary.play(_chime)
 
 
 func _build() -> void:

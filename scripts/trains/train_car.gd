@@ -28,6 +28,8 @@ var _door_player: AudioStreamPlayer3D
 var _pick_area: Area3D
 var _wheel_angle := 0.0
 var _door_amount := 0.0
+var _steps: Array[Dictionary] = []
+var _step_amount := 0.0
 
 
 ## Baut das Fahrzeug. [param materials]: {"paint", "glass", "lamp_white", "lamp_red", "snow"}.
@@ -51,6 +53,7 @@ func build(p_kind: String, train_type: TrainType, is_first: bool, is_last: bool,
 			leaf.rotation.y = PI
 		add_child(leaf)
 		_doors.append({"node": leaf, "closed": door["position"], "open_offset": door["open_offset"], "side": door["side"]})
+	_build_steps(materials["paint"])
 
 	var bogie_mesh := TrainMeshes.create_bogie(parts["wheel_base"])
 	var wheel_mesh := TrainMeshes.create_wheelset()
@@ -142,6 +145,35 @@ func set_doors(amount: float, side: float) -> void:
 ## Mitten der Türöffnungen auf Seite [param side] (±1) in Weltkoordinaten,
 ## auf Höhe des Wagenbodens. Zwei Türflügel bilden eine Öffnung.
 func get_door_centers(side: float) -> Array[Vector3]:
+	var result: Array[Vector3] = []
+	for opening in _door_openings(side):
+		result.append(global_transform * opening)
+	return result
+
+
+## Weg durch eine Tür über die Trittstufe (Weltkoordinaten), von innen nach außen:
+## {"inside", "door", "upper", "lower", "platform"} – "platform" liegt auf Stufenhöhe über
+## der Bahnsteigkante; die Bodenhöhe dort bestimmt der Fahrgast selbst.
+func get_boarding_paths(side: float) -> Array[Dictionary]:
+	var paths: Array[Dictionary] = []
+	var floor_y := TrainMeshes.FLOOR_HEIGHT
+	var hinge_x := TrainMeshes.STEP_EXTENDED_X + TrainMeshes.STEP_DEPTH * 0.5
+	var lower_x := hinge_x + TrainMeshes.STEP_LOWER_OFFSET.x
+	var lower_y := TrainMeshes.STEP_UPPER_Y - 0.02 + TrainMeshes.STEP_LOWER_OFFSET.y
+	for opening in _door_openings(side):
+		var z := opening.z
+		paths.append({
+			"inside": global_transform * Vector3(side * 0.85, floor_y, z),
+			"door": global_transform * Vector3(side * 1.3, floor_y, z),
+			"upper": global_transform * Vector3(side * TrainMeshes.STEP_EXTENDED_X, TrainMeshes.STEP_UPPER_Y, z),
+			"lower": global_transform * Vector3(side * lower_x, lower_y, z),
+			"platform": global_transform * Vector3(side * (lower_x + 0.5), lower_y, z),
+		})
+	return paths
+
+
+## Türöffnungen (lokal): zwei Türflügel bilden eine Öffnung.
+func _door_openings(side: float) -> Array[Vector3]:
 	var openings: Array[Vector3] = []
 	for door in _doors:
 		if float(door["side"]) != side:
@@ -154,10 +186,25 @@ func get_door_centers(side: float) -> Array[Vector3]:
 				merged = true
 		if not merged:
 			openings.append(Vector3(closed.x, TrainMeshes.FLOOR_HEIGHT, closed.z))
-	var result: Array[Vector3] = []
-	for opening in openings:
-		result.append(global_transform * opening)
-	return result
+	return openings
+
+
+## Trittstufen auf Seite [param side] ausfahren: 0 = eingefahren, 1 = ausgefahren.
+## Erst gleitet die Stufe heraus, dann klappt die untere Stufe herunter.
+func set_steps(amount: float, side: float) -> void:
+	_step_amount = clampf(amount, 0.0, 1.0)
+	var slide := smoothstep(0.0, 1.0, clampf(_step_amount / 0.55, 0.0, 1.0))
+	var unfold := smoothstep(0.0, 1.0, clampf((_step_amount - 0.55) / 0.45, 0.0, 1.0))
+	for step in _steps:
+		var active := 1.0 if float(step["side"]) == side else 0.0
+		var unit: Node3D = step["unit"]
+		var hinge: Node3D = step["hinge"]
+		unit.position.x = float(step["side"]) * lerpf(TrainMeshes.STEP_RETRACTED_X, TrainMeshes.STEP_EXTENDED_X, slide * active)
+		hinge.rotation.z = -TrainMeshes.STEP_FOLD_ANGLE * (1.0 - unfold * active)
+
+
+func get_step_amount() -> float:
+	return _step_amount
 
 
 func has_doors() -> bool:
@@ -187,14 +234,22 @@ func play_clack(intensity: float) -> void:
 	if _clack_player and intensity > 0.05:
 		_clack_player.pitch_scale = randf_range(0.9, 1.1)
 		_clack_player.volume_db = -8.0 + linear_to_db(clampf(intensity, 0.05, 1.0))
-		_clack_player.play()
+		SoundLibrary.play(_clack_player)
 
 
 func play_door_sound(opening: bool) -> void:
 	if _door_player:
 		_door_player.stream = SoundLibrary.get_sound("door_open" if opening else "door_close")
 		_door_player.pitch_scale = randf_range(0.96, 1.04)
-		_door_player.play()
+		SoundLibrary.play(_door_player)
+
+
+## Leises Entriegeln der Türen bzw. Surren der Trittstufe.
+func play_mechanism_sound(sound_name: String) -> void:
+	if _door_player:
+		_door_player.stream = SoundLibrary.get_sound(sound_name)
+		_door_player.pitch_scale = randf_range(0.97, 1.03)
+		SoundLibrary.play(_door_player)
 
 
 func _add_mesh(mesh: Mesh, material: Material, parent: Node3D = self) -> MeshInstance3D:
@@ -229,6 +284,7 @@ func _make_player(stream: AudioStream, volume: float, distance: float) -> AudioS
 	player.max_distance = distance
 	player.unit_size = 6.0
 	add_child(player)
+	SoundLibrary.stop_on_exit(player)
 	return player
 
 
@@ -257,3 +313,23 @@ func _make_snow_spray(material: Material) -> GPUParticles3D:
 	particles.emitting = false
 	particles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return particles
+
+
+## Unter jeder Türöffnung eine ausfahrbare Trittstufe (beide Seiten, eingefahren).
+func _build_steps(material: Material) -> void:
+	var upper := TrainMeshes.create_step_upper()
+	var lower := TrainMeshes.create_step_lower()
+	for side: float in [-1.0, 1.0]:
+		for opening in _door_openings(side):
+			var unit := Node3D.new()
+			unit.position = Vector3(side * TrainMeshes.STEP_RETRACTED_X, 0.0, opening.z)
+			if side < 0.0:
+				unit.rotation.y = PI
+			add_child(unit)
+			_add_mesh(upper, material, unit)
+			var hinge := Node3D.new()
+			hinge.position = Vector3(TrainMeshes.STEP_DEPTH * 0.5, TrainMeshes.STEP_UPPER_Y - 0.02, 0.0)
+			hinge.rotation.z = -TrainMeshes.STEP_FOLD_ANGLE
+			unit.add_child(hinge)
+			_add_mesh(lower, material, hinge)
+			_steps.append({"unit": unit, "hinge": hinge, "side": side})

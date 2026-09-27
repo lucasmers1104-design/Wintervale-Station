@@ -2,13 +2,18 @@
 ##
 ## Zwei Ebenen:
 ## - Bewegung: läuft einen Weg aus dem [WalkGraph] ab, folgt dabei dem Boden,
-##   dreht sich weich und wartet höflich, wenn die Spielfigur im Weg steht.
+##   dreht sich weich, wartet höflich bzw. weicht der Spielfigur aus und steigt
+##   über die Trittstufen in Züge ein und aus. Die Figur wird aus der echten
+##   Bewegung animiert (Tempo, Anfahren, Abbremsen, Drehen).
 ## - Verhalten ("Gedanken", alle 0,4 s): Was steht im Tagesablauf an? Zum
-##   Bahnhof gehen, sitzen, warten, einsteigen, heimgehen …
+##   Bahnhof gehen, sitzen, warten, sich anstellen, heimgehen … Beim Warten
+##   gibt es kleine, zufällige Gesten (Uhr, Hände wärmen, Dehnen, Umsehen).
+##
+## Ein- und Aussteigen organisiert der [NpcDirector] pro Tür mit einer
+## Warteschlange: erst aussteigen, dann einsteigen, einer nach dem anderen.
 ##
 ## Benannte Bewohner haben einen [NpcProfile]-Steckbrief. Reisende ohne
-## Steckbrief setzt der [NpcDirector] ein: Sie steigen in einen bestimmten
-## Zug ein oder kommen mit einem Zug an und gehen ins Dorf.
+## Steckbrief setzt der [NpcDirector] ein.
 class_name Npc
 extends AnimatableBody3D
 
@@ -18,9 +23,9 @@ signal alighted(npc: Npc, train: Train)
 enum State {
 	AT_HOME,           ## unsichtbar im Haus
 	AT_STATION,        ## unterwegs zum / am Bahnhof (sitzen, stehen, warten …)
-	BOARDING,          ## geht zur Zugtür und steigt ein
+	BOARDING,          ## steht an einer Zugtür an und steigt ein
 	AWAY,              ## im Zug unterwegs (unsichtbar)
-	ALIGHTING,         ## steigt aus
+	ALIGHTING,         ## wartet im Zug aufs Aussteigen bzw. steigt aus
 	GOING_HOME,        ## auf dem Heimweg
 	LEAVING,           ## Reisender geht ins Dorf und verschwindet
 }
@@ -28,7 +33,9 @@ enum State {
 ## Wie weit vor sich die Figur auf die Spielfigur Rücksicht nimmt.
 const PERSONAL_SPACE := 0.95
 const THINK_INTERVAL := 0.4
-const TURN_SPEED := 7.0
+const TURN_SPEED := 6.0
+## Auf den Trittstufen geht man etwas bedächtiger.
+const CLIMB_PACE := 0.75
 
 var profile: NpcProfile
 var director: NpcDirector
@@ -43,7 +50,7 @@ var trip_entry_index := -1
 
 var _behaviour := ""
 var _behaviour_time := 0.0
-var _watch_timer := 6.0
+var _idle_timer := 5.0
 var _spot: StationSpot
 var _seated := false
 var _seat_return := Vector3.ZERO
@@ -51,8 +58,11 @@ var _routine: NpcRoutine
 var _travel_routine: NpcRoutine
 var _done_day: Dictionary = {}
 var _train: Train
-var _door := {}
 var _used_trains: Dictionary[int, bool] = {}
+var _queue_ready := false
+var _queue_door := Vector3.ZERO
+var _visitor := false
+var _favourite_pose := CharacterModel.Pose.STAND
 
 var _path := PackedVector3Array()
 var _path_index := 0
@@ -60,12 +70,20 @@ var _on_arrive := Callable()
 var _moving := false
 var _pace := 1.0
 var _facing := Vector3.ZERO
-var _walk_phase := 0.0
-var _current_speed := 0.0
+var _last_flat := Vector3.ZERO
+var _last_speed := 0.0
+var _smoothed_accel := 0.0
+var _last_yaw := 0.0
 var _lane_offset := 0.0
 var _think_timer := 0.0
 var _blocked_time := 0.0
-var _busy := false  ## Übergangsanimation läuft (Hinsetzen, Einsteigen …)
+var _ground_timer := 0
+var _busy := false  ## Übergang läuft (Hinsetzen, Trittstufen …) – keine neuen Entscheidungen
+# Trittstufen: Punkte mit Höhe, die nacheinander begangen werden
+var _climb := PackedVector3Array()
+var _climb_index := 0
+var _climb_done := Callable()
+var _climb_fade := false
 var _tween: Tween
 var _label: Label3D
 var _footsteps: FootstepPlayer
@@ -73,7 +91,8 @@ var _rng := RandomNumberGenerator.new()
 
 
 ## Richtet den Bewohner ein. [param p_profile] = null für einen Reisenden mit [param look].
-func setup(p_director: NpcDirector, p_profile: NpcProfile, look: CharacterAppearance, seed_value: int) -> void:
+func setup(p_director: NpcDirector, p_profile: NpcProfile, look: CharacterAppearance, seed_value: int,
+		carry := CharacterModel.Carry.NONE) -> void:
 	director = p_director
 	profile = p_profile
 	_rng.seed = seed_value
@@ -96,7 +115,12 @@ func setup(p_director: NpcDirector, p_profile: NpcProfile, look: CharacterAppear
 
 	model = CharacterModel.new()
 	model.appearance = look
+	model.carry = profile.carry if profile else carry
+	# Jeder geht ein bisschen anders: gemächlich, normal oder munter
+	model.gait_energy = clampf(walk_speed * 0.8 + _rng.randf_range(-0.12, 0.12), 0.6, 1.3)
 	add_child(model)
+	_favourite_pose = CharacterModel.Pose.HANDS_BEHIND if walk_speed < 1.0 or _rng.randf() < 0.3 \
+		else CharacterModel.Pose.STAND
 	_footsteps = FootstepPlayer.new()
 	_footsteps.base_volume_db = -17.0
 	add_child(_footsteps)
@@ -113,6 +137,7 @@ func setup(p_director: NpcDirector, p_profile: NpcProfile, look: CharacterAppear
 		_label.outline_size = 8
 		_label.no_depth_test = false
 		_label.position = Vector3(0.0, 1.62 * (look.height_scale if look else 1.0) + 0.12, 0.0)
+		_label.visible = false
 		add_child(_label)
 	_set_present(false)
 
@@ -133,9 +158,22 @@ func is_seated() -> bool:
 	return _seated
 
 
+func is_busy() -> bool:
+	return _busy or not _climb.is_empty()
+
+
+func is_moving() -> bool:
+	return _moving
+
+
 ## Ist der Bewohner schon mit diesem Zug gefahren (angekommen oder abgefahren)?
 func has_used_train(train_id: int) -> bool:
 	return _used_trains.has(train_id)
+
+
+## Steht der Bewohner schon an seinem Platz in der Warteschlange?
+func is_waiting_in_queue() -> bool:
+	return state == State.BOARDING and _queue_ready and _climb.is_empty()
 
 
 ## Geht zu einem Platz und nimmt ihn ein (sitzen, stehen, Uhr ansehen …).
@@ -196,7 +234,7 @@ func resume(hours: float) -> void:
 
 
 func _think() -> void:
-	if _busy:
+	if is_busy():
 		return
 	var now := WorldClock.time_of_day
 	match state:
@@ -211,8 +249,10 @@ func _think() -> void:
 		State.AT_STATION:
 			_think_at_station(now)
 		State.BOARDING:
-			if not _train_usable(_train):
-				_abort_boarding()
+			if not is_instance_valid(_train) or _train.state != Train.State.DWELLING:
+				boarding_aborted()
+			elif _queue_ready:
+				_idle_gestures(true)
 		State.AWAY:
 			_think_away(now)
 
@@ -232,16 +272,46 @@ func _think_at_station(now: float) -> void:
 		return
 	if routine.activity == NpcRoutine.Activity.TRAVEL:
 		var train := director.find_departing_train(routine.destination, self)
-		if train:
-			_start_boarding(train)
+		if train and _start_boarding(train):
+			return
+		if _approach_incoming(routine.destination, -1):
 			return
 	_continue_behaviour()
 
 
+## Fährt der eigene Zug gerade ein, stellt man sich schon an die richtige Bahnsteigkante.
+func _approach_incoming(destination: String, entry_index: int) -> bool:
+	if _moving or is_busy() or _behaviour == "ready":
+		return false
+	var train := director.find_incoming_train(destination, entry_index)
+	if train == null:
+		return false
+	var spot := director.claim_spot_near_stop(self, train)
+	if spot == null:
+		return false
+	if _seated:
+		_stand_up(func() -> void: _walk_to_ready(spot))
+	else:
+		_walk_to_ready(spot)
+	return true
+
+
+func _walk_to_ready(spot: StationSpot) -> void:
+	_leave_spot()
+	spot.reserve(self)
+	_spot = spot
+	_behaviour = "ready"
+	walk_to(spot.get_approach_point(), func() -> void:
+		_face(spot.get_facing())
+		model.set_pose(_favourite_pose)
+		_behaviour_time = 999.0, 1.15)
+
+
 func _think_traveller(now: float) -> void:
 	var train := director.find_departing_train(trip_destination, self, trip_entry_index)
-	if train:
-		_start_boarding(train)
+	if train and _start_boarding(train):
+		return
+	if _approach_incoming(trip_destination, trip_entry_index):
 		return
 	# Zug verpasst oder ausgefallen: wieder ins Dorf
 	if trip_entry_index >= 0 and director.has_departed(trip_entry_index, now):
@@ -258,7 +328,6 @@ func _think_away(now: float) -> void:
 		return
 	var train := director.find_arriving_train(_travel_routine.destination, self)
 	if train:
-		_mark_done(_travel_routine)
 		alight_from(train, false)
 	elif now > _travel_routine.get_return_hours() + 4.0:
 		_mark_done(_travel_routine)  # spät nachts mit dem Bus heimgekommen …
@@ -318,99 +387,140 @@ func leave_to_village() -> void:
 	walk_to(director.get_exit_point(), _vanish.bind(State.LEAVING), 1.0)
 
 
-## Kommt mit [param train] an: erscheint in einer Tür und steigt aus.
+## Kommt mit [param train] an: stellt sich im Zug zum Aussteigen an. Der Director
+## ruft [method climb_out], sobald die Tür frei ist.
 func alight_from(train: Train, is_visitor: bool) -> void:
 	_stop_everything()
-	var door := director.assign_door(train, self, Vector3.INF)
-	if door.is_empty():
-		if is_visitor:
-			queue_free()
-		else:
-			_enter_state_home()
-		return
+	_visitor = is_visitor
 	_train = train
 	_used_trains[train.train_id] = true
-	train.hold_doors(get_instance_id())
 	state = State.ALIGHTING
+	_set_present(false)
+	if not director.request_alight(self, train):
+		alight_cancelled()
+
+
+## Die Tür ist frei: über die Trittstufen auf den Bahnsteig.
+func climb_out(door: Dictionary) -> void:
 	var inside: Vector3 = door["inside"]
-	var outside: Vector3 = door["platform"]
-	_place_at(inside, false)
-	global_position.y = door["floor_y"]
-	_face_now(outside - inside)
-	_set_present(true, true)
-	_busy = true
+	var platform: Vector3 = door["platform"]
+	global_position = inside
+	_face_now(platform - inside)
+	_set_present(true)
+	model.set_fade(0.0)
 	_kill_tween()
 	_tween = create_tween()
-	_tween.tween_interval(0.25)
-	_tween.tween_method(_hop.bind(inside, door["floor_y"], outside), 0.0, 1.0, 0.7 / director.speed_factor())
-	_tween.tween_callback(func() -> void:
-		_busy = false
-		train.release_doors(get_instance_id())
-		alighted.emit(self, train)
-		_train = null
-		if is_visitor or profile == null:
-			leave_to_village()
-		else:
-			go_home())
+	_tween.tween_method(model.set_fade, 0.0, 1.0, 0.35)
+	_start_climb([inside, door["door"], door["upper_top"], door["lower_top"], platform], _on_climbed_out, false)
 
 
-func _start_boarding(train: Train) -> void:
-	var door := director.assign_door(train, self, global_position)
-	if door.is_empty():
-		return
+func _on_climbed_out() -> void:
+	var train := _train
+	_train = null
+	director.door_done(self)
+	if profile and _travel_routine:
+		_mark_done(_travel_routine)
+	alighted.emit(self, train)
+	# Ein paar Schritte vom Zug weg, kurz umsehen, dann weiter
+	var along := RailGeometry.flat(train.get_focus_point() - global_position).normalized() if is_instance_valid(train) \
+		else Vector3.FORWARD
+	var target := director.spread_point(global_position, along, _rng)
+	state = State.ALIGHTING
+	walk_to(target, func() -> void:
+		_busy = true
+		var gesture: CharacterModel.Pose = [CharacterModel.Pose.STRETCH, CharacterModel.Pose.LOOK_UP,
+			CharacterModel.Pose.CHECK_WATCH, CharacterModel.Pose.STAND][_rng.randi() % 4]
+		model.play_gesture(gesture, 2.0)
+		get_tree().create_timer(_rng.randf_range(1.2, 2.6) / director.speed_factor()).timeout.connect(func() -> void:
+			if not is_instance_valid(self):
+				return
+			_busy = false
+			if _visitor or profile == null:
+				leave_to_village()
+			else:
+				go_home()), 0.85)
+
+
+## Aussteigen hat nicht geklappt (Zug fährt schon weiter): Besucher verschwinden,
+## Bewohner warten auf die nächste Ankunft.
+func alight_cancelled() -> void:
+	if _visitor or profile == null:
+		queue_free()
+	else:
+		state = State.AWAY  # nächste Ankunft abwarten
+
+
+## Stellt sich zum Einsteigen an einer Tür an. Gibt false zurück, wenn es keine gibt.
+func _start_boarding(train: Train) -> bool:
 	if _seated:
-		_stand_up(_start_boarding.bind(train))
-		return
+		_stand_up(func() -> void: _start_boarding(train))
+		return true
+	var slot := director.join_boarding(self, train)
+	if slot.is_empty():
+		return false
 	_leave_spot()
 	_train = train
-	_door = door
 	state = State.BOARDING
-	train.hold_doors(get_instance_id())
-	walk_to(door["platform"], _enter_train, 1.25)
+	_queue_ready = false
+	_behaviour = "queue"
+	_queue_door = slot["door"]
+	walk_to(slot["slot"], _on_queue_reached, 1.1)
+	return true
 
 
-func _enter_train() -> void:
-	if not _train_usable(_train):
-		_abort_boarding()
+## Der Director hat die Warteschlange verschoben (jemand ist vorgerückt).
+func move_to_queue_slot(slot: Vector3, door_point: Vector3) -> void:
+	if state != State.BOARDING or is_busy():
 		return
-	var inside: Vector3 = _door["inside"]
-	var start := global_position
-	_face_now(inside - start)
-	_busy = true
-	_kill_tween()
-	_tween = create_tween()
-	_tween.tween_method(_hop.bind(start, _door["floor_y"], inside), 0.0, 1.0, 0.6 / director.speed_factor())
-	_tween.parallel().tween_method(model.set_fade, 1.0, 0.0, 0.6 / director.speed_factor()).set_delay(0.25 / director.speed_factor())
-	_tween.tween_callback(func() -> void:
-		_busy = false
-		var train := _train
-		train.release_doors(get_instance_id())
-		_used_trains[train.train_id] = true
-		_travel_routine = _routine
-		if _routine:
-			_mark_done(_routine)
-		_train = null
-		_set_present(false)
-		state = State.AWAY
-		boarded.emit(self, train)
-		if profile == null:
-			queue_free())
+	_queue_door = door_point
+	if _queue_ready and RailGeometry.flat(slot - global_position).length() < 0.2:
+		return
+	_queue_ready = false
+	walk_to(slot, _on_queue_reached, 0.8)
 
 
-func _abort_boarding() -> void:
-	if _train and is_instance_valid(_train):
-		_train.release_doors(get_instance_id())
+func _on_queue_reached() -> void:
+	_queue_ready = true
+	_face(_queue_door - global_position)
+	model.set_pose(_favourite_pose if _rng.randf() < 0.5 else CharacterModel.Pose.STAND)
+
+
+## Jetzt ist man dran: über die Trittstufen in den Zug.
+func climb_in(door: Dictionary) -> void:
+	_queue_ready = false
+	model.set_pose(CharacterModel.Pose.STAND)
+	var platform: Vector3 = door["platform"]
+	walk_to(platform, func() -> void:
+		_start_climb([global_position, door["lower_top"], door["upper_top"], door["door"], door["inside"]],
+			_on_climbed_in, true), 1.0)
+
+
+func _on_climbed_in() -> void:
+	var train := _train
+	director.door_done(self)
+	_used_trains[train.train_id] = true
+	_travel_routine = _routine
+	if _routine:
+		_mark_done(_routine)
 	_train = null
-	_door = {}
+	_set_present(false)
+	state = State.AWAY
+	boarded.emit(self, train)
+	if profile == null:
+		queue_free()
+
+
+## Der Zug fährt ab (oder fällt aus), bevor man dran war: weiter warten.
+func boarding_aborted() -> void:
+	director.leave_queues(self)
+	_train = null
+	_queue_ready = false
+	_climb = PackedVector3Array()
 	_busy = false
 	model.set_fade(1.0)
-	state = State.AT_STATION
-	_next_behaviour()
-
-
-func _train_usable(train: Train) -> bool:
-	return train != null and is_instance_valid(train) and train.state == Train.State.DWELLING \
-		and (train.doors_open() or train.is_held())
+	if state == State.BOARDING:
+		state = State.AT_STATION
+		_next_behaviour()
 
 
 # --- Verhalten am Bahnsteig ------------------------------------------------------------
@@ -419,16 +529,41 @@ func _continue_behaviour() -> void:
 	if _moving:
 		return
 	_behaviour_time -= THINK_INTERVAL * director.speed_factor()
-	if _behaviour == "stand" or _behaviour == "wait":
-		_watch_timer -= THINK_INTERVAL * director.speed_factor()
-		if _watch_timer <= 0.0:
-			_watch_timer = _rng.randf_range(7.0, 14.0)
-			_glance_at_watch()
+	_idle_gestures(false)
 	if _behaviour_time <= 0.0:
 		_next_behaviour()
 
 
-## Wählt die nächste ruhige Beschäftigung: sitzen, stehen, Uhr ansehen, Tafel lesen, spazieren.
+## Kleine, zufällige Bewegungen beim Warten – damit niemand wie ein Roboter dasteht.
+func _idle_gestures(queueing: bool) -> void:
+	if _moving or model.is_gesturing():
+		return
+	_idle_timer -= THINK_INTERVAL * director.speed_factor()
+	if _idle_timer > 0.0:
+		return
+	_idle_timer = _rng.randf_range(4.0, 9.0)
+	if _seated:
+		if _rng.randf() < 0.35:
+			model.play_gesture(CharacterModel.Pose.CHECK_WATCH, 2.0)
+		return
+	var roll := _rng.randf()
+	if roll < 0.22:
+		model.play_gesture(CharacterModel.Pose.CHECK_WATCH, 2.2)
+	elif roll < 0.4 and WorldClock.is_dark() or roll < 0.34:
+		model.play_gesture(CharacterModel.Pose.WARM_HANDS, 2.6)
+	elif roll < 0.46 and not queueing:
+		model.play_gesture(CharacterModel.Pose.STRETCH, 2.6)
+	elif roll < 0.7:
+		# Hände hinter den Rücken oder wieder locker lassen
+		model.set_pose(CharacterModel.Pose.HANDS_BEHIND if model.pose == CharacterModel.Pose.STAND
+			else CharacterModel.Pose.STAND)
+	elif not queueing:
+		# Sich ein wenig umdrehen und umsehen
+		_face(_facing.rotated(Vector3.UP, _rng.randf_range(-0.6, 0.6)) if _facing != Vector3.ZERO else Vector3.FORWARD)
+
+
+## Wählt die nächste ruhige Beschäftigung: sitzen, stehen, Uhr ansehen, Tafel lesen,
+## spazieren, mit jemandem zusammenstehen.
 func _next_behaviour() -> void:
 	if state != State.AT_STATION:
 		return
@@ -442,19 +577,23 @@ func _next_behaviour() -> void:
 		"stroll": profile.likes_strolling if profile else 0.15,
 		"clock": profile.likes_clock if profile else 0.2,
 		"board": profile.likes_board if profile else 0.25,
+		"chat": (profile.likes_standing * 0.6 if profile else 0.0),
 	}
 	var choice := _weighted_choice(weights)
 	var kinds := {
 		"sit": [StationSpot.Kind.SEAT], "stand": [StationSpot.Kind.STAND],
 		"clock": [StationSpot.Kind.CLOCK], "board": [StationSpot.Kind.BOARD],
 	}
-	if kinds.has(choice):
-		var spot := director.claim_spot(self, kinds[choice], _rng)
-		if spot:
-			_behaviour = choice
-			walk_to(spot.get_approach_point(), _take_spot.bind(spot, false))
-			_spot = spot
-			return
+	var spot: StationSpot = null
+	if choice == "chat":
+		spot = director.claim_chat_spot(self, _rng)
+	elif kinds.has(choice):
+		spot = director.claim_spot(self, kinds[choice], _rng)
+	if spot:
+		_behaviour = choice
+		_spot = spot
+		walk_to(spot.get_approach_point(), _take_spot.bind(spot, false))
+		return
 	# Langsam den Bahnsteig entlang schlendern
 	_behaviour = "stroll"
 	_behaviour_time = 0.0
@@ -467,6 +606,7 @@ func _take_spot(spot: StationSpot, instant: bool) -> void:
 		_face_now(spot.get_facing())
 	else:
 		_face(spot.get_facing())
+	_idle_timer = _rng.randf_range(2.0, 6.0)
 	match spot.kind:
 		StationSpot.Kind.SEAT:
 			_behaviour = "sit"
@@ -476,8 +616,7 @@ func _take_spot(spot: StationSpot, instant: bool) -> void:
 			_behaviour = "wait" if (profile == null or (_routine and _routine.activity == NpcRoutine.Activity.TRAVEL)) \
 				else "stand"
 			_behaviour_time = _rng.randf_range(14.0, 35.0)
-			_watch_timer = _rng.randf_range(3.0, 9.0)
-			model.set_pose(CharacterModel.Pose.STAND)
+			model.set_pose(_favourite_pose)
 		StationSpot.Kind.CLOCK:
 			_behaviour = "clock"
 			_behaviour_time = _rng.randf_range(4.0, 7.0)
@@ -486,14 +625,40 @@ func _take_spot(spot: StationSpot, instant: bool) -> void:
 			_behaviour = "board"
 			_behaviour_time = _rng.randf_range(6.0, 10.0)
 			model.set_pose(CharacterModel.Pose.LOOK_UP)
+		StationSpot.Kind.CHAT:
+			_behaviour = "chat"
+			_behaviour_time = _rng.randf_range(25.0, 45.0)
+			model.set_pose(CharacterModel.Pose.STAND)
+			director.on_chat_spot_taken(self, spot)
 
 
+## Im Gespräch: ab und zu nicken oder mit der Hand erzählen.
+func chat_gesture() -> void:
+	if _moving or is_busy() or model.is_gesturing():
+		return
+	model.play_gesture(CharacterModel.Pose.NOD if _rng.randf() < 0.5 else CharacterModel.Pose.TALK,
+		_rng.randf_range(1.4, 2.4))
+
+
+## Kurz begrüßen: Kopf zum anderen, nicken oder winken.
+func greet(other: Npc) -> void:
+	if not is_present() or is_busy() or _seated:
+		if _seated:
+			model.play_gesture(CharacterModel.Pose.NOD, 1.2)
+		return
+	if not _moving:
+		_face(other.global_position - global_position)
+	var far := global_position.distance_to(other.global_position) > 2.2
+	model.play_gesture(CharacterModel.Pose.WAVE if far else CharacterModel.Pose.NOD, 1.6 if far else 1.2)
+
+
+## Hinsetzen: umdrehen, dann rückwärts auf die Bank sinken (mit Vorbeugen).
 func _sit_down(spot: StationSpot, instant: bool) -> void:
 	_seated = true
 	_seat_return = spot.get_approach_point()
-	model.set_pose(CharacterModel.Pose.SIT)
 	var seat := spot.global_position
 	if instant:
+		model.set_pose(CharacterModel.Pose.SIT)
 		global_position = seat
 		_busy = false
 		return
@@ -501,12 +666,16 @@ func _sit_down(spot: StationSpot, instant: bool) -> void:
 	var start := global_position
 	_kill_tween()
 	_tween = create_tween()
-	_tween.tween_interval(0.35 / director.speed_factor())
-	_tween.tween_method(func(t: float) -> void: global_position = start.lerp(seat, ease(t, -1.6)),
-		0.0, 1.0, 0.55 / director.speed_factor())
+	_tween.tween_interval(0.45 / director.speed_factor())  # erst zur Bank umdrehen
+	_tween.tween_callback(func() -> void: model.set_pose(CharacterModel.Pose.SIT))
+	_tween.tween_method(func(t: float) -> void:
+		var eased := ease(t, -1.8)
+		global_position = start.lerp(seat, eased) + Vector3.UP * sin(eased * PI) * 0.04,
+		0.0, 1.0, 0.75 / director.speed_factor())
 	_tween.tween_callback(func() -> void: _busy = false)
 
 
+## Aufstehen: vorbeugen, abstützen, nach vorne hochkommen.
 func _stand_up(then: Callable) -> void:
 	_seated = false
 	model.set_pose(CharacterModel.Pose.STAND)
@@ -516,33 +685,25 @@ func _stand_up(then: Callable) -> void:
 	_busy = true
 	_kill_tween()
 	_tween = create_tween()
-	_tween.tween_method(func(t: float) -> void: global_position = start.lerp(target, ease(t, -1.6)),
-		0.0, 1.0, 0.5 / director.speed_factor())
+	_tween.tween_interval(0.2 / director.speed_factor())
+	_tween.tween_method(func(t: float) -> void:
+		var eased := ease(t, -1.6)
+		global_position = start.lerp(target, eased) + Vector3.UP * sin(eased * PI) * 0.05,
+		0.0, 1.0, 0.7 / director.speed_factor())
+	_tween.tween_interval(0.15 / director.speed_factor())
 	_tween.tween_callback(func() -> void:
 		_busy = false
 		then.call())
 
 
-func _glance_at_watch() -> void:
-	if _seated or _busy:
-		return
-	model.set_pose(CharacterModel.Pose.CHECK_WATCH)
-	get_tree().create_timer(2.2 / director.speed_factor()).timeout.connect(func() -> void:
-		if is_instance_valid(self) and model.pose == CharacterModel.Pose.CHECK_WATCH:
-			model.set_pose(CharacterModel.Pose.STAND))
-
-
 ## Ein Zug fährt ein: Wer frei steht, winkt manchmal kurz.
 func react_to_arrival(train: Train) -> void:
-	if state != State.AT_STATION or _seated or _busy or _moving:
+	if state != State.AT_STATION or _seated or is_busy() or _moving:
 		return
 	if global_position.distance_to(train.get_focus_point()) > 45.0 or _rng.randf() > 0.3:
 		return
 	_face(RailGeometry.flat(train.get_focus_point() - global_position))
-	model.set_pose(CharacterModel.Pose.WAVE)
-	get_tree().create_timer(2.0 / director.speed_factor()).timeout.connect(func() -> void:
-		if is_instance_valid(self) and model.pose == CharacterModel.Pose.WAVE:
-			model.set_pose(CharacterModel.Pose.STAND))
+	model.play_gesture(CharacterModel.Pose.WAVE, 2.0)
 
 
 func _weighted_choice(weights: Dictionary) -> String:
@@ -569,12 +730,25 @@ func _walk_path(points: Array, on_arrive: Callable, pace := 1.0) -> void:
 	if _seated:
 		_stand_up(_walk_path.bind(points, on_arrive, pace))
 		return
-	_path = PackedVector3Array(points)
+	_path = PackedVector3Array()
+	for point: Vector3 in points:
+		_path.append(Vector3(point.x, 0.0, point.z))  # gegangen wird in der Ebene, die Höhe folgt dem Boden
 	_path_index = 1 if _path.size() > 1 else 0
 	_on_arrive = on_arrive
 	_pace = pace
 	_moving = true
-	model.set_pose(CharacterModel.Pose.STAND)
+	if model.pose != CharacterModel.Pose.HANDS_BEHIND or _rng.randf() < 0.5:
+		model.set_pose(CharacterModel.Pose.STAND)
+
+
+## Über Trittstufen gehen: Punkte mit Höhe nacheinander ablaufen.
+func _start_climb(points: Array, on_done: Callable, fade_out: bool) -> void:
+	_climb = PackedVector3Array(points)
+	_climb_index = 1
+	_climb_done = on_done
+	_climb_fade = fade_out
+	_moving = false
+	_busy = true
 
 
 func _physics_process(delta: float) -> void:
@@ -586,43 +760,66 @@ func _physics_process(delta: float) -> void:
 		_think()
 	if not visible:
 		return
-	var target_speed := 0.0
-	if _moving and not _busy:
-		target_speed = _step_along_path(delta)
-	_current_speed = lerpf(_current_speed, target_speed, 1.0 - exp(-8.0 * delta))
-	if not _busy and not _seated:
-		global_position.y = director.ground_height(global_position, global_position.y)
-	if _facing != Vector3.ZERO:
+	if not _climb.is_empty():
+		_step_climb(delta)
+	elif _moving and not _busy:
+		_step_along_path(delta)
+		# Boden nur neu abtasten, wenn man sich bewegt (spart Strahltests)
+		_ground_timer -= 1
+		if _ground_timer <= 0:
+			_ground_timer = 2
+			global_position.y = lerpf(global_position.y, director.ground_height(global_position, global_position.y),
+				1.0 - exp(-30.0 * delta * 2.0))
+	if _facing != Vector3.ZERO and _climb.is_empty():
 		var yaw := atan2(-_facing.x, -_facing.z)
 		rotation.y = lerp_angle(rotation.y, yaw, 1.0 - exp(-TURN_SPEED * delta))
-	var amount := clampf(_current_speed / 1.1, 0.0, 1.0)
-	_walk_phase += delta * _current_speed * 4.2
-	model.animate(amount, _walk_phase)
+	_animate(delta)
+
+
+## Figur aus der echten Bewegung animieren: Tempo, Beschleunigung, Drehung.
+func _animate(delta: float) -> void:
+	var flat := Vector3(global_position.x, 0.0, global_position.z)
+	var speed := flat.distance_to(_last_flat) / maxf(delta, 0.0001)
+	_last_flat = flat
+	if _busy and _climb.is_empty():
+		speed = 0.0  # Hinsetzen/Aufstehen: die Beine bleiben ruhig
+	speed = lerpf(_last_speed, speed, 1.0 - exp(-10.0 * delta))
+	_smoothed_accel = lerpf(_smoothed_accel, (speed - _last_speed) / maxf(delta, 0.0001), 1.0 - exp(-5.0 * delta))
+	_last_speed = speed
+	var turn := angle_difference(_last_yaw, rotation.y) / maxf(delta, 0.0001)
+	_last_yaw = rotation.y
+	model.move(speed, delta, 0.0, _smoothed_accel, turn)
 
 
 func _process(delta: float) -> void:
 	if _label and visible:
 		var alpha := director.get_name_tag_alpha(self)
+		if alpha <= 0.0 and not _label.visible:
+			return
 		var current := lerpf(_label.modulate.a, alpha, 1.0 - exp(-5.0 * delta))
 		_label.modulate.a = current
 		_label.outline_modulate.a = current * 0.8
 		_label.visible = current > 0.02
 
 
-## Ein Stück weitergehen; Rückgabe: aktuelle Geschwindigkeit.
-func _step_along_path(delta: float) -> float:
+## Ein Stück weitergehen.
+func _step_along_path(delta: float) -> void:
 	var target := _lane_point(_path_index)
 	var flat_pos := Vector3(global_position.x, 0.0, global_position.z)
 	var to_target := target - flat_pos
 	var distance := to_target.length()
-	var speed := walk_speed * _pace * director.speed_factor()
+	# Sanft anlaufen und vor dem Ziel etwas langsamer werden
+	var ease_in := clampf(0.4 + _last_speed / maxf(walk_speed, 0.1), 0.4, 1.0)
+	var remaining := distance + _remaining_path_length()
+	var ease_out := clampf(remaining / 0.8, 0.35, 1.0)
+	var speed := walk_speed * _pace * director.speed_factor() * minf(ease_in, ease_out)
 	if distance > 0.001 and director.is_path_blocked(self, to_target / distance, PERSONAL_SPACE):
 		# Höflich warten – und nach einem Moment seitlich ausweichen.
 		_blocked_time += delta * director.speed_factor()
 		if _blocked_time > 1.2:
 			_blocked_time = 0.0
 			_detour(to_target / distance)
-		return 0.0
+		return
 	_blocked_time = 0.0
 	var step := speed * delta
 	if distance <= step:
@@ -635,11 +832,52 @@ func _step_along_path(delta: float) -> float:
 			_on_arrive = Callable()
 			if callback.is_valid():
 				callback.call()
-		return speed
+		return
 	var direction := to_target / distance
 	global_position += direction * step
 	_facing = direction
-	return speed
+
+
+func _remaining_path_length() -> float:
+	var length := 0.0
+	for i in range(_path_index, _path.size() - 1):
+		length += _path[i].distance_to(_path[i + 1])
+	return length
+
+
+## Trittstufen: jede Stufe mit einem kleinen Schritt nach oben bzw. unten.
+func _step_climb(delta: float) -> void:
+	var from := _climb[_climb_index - 1]
+	var to := _climb[_climb_index]
+	var flat_to := Vector3(to.x, 0.0, to.z)
+	var flat_pos := Vector3(global_position.x, 0.0, global_position.z)
+	var total := maxf(Vector3(from.x, 0.0, from.z).distance_to(flat_to), 0.05)
+	var step := walk_speed * CLIMB_PACE * director.speed_factor() * delta
+	var remaining := flat_pos.distance_to(flat_to)
+	var direction := (flat_to - flat_pos).normalized() if remaining > 0.001 else Vector3.ZERO
+	if direction != Vector3.ZERO:
+		_facing = direction
+		rotation.y = lerp_angle(rotation.y, atan2(-direction.x, -direction.z), 1.0 - exp(-10.0 * delta))
+	if remaining <= step:
+		global_position = to
+		_climb_index += 1
+		if _climb_fade and _climb_index == _climb.size() - 1:
+			_kill_tween()
+			_tween = create_tween()
+			_tween.tween_method(model.set_fade, 1.0, 0.0, 0.45 / director.speed_factor())
+		if _climb_index >= _climb.size():
+			_climb = PackedVector3Array()
+			_busy = false
+			var callback := _climb_done
+			_climb_done = Callable()
+			if callback.is_valid():
+				callback.call()
+		return
+	flat_pos += direction * step
+	var progress := clampf(1.0 - (remaining - step) / total, 0.0, 1.0)
+	# Stufen: Höhe wird früh im Schritt gewonnen (Fuß hoch, dann nachziehen)
+	var rise := ease(progress, 0.6)
+	global_position = Vector3(flat_pos.x, lerpf(from.y, to.y, rise) + sin(progress * PI) * 0.04, flat_pos.z)
 
 
 ## Um die Spielfigur herumgehen: ein Umweg-Punkt seitlich vorbei – nur auf eine
@@ -667,17 +905,6 @@ func _lane_point(index: int) -> Vector3:
 	return point + direction.cross(Vector3.UP) * _lane_offset
 
 
-func _hop(t: float, from: Vector3, floor_y: float, to: Vector3) -> void:
-	var eased := ease(t, -1.8)
-	var pos := from.lerp(to, eased)
-	var low := minf(from.y, to.y)
-	var high := maxf(floor_y, maxf(from.y, to.y)) + 0.12
-	pos.y = lerpf(from.y, to.y, eased) + sin(eased * PI) * (high - low) * 0.35
-	global_position = pos
-	_walk_phase += 0.12
-	model.animate(0.6 * sin(t * PI), _walk_phase)
-
-
 func _face(direction: Vector3) -> void:
 	var flat := RailGeometry.flat(direction)
 	if flat.length_squared() > 0.0001:
@@ -688,12 +915,14 @@ func _face_now(direction: Vector3) -> void:
 	_face(direction)
 	if _facing != Vector3.ZERO:
 		rotation.y = atan2(-_facing.x, -_facing.z)
+		_last_yaw = rotation.y
 
 
 func _place_at(point: Vector3, snap := true) -> void:
 	global_position = Vector3(point.x, point.y, point.z)
 	if snap:
 		global_position.y = director.ground_height(point, point.y)
+	_last_flat = Vector3(point.x, 0.0, point.z)
 
 
 # --- Hilfen -----------------------------------------------------------------------
@@ -728,6 +957,7 @@ func _set_present(present: bool, fade_in := false) -> void:
 	collision_layer = GameDefs.LAYER_CHARACTERS if present else 0
 	if present:
 		model.set_fade(0.0 if fade_in else 1.0)
+		_last_flat = Vector3(global_position.x, 0.0, global_position.z)
 		if fade_in:
 			_kill_tween()
 			_tween = create_tween()
@@ -737,16 +967,16 @@ func _set_present(present: bool, fade_in := false) -> void:
 func _stop_everything() -> void:
 	_kill_tween()
 	_leave_spot()
-	if _train and is_instance_valid(_train):
-		_train.release_doors(get_instance_id())
+	if director:
+		director.leave_queues(self)
 	_train = null
-	_door = {}
+	_queue_ready = false
 	_moving = false
 	_busy = false
 	_seated = false
 	_behaviour = ""
 	_path = PackedVector3Array()
-	_current_speed = 0.0
+	_climb = PackedVector3Array()
 	if model:
 		model.set_pose(CharacterModel.Pose.STAND)
 		model.set_fade(1.0)
@@ -760,5 +990,5 @@ func _kill_tween() -> void:
 
 func _exit_tree() -> void:
 	_leave_spot()
-	if _train and is_instance_valid(_train):
-		_train.release_doors(get_instance_id())
+	if director and is_instance_valid(director):
+		director.leave_queues(self)

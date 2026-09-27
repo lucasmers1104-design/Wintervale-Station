@@ -41,7 +41,12 @@ var _spots: Array[StationSpot] = []
 var _platform_points: Array[Vector3] = []
 var _arrivals_seen: Dictionary[int, bool] = {}
 var _departures_spawned: Dictionary[int, int] = {}
-var _door_use: Dictionary[String, int] = {}
+var _queues: Dictionary[int, Array] = {}
+var _queue_trains: Dictionary[int, Train] = {}
+var _greeted: Dictionary[String, float] = {}
+var _social_timer := 1.0
+## Reihenfolge der Stufengänge je Tür: [Zug, Tür, "out" | "in"] (für Tests).
+var _door_log: Array = []
 var _last_hours := -1.0
 var _schedule_timer := 0.0
 var _traveller_count := 0
@@ -92,7 +97,8 @@ func resume_all() -> void:
 		if is_instance_valid(traveller):
 			traveller.queue_free()
 	_travellers.clear()
-	_door_use.clear()
+	for train_id in _queues.keys():
+		_close_queues(train_id, _queue_trains.get(train_id))
 	_arrivals_seen.clear()
 	for npc in _npcs:
 		npc.resume(WorldClock.time_of_day)
@@ -104,7 +110,8 @@ func get_npcs() -> Array[Npc]:
 
 
 func get_travellers() -> Array[Npc]:
-	_travellers = _travellers.filter(func(npc: Npc) -> bool: return is_instance_valid(npc) and not npc.is_queued_for_deletion())
+	_travellers.assign(_travellers.filter(func(npc: Variant) -> bool:
+		return is_instance_valid(npc) and not (npc as Npc).is_queued_for_deletion()))
 	return _travellers
 
 
@@ -123,11 +130,72 @@ func _physics_process(delta: float) -> void:
 	if _last_hours >= 0.0 and absf(_hours_between(_last_hours, now)) > 0.6:
 		resume_all()
 	_last_hours = now
+	_update_doors(delta)
 	_schedule_timer -= delta
 	if _schedule_timer <= 0.0:
 		_schedule_timer = 0.5
 		_watch_trains()
 		_spawn_departing_travellers(now)
+	_social_timer -= delta
+	if _social_timer <= 0.0:
+		_social_timer = 1.0
+		_update_social()
+
+
+# --- Begegnungen ----------------------------------------------------------------------
+
+## Bewohner, die sich begegnen, grüßen sich kurz (höchstens einmal pro Spielstunde).
+## Wer zusammensteht, nickt und erzählt ab und zu.
+func _update_social() -> void:
+	var present: Array[Npc] = []
+	for npc in _npcs:
+		if npc.is_present() and not npc.is_busy():
+			present.append(npc)
+	for i in present.size():
+		for j in range(i + 1, present.size()):
+			var a := present[i]
+			var b := present[j]
+			var distance := a.global_position.distance_to(b.global_position)
+			if distance > 3.0 or distance < 0.3:
+				continue
+			var key := a.name + "|" + b.name
+			if _hours_between(float(_greeted.get(key, -99.0)), WorldClock.time_of_day) < 1.0 \
+					and _greeted.has(key):
+				continue
+			_greeted[key] = WorldClock.time_of_day
+			a.greet(b)
+			b.greet(a)
+	for npc in present:
+		if npc.get_behaviour() == "chat" and npc.get_spot() and npc.get_spot().partner \
+				and npc.get_spot().partner.occupant is Npc and _rng.randf() < 0.3:
+			npc.chat_gesture()
+
+
+## Gesprächsplatz: am liebsten gegenüber von jemandem, der dort schon steht.
+func claim_chat_spot(npc: Npc, rng: RandomNumberGenerator) -> StationSpot:
+	var waiting: Array[StationSpot] = []
+	var free_pairs: Array[StationSpot] = []
+	for spot in _spots:
+		if spot.kind != StationSpot.Kind.CHAT or not spot.is_free() or spot.partner == null:
+			continue
+		if not spot.partner.is_free():
+			waiting.append(spot)
+		elif spot.partner.is_free():
+			free_pairs.append(spot)
+	var pool := waiting if not waiting.is_empty() else free_pairs
+	if pool.is_empty():
+		return null
+	var spot := pool[rng.randi() % pool.size()]
+	spot.reserve(npc)
+	return spot
+
+
+## Jemand ist am Gesprächsplatz angekommen – wer gegenüber steht, grüßt.
+func on_chat_spot_taken(npc: Npc, spot: StationSpot) -> void:
+	var partner := spot.partner.occupant as Npc if spot.partner else null
+	if partner and is_instance_valid(partner):
+		npc.greet(partner)
+		partner.greet(npc)
 
 
 # --- Züge ---------------------------------------------------------------------------
@@ -144,6 +212,46 @@ func find_departing_train(destination: String, _npc: Npc = null, entry_index := 
 		elif destination == "" or train.entry.destination == destination:
 			return train
 	return null
+
+
+## Ein Zug nach [param destination], der gerade auf den Bahnhof zufährt (letzte ~300 m).
+func find_incoming_train(destination: String, entry_index := -1) -> Train:
+	if dispatcher == null:
+		return null
+	for train in dispatcher.get_trains():
+		if train.state != Train.State.RUNNING or train.stop_at < 0.0 or train.platform_stop == null \
+				or train.platform_stop.station_name != station_name or not train.entry.stops:
+			continue
+		if train.stop_at - train.head > 300.0:
+			continue
+		if entry_index >= 0:
+			if int(train.get_meta(&"entry_index", -1)) == entry_index:
+				return train
+		elif train.entry.destination == destination:
+			return train
+	return null
+
+
+## Freier Stehplatz an der Bahnsteigkante des Gleises, auf dem [param train] halten wird –
+## möglichst nahe der Zugmitte.
+func claim_spot_near_stop(npc: Npc, train: Train) -> StationSpot:
+	var stop := train.platform_stop
+	var toward_track := -stop.get_platform_direction()
+	var best: StationSpot = null
+	var best_distance := INF
+	for spot in _spots:
+		if spot.kind != StationSpot.Kind.STAND or not (spot.is_free() or spot.occupant == npc):
+			continue
+		if spot.get_facing().dot(toward_track) < 0.5:
+			continue
+		var distance := RailGeometry.flat(spot.global_position - stop.global_position).length() \
+			+ _rng.randf() * 4.0
+		if distance < best_distance:
+			best_distance = distance
+			best = spot
+	if best:
+		best.reserve(npc)
+	return best
 
 
 ## Ein Zug aus [param origin], aus dem [param npc] noch nicht ausgestiegen ist.
@@ -168,32 +276,182 @@ func has_departed(entry_index: int, now: float) -> bool:
 	return _hours_between(entry.get_departure_hours(), now) > 0.25
 
 
-## Sucht eine Tür für [param npc] (nahe [param near]; Vector3.INF = gleichmäßig verteilt).
-## Rückgabe: {"platform": Stehpunkt am Bahnsteig, "inside": Punkt in der Tür, "floor_y": Wagenboden}.
-func assign_door(train: Train, npc: Npc, near: Vector3) -> Dictionary:
-	var points := train.get_door_points()
-	var outward := train.get_platform_direction()
-	if points.is_empty() or outward == Vector3.ZERO:
+# --- Türen und Warteschlangen --------------------------------------------------------
+#
+# Pro haltendem Zug und Tür eine Warteschlange:
+#   "alight": wer aussteigen will (noch im Zug, unsichtbar)
+#   "board":  wer einsteigen will (steht links/rechts neben der Tür an)
+#   "busy":   wer gerade auf den Trittstufen ist
+# Regeln: erst alle aussteigen lassen, dann einsteigen – immer nur einer pro Tür.
+# Solange sich an einer Tür etwas tut, hält der Director die Türen offen.
+
+## Steigt aus [param train] aus: in die Aussteige-Schlange der ruhigsten Tür.
+func request_alight(npc: Npc, train: Train) -> bool:
+	var doors := _doors_for(train)
+	if doors.is_empty():
+		return false
+	var best: Dictionary = doors[0]
+	for door: Dictionary in doors:
+		if (door["alight"] as Array).size() < (best["alight"] as Array).size() \
+				or ((door["alight"] as Array).size() == (best["alight"] as Array).size() and _rng.randf() < 0.4):
+			best = door
+	(best["alight"] as Array).append(npc)
+	return true
+
+
+## Stellt [param npc] zum Einsteigen an einer Tür an (nächste und kürzeste Schlange).
+## Rückgabe: {"slot": Wartepunkt, "door": Punkt vor der Tür} oder leer.
+func join_boarding(npc: Npc, train: Train) -> Dictionary:
+	if not train.doors_open() or train.dwell_phase == Train.Dwell.CLOSING:
 		return {}
-	var best := {}
+	var doors := _doors_for(train)
+	if doors.is_empty():
+		return {}
+	var best: Dictionary = {}
 	var best_score := INF
-	for point in points:
-		var key := "%d:%d:%d" % [train.train_id, roundi(point.x * 2.0), roundi(point.z * 2.0)]
-		var score := float(_door_use.get(key, 0)) * 6.0
-		if near != Vector3.INF:
-			score += RailGeometry.flat(point - near).length() * 0.2
-		else:
-			score += _rng.randf() * 3.0
+	for door: Dictionary in doors:
+		var platform: Vector3 = door["platform"]
+		var score := RailGeometry.flat(platform - npc.global_position).length() * 0.15 \
+			+ (door["board"] as Array).size() * 2.5 + (door["alight"] as Array).size() * 1.0
 		if score < best_score:
 			best_score = score
-			var flat_door := Vector3(point.x, 0.0, point.z)
-			var platform := flat_door + outward * 0.65
-			platform.y = ground_height(platform, point.y)
-			var inside := flat_door - outward * 0.35
-			inside.y = point.y
-			best = {"key": key, "platform": platform, "inside": inside, "floor_y": point.y}
-	_door_use[best["key"]] = int(_door_use.get(best["key"], 0)) + 1
-	return best
+			best = door
+	(best["board"] as Array).append(npc)
+	var index := (best["board"] as Array).size() - 1
+	return {"slot": queue_slot(best, index), "door": best["platform"]}
+
+
+## Wartepunkt Nummer [param index] an einer Tür: abwechselnd links und rechts
+## neben der Tür, damit die Mitte für Aussteigende frei bleibt.
+func queue_slot(door: Dictionary, index: int) -> Vector3:
+	var along: Vector3 = door["along"]
+	var side := 1.0 if index % 2 == 0 else -1.0
+	var distance := 0.8 + 0.55 * floorf(index / 2.0)
+	var point: Vector3 = door["platform"] + along * side * distance
+	point.y = ground_height(point, (door["platform"] as Vector3).y)
+	return point
+
+
+## Jemand hat die Trittstufen verlassen – die Tür ist wieder frei.
+func door_done(npc: Npc) -> void:
+	for train_id in _queues:
+		for door: Dictionary in _queues[train_id]:
+			if door["busy"] == npc:
+				door["busy"] = null
+				door["cooldown"] = 0.35
+
+
+## Aus allen Warteschlangen austragen (Abbruch, Heimweg …).
+func leave_queues(npc: Npc) -> void:
+	for train_id in _queues:
+		for door: Dictionary in _queues[train_id]:
+			(door["alight"] as Array).erase(npc)
+			(door["board"] as Array).erase(npc)
+			if door["busy"] == npc:
+				door["busy"] = null
+
+
+## Wie viele warten an [param train] noch aufs Ein- bzw. Aussteigen (für Tests).
+func get_queue_counts(train: Train) -> Vector2i:
+	var counts := Vector2i.ZERO
+	for door: Dictionary in _queues.get(train.train_id, []):
+		counts.x += (door["alight"] as Array).size()
+		counts.y += (door["board"] as Array).size()
+	return counts
+
+
+func _doors_for(train: Train) -> Array:
+	if not _queues.has(train.train_id):
+		var doors := []
+		for path in train.get_door_paths():
+			var platform: Vector3 = path["platform"]
+			platform.y = ground_height(platform, platform.y)
+			doors.append({
+				"inside": path["inside"], "door": path["door"],
+				"upper_top": path["upper"], "lower_top": path["lower"],
+				"platform": platform, "along": path["along"],
+				"alight": [], "board": [], "busy": null, "cooldown": 0.6,
+			})
+		if doors.is_empty():
+			return []
+		_queues[train.train_id] = doors
+		_queue_trains[train.train_id] = train
+	return _queues[train.train_id]
+
+
+## Jeden Frame: Türen abarbeiten, Türen aufhalten, abgefahrene Züge aufräumen.
+func _update_doors(delta: float) -> void:
+	for train_id in _queues.keys():
+		var train: Train = _queue_trains.get(train_id)
+		var doors: Array = _queues[train_id]
+		var gone := train == null or not is_instance_valid(train) or train.state != Train.State.DWELLING
+		if gone or train.dwell_phase == Train.Dwell.CLOSING or train.dwell_phase == Train.Dwell.STEP_IN:
+			_close_queues(train_id, train if not gone else null)
+			continue
+		if not train.doors_open():
+			continue
+		var active := false
+		for door_index in doors.size():
+			var door: Dictionary = doors[door_index]
+			door["cooldown"] = float(door["cooldown"]) - delta * speed_factor()
+			var alight: Array = door["alight"]
+			var board: Array = door["board"]
+			if door["busy"] != null or not alight.is_empty() or not board.is_empty():
+				active = true
+			if door["busy"] != null and not is_instance_valid(door["busy"]):
+				door["busy"] = null
+			if door["busy"] != null or float(door["cooldown"]) > 0.0:
+				continue
+			if not alight.is_empty():
+				var npc: Npc = alight.pop_front()
+				if is_instance_valid(npc):
+					door["busy"] = npc
+					npc.climb_out(door)
+					_door_log.append([train_id, door_index, "out"])
+			elif not board.is_empty():
+				var first: Npc = board[0]
+				if not is_instance_valid(first):
+					board.pop_front()
+				elif first.is_waiting_in_queue():
+					board.pop_front()
+					door["busy"] = first
+					first.climb_in(door)
+					_door_log.append([train_id, door_index, "in"])
+					for i in board.size():
+						(board[i] as Npc).move_to_queue_slot(queue_slot(door, i), door["platform"])
+		if active:
+			train.hold_doors(_hold_id(train))
+		else:
+			train.release_doors(_hold_id(train))
+
+
+## Der Zug schließt die Türen: Wer noch wartet, muss auf den nächsten Zug warten.
+func _close_queues(train_id: int, train: Train) -> void:
+	for door: Dictionary in _queues[train_id]:
+		for npc in (door["board"] as Array).duplicate():
+			if is_instance_valid(npc):
+				(npc as Npc).boarding_aborted()
+		for npc in (door["alight"] as Array).duplicate():
+			if is_instance_valid(npc):
+				(npc as Npc).alight_cancelled()
+	if train and is_instance_valid(train):
+		train.release_doors(_hold_id(train))
+	_queues.erase(train_id)
+	_queue_trains.erase(train_id)
+
+
+func _hold_id(train: Train) -> int:
+	return -1000 - train.train_id
+
+
+## Nach dem Aussteigen ein paar Schritte auf den Bahnsteig – jeder etwas woanders hin.
+func spread_point(from: Vector3, along: Vector3, rng: RandomNumberGenerator) -> Vector3:
+	for attempt in 6:
+		var inward := along.cross(Vector3.UP).normalized()
+		var candidate := from + along * rng.randf_range(-3.0, 3.0) + inward * rng.randf_range(-0.6, 0.6)
+		if absf(ground_height(candidate, from.y) - from.y) < 0.12:
+			return candidate
+	return from
 
 
 func _station_trains() -> Array[Train]:
@@ -266,7 +524,11 @@ func spawn_traveller(rng: RandomNumberGenerator) -> Npc:
 	_traveller_count += 1
 	var npc := Npc.new()
 	add_child(npc)
-	npc.setup(self, null, random_appearance(rng), 1000 + _traveller_count)
+	# Reisende haben meist Gepäck dabei: Koffer, Rucksack oder Einkaufstasche
+	var roll := rng.randf()
+	var carry := CharacterModel.Carry.SUITCASE if roll < 0.45 else (CharacterModel.Carry.BACKPACK if roll < 0.7
+		else (CharacterModel.Carry.SHOPPING_BAG if roll < 0.85 else CharacterModel.Carry.NONE))
+	npc.setup(self, null, random_appearance(rng), 1000 + _traveller_count, carry)
 	_relay_signals(npc)
 	_travellers.append(npc)
 	return npc
@@ -399,3 +661,8 @@ func _hours_between(from: float, to: float) -> float:
 
 func _exit_tree() -> void:
 	CharacterModel.clear_cache()
+
+
+## Alle bisherigen Stufengänge [Zug, Tür, "out" | "in"] – für Tests.
+func get_door_log() -> Array:
+	return _door_log

@@ -14,6 +14,8 @@ extends Resource
 @export_range(0.6, 1.8, 0.05) var walk_speed := 1.1
 ## Tagesablauf, nach Uhrzeit sortiert.
 @export var routines: Array[NpcRoutine] = []
+## Gepäck, das der Bewohner dabeihat (Koffer, Rucksack, Einkaufstasche).
+@export var carry := CharacterModel.Carry.NONE
 
 @export_group("Vorlieben am Bahnsteig")
 ## Wie gern sitzt, steht, spaziert der Bewohner, schaut auf Uhr oder Tafel? (Gewichte)

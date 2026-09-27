@@ -18,16 +18,26 @@ enum Kind {
 	CLOCK,
 	## Vor der Abfahrtstafel oder dem Fahrplanaushang.
 	BOARD,
+	## Zusammenstehen: zwei Plätze einander gegenüber (siehe [member partner]).
+	CHAT,
 }
 
 @export var kind := Kind.STAND
 @export var station_name := "Wintervale"
+## Nur CHAT: der gegenüberliegende Platz.
+@export var partner: StationSpot
 
 var occupant: Node = null
 
 
 func _ready() -> void:
 	add_to_group(GROUP)
+	add_to_group(PropScatter.GROUP_CLEARING)
+
+
+## Kein Baum auf dem Platz.
+func clears(x: float, z: float) -> bool:
+	return Vector2(x, z).distance_to(Vector2(global_position.x, global_position.z)) < 1.0
 
 
 func is_free() -> bool:

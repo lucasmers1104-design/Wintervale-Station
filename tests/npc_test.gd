@@ -102,9 +102,36 @@ func _test_characters() -> void:
 	check(is_equal_approx(kid.get_hip_height(), CharacterModel.HIP_HEIGHT * 0.74), "child has shorter legs")
 	kid.queue_free()
 
+	var traveller_model := CharacterModel.new()
+	traveller_model.appearance = load("res://assets/characters/lotte.tres")
+	traveller_model.carry = CharacterModel.Carry.SUITCASE
+	add_child(traveller_model)
+	check(traveller_model.find_child("Suitcase", true, false) != null, "travellers can carry a suitcase")
+	traveller_model.set_pose(CharacterModel.Pose.HANDS_BEHIND)
+	traveller_model.play_gesture(CharacterModel.Pose.STRETCH, 0.6)
+	await get_tree().create_timer(0.45).timeout
+	var stretching := traveller_model.get_pose_weight(CharacterModel.Pose.STRETCH)
+	await get_tree().create_timer(1.0).timeout
+	check(stretching > 0.5 and traveller_model.pose == CharacterModel.Pose.HANDS_BEHIND
+		and traveller_model.get_pose_weight(CharacterModel.Pose.STRETCH) < 0.05,
+		"a short stretch, then back to hands behind the back")
+	var eye_min := INF
+	for i in 400:
+		await get_tree().process_frame
+		eye_min = minf(eye_min, traveller_model.get_eye_openness())
+	check(eye_min < 0.5, "blinks now and then")
+	traveller_model.queue_free()
+
 
 func _test_sounds() -> void:
 	print("--- Footstep sounds")
+	for sound_name in ["door_unlock", "stairs_out", "stairs_in", "brake_squeal", "wind", "station_murmur", "bird_0", "bird_3"]:
+		var sound := SoundLibrary.get_sound(sound_name)
+		var sound_peak := SoundLibrary.peak(sound)
+		check(sound_peak > 0.1 and sound_peak < 0.55, "%s is subtle (peak %.2f)" % [sound_name, sound_peak])
+	check(SoundLibrary.get_sound("wind").loop_mode == AudioStreamWAV.LOOP_FORWARD, "wind loops seamlessly")
+	var ambience: AmbientSoundscape = main.get_node("AmbientSoundscape")
+	check(ambience != null, "ambient soundscape in the scene")
 	for surface in ["snow", "stone"]:
 		for variant in 3:
 			var stream := SoundLibrary.get_sound("step_%s_%d" % [surface, variant])
@@ -135,13 +162,17 @@ func _test_world_setup() -> void:
 	var kinds := {}
 	for spot in director.get_spots():
 		kinds[spot.kind] = int(kinds.get(spot.kind, 0)) + 1
-	check(kinds.get(StationSpot.Kind.SEAT, 0) == 12, "six benches with two seats each (%d)" % kinds.get(StationSpot.Kind.SEAT, 0))
+	var platform_seats := director.get_spots().filter(func(spot: StationSpot) -> bool:
+		return spot.kind == StationSpot.Kind.SEAT and absf(spot.global_position.x) < 2.2).size()
+	check(platform_seats == 12, "six platform benches with two seats each (%d)" % platform_seats)
+	check(kinds.get(StationSpot.Kind.SEAT, 0) == 20, "plus two seating groups with four seats (%d)" % kinds.get(StationSpot.Kind.SEAT, 0))
+	check(kinds.get(StationSpot.Kind.CHAT, 0) == 4, "two pairs of chat spots")
 	check(kinds.get(StationSpot.Kind.STAND, 0) == 10 and kinds.get(StationSpot.Kind.CLOCK, 0) == 4
 		and kinds.get(StationSpot.Kind.BOARD, 0) == 3, "waiting, clock and board spots")
 	var platform_top := terrain.get_height(0.0, -9.0) + 0.55
 	var seat_error := 0.0
 	for spot in director.get_spots():
-		if spot.kind == StationSpot.Kind.SEAT:
+		if spot.kind == StationSpot.Kind.SEAT and absf(spot.global_position.x) < 2.2:
 			seat_error = maxf(seat_error, absf(spot.global_position.y - platform_top - StationPropMeshes.BENCH_SEAT_HEIGHT))
 	check(seat_error < 0.08, "seats at bench height (error %.2f m)" % seat_error)
 
@@ -187,8 +218,8 @@ func _test_daily_routine() -> void:
 	for npc in director.get_npcs():
 		if npc.state == Npc.State.AT_STATION:
 			at_station += 1
-			check(npc.is_present() and npc.get_spot() != null and absf(npc.global_position.x) < 2.2,
-				"%s placed on the platform (%s)" % [npc.display_name, npc.get_behaviour()])
+			check(npc.is_present() and npc.get_spot() != null and npc.global_position.distance_to(Vector3(-5.0, npc.global_position.y, 0.0)) < 30.0,
+				"%s placed at the station (%s)" % [npc.display_name, npc.get_behaviour()])
 	check(at_station == 3, "three villagers at the station at 15:00")
 
 
@@ -253,14 +284,24 @@ func _test_player() -> void:
 	model.footstep.connect(func() -> void: steps[0] += 1)
 	var pivot: Node3D = player.get_node("CameraYaw")
 	var max_lag := 0.0
+	var start_lean := 0.0
 	Input.action_press(&"move_forward")
 	for i in 60:
 		await get_tree().physics_frame
 		max_lag = maxf(max_lag, pivot.global_position.distance_to(player.global_position + Vector3.UP * CharacterModel.EYE_HEIGHT))
+		if i < 25:
+			start_lean = maxf(start_lean, model.get_lean())
+	var walk_lean := model.get_lean()
 	Input.action_release(&"move_forward")
+	var stop_lean := INF
+	for i in 30:
+		await get_tree().physics_frame
+		stop_lean = minf(stop_lean, model.get_lean())
+	check(start_lean > walk_lean + 0.01, "leans into the first steps (%.3f vs %.3f)" % [start_lean, walk_lean])
+	check(stop_lean < walk_lean - 0.02, "leans back gently when stopping (%.3f)" % stop_lean)
 	check(steps[0] >= 3, "footsteps while walking (%d)" % steps[0])
 	check(max_lag > 0.05 and max_lag < 1.0, "camera follows with a gentle delay (%.2f m)" % max_lag)
-	await frames(90)
+	await frames(60)
 	var rest := pivot.global_position.distance_to(player.global_position + Vector3.UP * CharacterModel.EYE_HEIGHT)
 	check(rest < 0.05, "camera settles behind the player (%.3f m)" % rest)
 	var footsteps: FootstepPlayer = null
@@ -275,6 +316,8 @@ func _test_player() -> void:
 	Input.action_press(&"move_back")
 	Input.action_press(&"sprint")
 	await frames(60)
+	var sprint_lean := model.get_lean()
+	check(sprint_lean > walk_lean + 0.05, "sprinting leans further forward (%.3f)" % sprint_lean)
 	Input.action_release(&"move_back")
 	Input.action_release(&"sprint")
 	check(player.global_position.distance_to(sprint_start) > 3.5, "sprinting is faster than walking")
@@ -318,19 +361,40 @@ func _test_trains_and_passengers() -> void:
 	var departed := {}
 	var greta := director.get_npc("Greta Berger")
 	var max_held_after_departure := 0.0
+	var phases := {}
+	var steps_ok := {}
+	var last_state := {}
+	var end_speed := {}
+	var luggage := 0
 	while WorldClock.time_of_day < 15.6:
 		await get_tree().physics_frame
+		for npc in director.get_travellers():
+			if npc.model.carry != CharacterModel.Carry.NONE:
+				luggage += 1
 		for train in dispatcher.get_trains():
+			var key := train.entry.train_number
+			if train.state == Train.State.DWELLING:
+				var list: Array = phases.get(key, [])
+				if list.is_empty() or list[-1] != train.dwell_phase:
+					list.append(train.dwell_phase)
+				phases[key] = list
+				# Türen erst öffnen, wenn die Trittstufe ganz draußen ist
+				if train.cars[1].get_door_amount() > 0.01 and train.get_step_amount() < 0.99:
+					steps_ok[key] = false
+			elif last_state.get(key, -1) == Train.State.DWELLING and train.get_step_amount() > 0.01:
+				steps_ok[key] = false  # abgefahren, obwohl die Stufe noch draußen ist
+			last_state[key] = train.state
+			if train.state == Train.State.RUNNING and train.stop_at >= 0.0 and train.stop_at - train.head < 1.5:
+				end_speed[key] = maxf(float(end_speed.get(key, 0.0)), train.speed)
 			if train.entry.station == "Wintervale" and train.departed_at >= 0.0:
 				departed[train.entry.train_number] = train.departed_at
-			if train.state == Train.State.DWELLING and train.is_held():
-				var late := fposmod(WorldClock.time_of_day - train.entry.get_departure_hours() + 12.0, 24.0) - 12.0
-				max_held_after_departure = maxf(max_held_after_departure, late)
+			max_held_after_departure = maxf(max_held_after_departure, train.get_hold_time())
 	WorldClock.time_scale = 1.0
 	WorldClock.paused = true
 	var travellers_boarded := boarded.filter(func(row: Array) -> bool: return row[0] == null or not is_instance_valid(row[0]) or (row[0] as Npc).profile == null)
 	check(departed.has("RB 315") and departed.has("RB 316"), "both trains still departed (%s)" % str(departed.keys()))
-	check(max_held_after_departure < 0.1, "passengers delay a train only briefly (%.0f min)" % (max_held_after_departure * 60.0))
+	check(max_held_after_departure <= Train.MAX_DOOR_HOLD + 0.1,
+		"passengers hold the doors only briefly (%.1f s beyond departure)" % max_held_after_departure)
 	check(boarded.any(func(row: Array) -> bool: return is_instance_valid(row[0]) and row[0] == greta and row[2] == "Nordtal"),
 		"Greta boarded a train to Nordtal")
 	check(greta.state == Npc.State.AWAY and not greta.is_present(), "Greta is away on her trip")
@@ -340,5 +404,21 @@ func _test_trains_and_passengers() -> void:
 	for train in dispatcher.get_trains():
 		still_held = still_held or train.is_held()
 	check(not still_held, "no train is left with held doors")
+	var expected := [Train.Dwell.UNLOCKING, Train.Dwell.STEP_OUT, Train.Dwell.OPENING, Train.Dwell.WAITING,
+		Train.Dwell.CLOSING, Train.Dwell.STEP_IN]
+	for number in ["RB 315", "RB 316"]:
+		check(phases.get(number, []) == expected, "%s: unlock, step out, doors open, wait, close, step in" % number)
+		check(steps_ok.get(number, true), "%s: doors only open with the step extended, departs with it retracted" % number)
+		check(float(end_speed.get(number, 9.0)) < 1.0, "%s: rolls in gently (%.2f m/s on the last 1.5 m)" % [number, end_speed.get(number, 9.0)])
+	var order_ok := true
+	var seen_in := {}
+	for row: Array in director.get_door_log():
+		var door_key := "%d:%d" % [row[0], row[1]]
+		if row[2] == "in":
+			seen_in[door_key] = true
+		elif seen_in.has(door_key):
+			order_ok = false
+	check(order_ok and director.get_door_log().size() >= 3, "at every door: first off, then on (%d step walks)" % director.get_door_log().size())
+	check(luggage > 0, "travellers carry luggage")
 	dispatcher.enabled = false
 	dispatcher.clear_trains()

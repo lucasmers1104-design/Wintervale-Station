@@ -31,7 +31,7 @@ func play_step() -> void:
 	stream = SoundLibrary.get_sound("step_%s_%d" % [_last_surface, _rng.randi_range(0, 2)])
 	pitch_scale = _rng.randf_range(0.9, 1.1)
 	volume_db = base_volume_db + _rng.randf_range(-1.5, 1.0)
-	play()
+	SoundLibrary.play(self)
 
 
 ## "snow" oder "stone" – je nachdem, worauf die Figur gerade steht.

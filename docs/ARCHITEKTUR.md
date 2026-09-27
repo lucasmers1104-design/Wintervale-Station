@@ -193,3 +193,16 @@ Ausführlich in [NPCS.md](NPCS.md). Kurz:
   - `main.gd`: richtet auch Bohlenübergänge auf die Gleishöhe aus.
   - Physik-Ebene 7 „Bewohner“ (`GameDefs.LAYER_CHARACTERS`); die Spielfigur stößt an Bewohner.
 - `tests/npc_test.*`: 72 Prüfungen.
+
+## Etappe 5: Lebendige Fahrgäste und Animations-Feinschliff
+
+Ausführlich in [NPCS.md](NPCS.md) (Animationen, Passagier-System) und [ZUEGE.md](ZUEGE.md) (Halt mit Trittstufe). Kurz:
+
+- **Animationen** (`CharacterModel`, Animationsteil überarbeitet, Aufbau und Schnittstelle erhalten): neue Fortbewegung `move(tempo, delta, sprint, beschleunigung, drehrate)` mit tempoabhängiger Schrittfrequenz, Sprint-Haltung, Vor-/Zurücklehnen beim Anfahren/Bremsen, Kurvenlage, Trippeln beim Drehen, stabilisiertem Kopf, Blinzeln, Gewichtsverlagerung; neue Haltungen und Gesten (`HANDS_BEHIND`, `STRETCH`, `WARM_HANDS`, `NOD`, `TALK`) über `play_gesture()`; weicheres Hinsetzen/Aufstehen; Gepäck (`carry`).
+- **Spielfigur:** wird aus der echten Bewegung animiert (Tempo, Beschleunigung, Drehung); kleine Leerlauf-Gesten nach längerem Stillstehen.
+- **Zughalt** (`Train`, erweitert): sanftes Ausrollen auf den letzten 10 m, weiches Anfahren, neue Haltephasen `UNLOCKING → STEP_OUT → OPENING → WAITING → CLOSING → STEP_IN`; ausfahrbare, klappbare Trittstufe je Tür (`TrainMeshes`, `TrainCar.set_steps`); `get_door_paths()` für den Weg über die Stufen; Türen höchstens 8 Simulationssekunden aufhalten.
+- **Passagier-System** (`NpcDirector`, `Npc`): Warteschlange je Tür, erst aussteigen, dann einsteigen, einer nach dem anderen über die Stufen; Wartende stehen neben der Tür; Aussteiger verteilen sich; Reisende gehen zur Bahnsteigkante, wenn ihr Zug einfährt.
+- **Bahnsteig-Leben:** Gesprächsplätze (`StationSpot.Kind.CHAT`, paarweise), Begrüßen im Vorbeigehen, zufällige Leerlauf-Gesten; neue Details (`StationProp`: Gepäckstapel, Fahrrad im Ständer, Schneebänke, Sitzgruppen mit Tisch).
+- **Klang:** neue Klänge (Entriegeln, Trittstufe aus/ein, leises Bremsquietschen, Wind, Bahnsteig-Gemurmel, Vögel), gedämpftere Türen; neue Klangkulisse `AmbientSoundscape`. `SoundLibrary.play()` spielt ohne Audioausgabe (headless) nichts ab.
+- **Leistung:** Bodenabtastung der Bewohner nur alle zwei Physik-Schritte und nur in Bewegung; Namensschilder nur bei Bedarf; kleine Figurdetails (Augen, Knöpfe, Brille …) ohne Schatten und ab 45 m ausgeblendet; kleine Bahnhofsdetails ab 110 m ausgeblendet; Materialien geteilt. Gemessen auf dem schwachen Entwicklungs-Laptop (Intel HD 520, Kompatibilitätsmodus): gleiche Bildrate wie Etappe 4, in der Nahansicht ~30 % weniger Draw-Calls (767 → 531).
+- `tests/npc_test.*`: jetzt 98 Prüfungen.

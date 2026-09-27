@@ -46,7 +46,11 @@ var _yaw := 0.0
 var _smoothed_pitch := -0.3
 var _target_distance := 4.5
 var _footsteps: FootstepPlayer
-var _walk_phase := 0.0
+var _last_speed := 0.0
+var _smoothed_accel := 0.0
+var _last_model_yaw := 0.0
+var _idle_time := 0.0
+var _next_gesture := 8.0
 var _spawn_point := Vector3.ZERO
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 
@@ -222,9 +226,31 @@ func _turn_model(direction: Vector3, delta: float) -> void:
 	_model.rotation.y = lerp_angle(_model.rotation.y, target_yaw, 1.0 - exp(-turn_speed * delta))
 
 
-## Laufanimation abhängig von der Geschwindigkeit (kurze Beinchen = schnellere Schritte).
+## Animation aus der echten Bewegung: Tempo, Sprintanteil, Beschleunigung und
+## Drehung werden an die Figur gegeben – sie federt Start, Stopp und Kurven selbst weich ab.
+## Steht die Figur eine Weile still, macht sie ab und zu eine kleine Geste.
 func _animate_walk(delta: float) -> void:
 	var speed := Vector2(velocity.x, velocity.z).length()
-	var amount := clampf(speed / walk_speed, 0.0, 1.0) if is_on_floor() else 0.3
-	_walk_phase += delta * speed * 4.0
-	_model.animate(amount, _walk_phase)
+	if not is_on_floor():
+		speed *= 0.3
+	var accel := (speed - _last_speed) / maxf(delta, 0.0001)
+	_smoothed_accel = lerpf(_smoothed_accel, accel, 1.0 - exp(-6.0 * delta))
+	_last_speed = speed
+	var turn_rate := angle_difference(_last_model_yaw, _model.rotation.y) / maxf(delta, 0.0001)
+	_last_model_yaw = _model.rotation.y
+	var sprint := clampf((speed - walk_speed) / maxf(sprint_speed - walk_speed, 0.1), 0.0, 1.0)
+	_model.move(speed, delta, sprint, _smoothed_accel, turn_rate if not first_person else 0.0)
+	_update_idle_gestures(delta, speed)
+
+
+func _update_idle_gestures(delta: float, speed: float) -> void:
+	if speed > 0.2 or not input_enabled or first_person:
+		_idle_time = 0.0
+		_next_gesture = randf_range(7.0, 11.0)
+		return
+	_idle_time += delta
+	if _idle_time >= _next_gesture:
+		_next_gesture = _idle_time + randf_range(10.0, 18.0)
+		var gestures := [CharacterModel.Pose.WARM_HANDS, CharacterModel.Pose.CHECK_WATCH, CharacterModel.Pose.STRETCH]
+		var gesture: CharacterModel.Pose = gestures[randi() % gestures.size()]
+		_model.play_gesture(gesture, 2.6 if gesture == CharacterModel.Pose.STRETCH else 2.2)

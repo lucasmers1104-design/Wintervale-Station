@@ -31,6 +31,20 @@ const BUFFER_HEIGHT := 1.05
 ## Oberkante des Wagenbodens an den Türen (über Schienenoberkante).
 const FLOOR_HEIGHT := 1.08
 
+# Ausfahrbare Trittstufe (Maße für die Seite +X, lokal zum Wagen)
+const STEP_WIDTH := 1.0
+const STEP_DEPTH := 0.34
+## Oberkante der oberen Stufe.
+const STEP_UPPER_Y := 0.72
+## Mitte der unteren Stufe relativ zum Scharnier (ausgeklappt).
+const STEP_LOWER_OFFSET := Vector2(0.3, -0.36)
+## Mitte der oberen Stufe eingefahren / ausgefahren (Abstand zur Wagenmitte).
+const STEP_RETRACTED_X := 1.0
+const STEP_EXTENDED_X := 1.48
+## So weit ist die untere Stufe eingeklappt (Bogenmaß um die Längsachse).
+const STEP_FOLD_ANGLE := 2.14
+const STEP_YELLOW := Color(0.95, 0.76, 0.22)
+
 const UNDER := Color(0.16, 0.16, 0.18)
 const FRAME := Color(0.2, 0.2, 0.22)
 const METAL := Color(0.38, 0.38, 0.4)
@@ -409,6 +423,47 @@ static func create_wheelset() -> ArrayMesh:
 	var mesh := st.commit()
 	_cache["wheelset"] = mesh
 	return mesh
+
+
+# --- Trittstufen ---------------------------------------------------------------------
+
+## Obere Stufe der ausfahrbaren Trittstufe (gebaut für die Seite +X, die Gegenseite
+## wird um 180° gedreht). Ursprung = Stufenmitte in Längsrichtung, eingefahren.
+static func create_step_upper() -> ArrayMesh:
+	if _cache.has("step_upper"):
+		return _cache["step_upper"]
+	var st := _new_st()
+	_step_tread(st, Vector3(0.0, STEP_UPPER_Y, 0.0))
+	# Seitenwangen und Führungsschiene darunter
+	for z: float in [-STEP_WIDTH * 0.5 + 0.02, STEP_WIDTH * 0.5 - 0.02]:
+		LowPolyBuilder.add_box(st, Vector3(0.0, STEP_UPPER_Y - 0.08, z), Vector3(STEP_DEPTH, 0.12, 0.03), FRAME)
+	LowPolyBuilder.add_box(st, Vector3(-0.05, STEP_UPPER_Y - 0.13, 0.0), Vector3(0.2, 0.04, STEP_WIDTH - 0.1), UNDER)
+	var mesh := st.commit()
+	_cache["step_upper"] = mesh
+	return mesh
+
+
+## Untere, klappbare Stufe mit Wangen. Ursprung = Scharnier an der Vorderkante der oberen Stufe.
+static func create_step_lower() -> ArrayMesh:
+	if _cache.has("step_lower"):
+		return _cache["step_lower"]
+	var st := _new_st()
+	for z: float in [-STEP_WIDTH * 0.5 + 0.02, STEP_WIDTH * 0.5 - 0.02]:
+		LowPolyBuilder.add_beam(st, Vector3(-0.02, -0.01, z), Vector3(STEP_LOWER_OFFSET.x + STEP_DEPTH * 0.45, STEP_LOWER_OFFSET.y - 0.05, z),
+			0.035, FRAME)
+	_step_tread(st, Vector3(STEP_LOWER_OFFSET.x, STEP_LOWER_OFFSET.y, 0.0))
+	var mesh := st.commit()
+	_cache["step_lower"] = mesh
+	return mesh
+
+
+## Eine Stufe: Riffelblech mit gelber Sicherheitskante vorne. [param top] = Mitte der Oberkante.
+static func _step_tread(st: SurfaceTool, top: Vector3) -> void:
+	LowPolyBuilder.add_box(st, top - Vector3(0.0, 0.0225, 0.0), Vector3(STEP_DEPTH, 0.045, STEP_WIDTH), METAL)
+	for i in 5:
+		var x := -STEP_DEPTH * 0.5 + 0.05 + i * 0.055
+		LowPolyBuilder.add_box(st, top + Vector3(x, 0.005, 0.0), Vector3(0.018, 0.01, STEP_WIDTH - 0.1), METAL.darkened(0.3))
+	LowPolyBuilder.add_box(st, top + Vector3(STEP_DEPTH * 0.5 - 0.025, -0.02, 0.0), Vector3(0.05, 0.05, STEP_WIDTH), STEP_YELLOW)
 
 
 # --- Bausteine ---------------------------------------------------------------------
