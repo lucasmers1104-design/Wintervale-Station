@@ -86,9 +86,38 @@ func _test_layout() -> void:
 	for portal_name in ["Nordtal", "Südtal"]:
 		var portal := dispatcher.get_portal(portal_name)
 		check(portal != null and portal.get_end_node(network) != null, "portal %s bound to track end" % portal_name)
+		if portal:
+			_check_portal_mountain(portal)
 	check(dispatcher.get_platform_stops("Wintervale").size() == 2, "two platform tracks")
 	var nature: PropScatter = main.get_node("World/Nature")
 	check(nature.get_cleared_count() > 0, "trees cleared along the line (%d)" % nature.get_cleared_count())
+
+
+## Der Berg liegt auf der Portalmauer, deckt die Röhre ab und lässt das Gleis frei.
+func _check_portal_mountain(portal: TrainPortal) -> void:
+	var on_wall := INF
+	for x: float in [-7.0, -4.0, 0.0, 4.0, 7.0]:
+		on_wall = minf(on_wall, portal.get_mound_height(x, TunnelMeshes.WALL_BACK_ROW))
+	check(on_wall > TunnelMeshes.WALL_HEIGHT - 1.0 and on_wall < TunnelMeshes.WALL_HEIGHT,
+		"%s: mountain rests on the portal wall (%.2f m)" % [portal.portal_name, on_wall])
+	var over_tube := INF
+	var z := -2.0
+	while z > -portal.tunnel_length:
+		for x: float in [-3.0, 0.0, 3.0]:
+			over_tube = minf(over_tube, portal.get_mound_height(x, z))
+		z -= 1.5
+	check(over_tube > TunnelMeshes.OPENING_HEIGHT + 0.5,
+		"%s: mountain covers the whole tunnel tube (min %.1f m)" % [portal.portal_name, over_tube])
+	var in_cut := -INF
+	z = TunnelMeshes.WALL_FRONT_ROW
+	while z < 17.0:
+		for x: float in [-2.2, 0.0, 2.2]:
+			in_cut = maxf(in_cut, portal.get_mound_height(x, z))
+		z += 0.5
+	check(in_cut <= 0.0, "%s: rock cut keeps the track clear (max %.2f m)" % [portal.portal_name, in_cut])
+	var body := portal.get_node_or_null("PortalCollision") as StaticBody3D
+	check(body != null and body.collision_layer == GameDefs.LAYER_WORLD and body.get_child_count() == 3,
+		"%s: mountain and wall are solid ground" % portal.portal_name)
 
 
 func _test_timetable() -> void:

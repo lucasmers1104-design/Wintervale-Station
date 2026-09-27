@@ -53,10 +53,15 @@ func align_to_track(network: RailNetwork) -> void:
 		global_position.y = node.position.y
 
 
-## Rodet Bäume und Steine rund um Portal und Hügel.
+## Höhe des Berges über dem Tunnelmund an einer lokalen Stelle (-Z = in den Berg).
+func get_mound_height(local_x: float, local_z: float) -> float:
+	return TunnelMeshes.mound_height(local_x, local_z, tunnel_length, TunnelMeshes.mound_noise(_mound_seed()))
+
+
+## Rodet Bäume und Steine rund um Portal und Berg (der Berg bringt eigene Tannen mit).
 func clears(x: float, z: float) -> bool:
 	var local := global_transform.affine_inverse() * Vector3(x, global_position.y, z)
-	return absf(local.x) < 18.0 and local.z < 6.0 and local.z > -tunnel_length - 8.0
+	return absf(local.x) < 24.0 and local.z < 12.0 and local.z > -tunnel_length - 14.0
 
 
 func _build() -> void:
@@ -66,18 +71,22 @@ func _build() -> void:
 			child.queue_free()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = variation_seed
-	for mesh in [TunnelMeshes.create_portal(tunnel_length, rng), TunnelMeshes.create_mound(tunnel_length, rng)]:
+	var portal_mesh := TunnelMeshes.create_portal(tunnel_length, rng)
+	var mound_mesh := TunnelMeshes.create_mound(tunnel_length, _mound_seed())
+	for mesh: ArrayMesh in [portal_mesh, mound_mesh]:
 		var instance := MeshInstance3D.new()
 		instance.mesh = mesh
 		instance.material_override = material
 		_add_generated(instance)
-	# Felsbrocken an den Seiten
-	for side in [-1.0, 1.0]:
+	_build_collision(portal_mesh, mound_mesh)
+	_build_mound_trees(rng)
+	# Felsbrocken am Fuß des Einschnitts
+	for side: float in [-1.0, 1.0]:
 		var rock := MeshInstance3D.new()
 		rock.mesh = NatureMeshes.create_rock(rng)
 		rock.material_override = material
-		rock.position = Vector3(side * rng.randf_range(8.0, 10.0), 0.2, rng.randf_range(0.5, 2.5))
-		rock.scale = Vector3.ONE * rng.randf_range(1.2, 1.8)
+		rock.position = Vector3(side * rng.randf_range(4.2, 4.5), 0.35, rng.randf_range(2.8, 4.2))
+		rock.scale = Vector3.ONE * rng.randf_range(0.8, 1.0)
 		_add_generated(rock)
 	# Kleine Laterne über dem Tunnelmund
 	_lamp = OmniLight3D.new()
@@ -98,6 +107,62 @@ func _build() -> void:
 	lamp_box.mesh = box
 	lamp_box.position = Vector3(0.0, TunnelMeshes.OPENING_HEIGHT + 0.6, 0.75)
 	_add_generated(lamp_box)
+
+
+## Berg und Mauer sind begehbar; eine unsichtbare Wand hält die Spielfigur aus der Röhre.
+func _build_collision(portal_mesh: ArrayMesh, mound_mesh: ArrayMesh) -> void:
+	var body := StaticBody3D.new()
+	body.name = "PortalCollision"
+	body.collision_layer = GameDefs.LAYER_WORLD
+	body.collision_mask = 0
+	for mesh in [portal_mesh, mound_mesh]:
+		var shape := CollisionShape3D.new()
+		shape.shape = (mesh as ArrayMesh).create_trimesh_shape()
+		body.add_child(shape)
+	var plug := CollisionShape3D.new()
+	var plug_box := BoxShape3D.new()
+	plug_box.size = Vector3(TunnelMeshes.OPENING_WIDTH, TunnelMeshes.OPENING_HEIGHT, 0.5)
+	plug.shape = plug_box
+	plug.position = Vector3(0.0, TunnelMeshes.OPENING_HEIGHT * 0.5, -3.0)
+	body.add_child(plug)
+	_add_generated(body)
+
+
+## Ein paar verschneite Tannen auf dem Berg – nicht über der Röhre und nicht im Einschnitt.
+func _build_mound_trees(rng: RandomNumberGenerator) -> void:
+	var noise := TunnelMeshes.mound_noise(_mound_seed())
+	var spots: Array[Vector2] = []
+	var attempts := 0
+	while spots.size() < 9 and attempts < 200:
+		attempts += 1
+		var spot := Vector2(rng.randf_range(-22.0, 22.0), rng.randf_range(-tunnel_length - 4.0, 6.0))
+		if absf(spot.x) < 9.0 and spot.y > -tunnel_length * 0.6:
+			continue  # Hangkante und Blick auf das Portal frei halten
+		if spot.y > -1.0 and absf(spot.x) < 12.0:
+			continue
+		var too_close := false
+		for other in spots:
+			if other.distance_to(spot) < 5.5:
+				too_close = true
+		if too_close:
+			continue
+		var height := TunnelMeshes.mound_height(spot.x, spot.y, tunnel_length, noise)
+		var slope := absf(TunnelMeshes.mound_height(spot.x + 1.0, spot.y, tunnel_length, noise) - height) \
+			+ absf(TunnelMeshes.mound_height(spot.x, spot.y + 1.0, tunnel_length, noise) - height)
+		if height < 1.0 or slope > 1.1:
+			continue
+		spots.append(spot)
+		var tree := MeshInstance3D.new()
+		tree.mesh = NatureMeshes.create_pine(rng)
+		tree.material_override = material
+		tree.position = Vector3(spot.x, height - 0.45, spot.y)
+		tree.rotation.y = rng.randf() * TAU
+		tree.scale = Vector3.ONE * rng.randf_range(0.8, 1.15)
+		_add_generated(tree)
+
+
+func _mound_seed() -> int:
+	return variation_seed * 7919 + 13
 
 
 func _on_darkness_changed(dark: bool) -> void:

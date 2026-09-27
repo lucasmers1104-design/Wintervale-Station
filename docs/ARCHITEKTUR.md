@@ -168,3 +168,11 @@ Ausführlich in [ZUEGE.md](ZUEGE.md). Kurz:
   - `BirdEyeCamera`: folgt einem angeklickten Zug ruhig.
   - `WorldClock`: ein Spieltag dauert jetzt 48 Minuten (1 Spielminute = 2 Sekunden).
 - Physik-Ebenen neu: 5 „Natur“ (Bäume, Steine), 6 „Züge“ (Klickflächen).
+
+## Feinschliff nach Etappe 3: Tunnelberg und gemütliches Licht
+
+- **Tunnelportale sitzen im Berg** (`TunnelMeshes.create_mound`): Der Berg liegt direkt hinter dem Gesims auf der Portalmauer, steigt über der Röhre an und läuft seitlich (±30 m) und nach vorne weit unter dem Gelände aus. Vor der Mauer schneidet ein felsiger Einschnitt die Trasse frei; seine Flanken laufen von den Mauerecken schräg zum Gleis. Obendrauf wachsen ein paar Tannen.
+- `TrainPortal`: Berg und Mauer sind jetzt begehbarer Boden (Ebene „Welt“), eine unsichtbare Wand 3 m im Tunnel hält die Spielfigur draußen. `get_mound_height()` liefert die Berghöhe (für Tests/Deko). Die Rodung reicht so weit wie der Berg.
+- **Licht** (`DayNightCycle._build_gradients`, `Environment` in `main.tscn`): goldenes Sonnenlicht, cremiger Horizont und Nebel, kühle Lavendel-Schatten („gelbes Licht, kalter Schnee“). Nachts ruhiges, entsättigtes Blau – Mond neutraler, damit Laternen, Bahnsteiglampen und Zugfenster warm herausleuchten. Weniger Bloom-Schleier, leicht angehobene Sättigung.
+- **Farben**: Fels und Erde wärmer (Gelände, Tunnelberg, Steine), Tannen in frischerem Grün, Portalmauer aus warmem Sandstein. Zugfenster matter, tagsüber mit einem Hauch Innenlicht (`TrainDispatcher.day_window_glow`). Laternen etwas heller und weiter.
+- `tests/train_test.*`: 8 neue Prüfungen (Berg auf der Mauer, Röhre überdeckt, Gleis frei, Kollision) – jetzt 105.

@@ -5,7 +5,7 @@
 class_name Lantern
 extends StaticBody3D
 
-@export var light_energy := 2.4
+@export var light_energy := 3.0
 @export var glass_emission := 4.0
 @export var fade_duration := 2.0
 @export var max_switch_delay := 1.5

@@ -27,6 +27,8 @@ const MAX_LATE_HOURS := 0.5
 @export var glass_material: StandardMaterial3D
 ## Leuchtstärke der Fenster bei Nacht (warmes Licht von innen).
 @export var window_glow := 1.2
+## Auch tagsüber brennt drinnen ein wenig Licht – die Fenster wirken warm statt grau.
+@export var day_window_glow := 0.07
 
 var _trains: Array[Train] = []
 var _next_id := 1
@@ -385,7 +387,7 @@ func _on_darkness_changed(dark: bool) -> void:
 		if _glow_tween and _glow_tween.is_valid():
 			_glow_tween.kill()
 		_glow_tween = create_tween()
-		_glow_tween.tween_property(glass_material, "emission_energy_multiplier", window_glow if dark else 0.0, 3.0)
+		_glow_tween.tween_property(glass_material, "emission_energy_multiplier", window_glow if dark else day_window_glow, 3.0)
 
 
 func _lamp_material(color: Color, energy: float) -> StandardMaterial3D:

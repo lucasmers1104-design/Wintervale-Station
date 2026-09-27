@@ -97,4 +97,4 @@ position = Vector3(0, 2.845, 0)
 light_color = Color(1, 0.72, 0.42, 1)
 light_energy = 0.0
 shadow_enabled = true
-omni_range = 11.0
+omni_range = 13.0

@@ -51,21 +51,23 @@ process_mode = 2
 background_mode = 2
 sky = SubResource("Sky_main")
 ambient_light_source = 2
-ambient_light_color = Color(0.62, 0.67, 0.78, 1)
-ambient_light_energy = 0.6
+ambient_light_color = Color(0.64, 0.62, 0.72, 1)
+ambient_light_energy = 0.5
 reflected_light_source = 2
 tonemap_mode = 3
 ssao_enabled = true
 ssao_radius = 1.2
 ssao_intensity = 1.6
 glow_enabled = true
-glow_intensity = 0.7
-glow_bloom = 0.04
+glow_intensity = 0.85
+glow_bloom = 0.03
 glow_hdr_threshold = 1.1
 fog_enabled = true
-fog_light_color = Color(0.8, 0.84, 0.9, 1)
-fog_density = 0.005
+fog_light_color = Color(0.95, 0.88, 0.8, 1)
+fog_density = 0.0035
 fog_sky_affect = 0.3
+adjustment_enabled = true
+adjustment_saturation = 1.06
 
 [node name="Main" type="Node3D" node_paths=PackedStringArray("terrain", "player", "network", "starter_railway", "nature")]
 script = ExtResource("1_main")
@@ -86,13 +88,13 @@ moon = NodePath("Moon")
 world_environment = NodePath("../WorldEnvironment")
 
 [node name="Sun" type="DirectionalLight3D" parent="DayNightCycle"]
-light_color = Color(1, 0.86, 0.68, 1)
+light_color = Color(1, 0.88, 0.7, 1)
 light_angular_distance = 0.8
 shadow_enabled = true
 directional_shadow_max_distance = 120.0
 
 [node name="Moon" type="DirectionalLight3D" parent="DayNightCycle"]
-light_color = Color(0.62, 0.72, 1, 1)
+light_color = Color(0.8, 0.82, 0.9, 1)
 light_energy = 0.0
 shadow_enabled = true
 directional_shadow_max_distance = 80.0

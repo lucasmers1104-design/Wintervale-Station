@@ -20,10 +20,10 @@ signal terrain_changed(region: Rect2)
 
 const COLOR_SNOW := Color(0.90, 0.93, 0.97)
 const COLOR_SNOW_SHADE := Color(0.80, 0.85, 0.93)
-const COLOR_TRACKSIDE := Color(0.80, 0.82, 0.87)
-const COLOR_ROCK := Color(0.42, 0.43, 0.48)
-const COLOR_ROCK_DARK := Color(0.31, 0.32, 0.37)
-const COLOR_EARTH := Color(0.45, 0.39, 0.33)
+const COLOR_TRACKSIDE := Color(0.83, 0.82, 0.85)
+const COLOR_ROCK := Color(0.47, 0.44, 0.44)
+const COLOR_ROCK_DARK := Color(0.36, 0.34, 0.36)
+const COLOR_EARTH := Color(0.50, 0.40, 0.32)
 const COLOR_LAKE_BED := Color(0.55, 0.63, 0.70)
 ## Zellen pro Kachel-Kante.
 const CHUNK_CELLS := 16

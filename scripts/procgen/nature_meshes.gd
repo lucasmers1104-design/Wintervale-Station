@@ -6,12 +6,12 @@
 class_name NatureMeshes
 extends RefCounted
 
-const TRUNK_COLOR := Color(0.33, 0.23, 0.17)
-const NEEDLE_COLOR := Color(0.17, 0.29, 0.24)
-const NEEDLE_COLOR_DARK := Color(0.12, 0.21, 0.19)
+const TRUNK_COLOR := Color(0.38, 0.25, 0.17)
+const NEEDLE_COLOR := Color(0.15, 0.33, 0.27)
+const NEEDLE_COLOR_DARK := Color(0.10, 0.24, 0.21)
 const SNOW_COLOR := Color(0.90, 0.93, 0.97)
-const ROCK_COLOR := Color(0.44, 0.45, 0.50)
-const ROCK_COLOR_DARK := Color(0.35, 0.36, 0.41)
+const ROCK_COLOR := Color(0.48, 0.46, 0.46)
+const ROCK_COLOR_DARK := Color(0.38, 0.36, 0.37)
 
 
 ## Tanne aus gestapelten Kegeln, jede Stufe mit einer Schneehaube.

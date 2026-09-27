@@ -77,7 +77,7 @@ In `scripts/procgen/train_meshes.gd`:
 
 ### Neuer Herkunfts-/Zielort oder Bahnhof
 
-- **Portal:** Node mit `train_portal.gd` am Tunnelmund des Gleisendes platzieren, `portal_name` setzen; -Z zeigt in den Tunnel. Das Gleisende muss `tunnel_length` Meter dahinter liegen.
+- **Portal:** Node mit `train_portal.gd` am Tunnelmund des Gleisendes platzieren, `portal_name` setzen; -Z zeigt in den Tunnel. Das Gleisende muss `tunnel_length` Meter dahinter liegen. Mauer, Berg (mit Tannen und Felseinschnitt) und Kollision entstehen automatisch; `variation_seed` ändert die Bergform.
 - **Bahnsteiggleis:** Node mit `platform_stop.gd` auf die Gleisachse in Bahnsteigmitte setzen: `station_name`, `platform_number`, `platform_direction` (Richtung zum Bahnsteig).
 
 ## Dateien
@@ -94,7 +94,7 @@ scripts/trains/train_dispatcher.gd  Fahrdienstleiter: Fahrplan, Einsetzen, Gleis
 scripts/trains/train_portal.gd      Tunnelportal (Herkunft/Ziel)
 scripts/trains/platform_stop.gd     Haltepunkt eines Bahnsteiggleises
 scripts/procgen/train_meshes.gd     alle Zugmodelle
-scripts/procgen/tunnel_meshes.gd    Steinportal, Tunnelröhre, Felshügel
+scripts/procgen/tunnel_meshes.gd    Steinportal, Tunnelröhre, Berg mit Felseinschnitt
 scripts/audio/sound_library.gd      synthetisierte Klänge
 scripts/rail/starter_railway.gd     Startstrecke beim ersten Spielstart
 scripts/props/departure_board.gd    Anzeigetafel mit Gong
@@ -103,5 +103,5 @@ scripts/world/snowfall.gd           Schneefall mit langsam wechselndem Wetter
 assets/trains/*.tres                Zuggattungen RE, RB, GZ
 assets/timetables/wintervale.tres   Fahrplan
 assets/materials/train_*.tres       Lack (glänzend) und Glas (spiegelnd, nachts warm beleuchtet)
-tests/train_test.*                  97 Prüfungen inkl. Sicherheitsüberwachung jedes Frames
+tests/train_test.*                  105 Prüfungen inkl. Sicherheitsüberwachung jedes Frames
 ```
