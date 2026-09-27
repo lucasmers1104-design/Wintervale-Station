@@ -31,6 +31,15 @@ static func compute(planar: Curve3D, start_height: float, end_height: float, sta
 
 	var h0 := start_height if start_fixed else ground[0]
 	var h1 := end_height if end_fixed else ground[n]
+	# Ein freies Ende folgt dem Gelände nur so weit, wie es die Steigung erlaubt –
+	# den Rest übernehmen Damm oder Einschnitt.
+	var max_rise := RailConfig.MAX_GRADE * length
+	if start_fixed and not end_fixed:
+		h1 = clampf(h1, h0 - max_rise, h0 + max_rise)
+	elif end_fixed and not start_fixed:
+		h0 = clampf(h0, h1 - max_rise, h1 + max_rise)
+	elif not start_fixed and not end_fixed:
+		h1 = clampf(h1, h0 - max_rise, h0 + max_rise)
 	if absf(h1 - h0) > RailConfig.MAX_GRADE * length + 0.001:
 		return {"heights": _linear(h0, h1, n), "ground": ground, "error": "Zu steil", "max_earthwork": 0.0}
 
@@ -41,6 +50,15 @@ static func compute(planar: Curve3D, start_height: float, end_height: float, sta
 	if end_fixed and not is_nan(end_grade) and n > 3:
 		pinned[n - 1] = h1 - clampf(end_grade, -RailConfig.MAX_GRADE, RailConfig.MAX_GRADE) * ds
 
+	var result := _solve(ground, pinned, n, max_step)
+	if result["error"] != "" and pinned.size() > 2:
+		# Übergangssteigung passt nicht (z.B. sehr kurzes Gleis): ohne sie erneut versuchen
+		result = _solve(ground, {0: h0, n: h1}, n, max_step)
+	return result
+
+
+## Glättet das Gelände-Profil und begrenzt die Steigung; feste Punkte bleiben erhalten.
+static func _solve(ground: PackedFloat32Array, pinned: Dictionary, n: int, max_step: float) -> Dictionary:
 	var heights := ground.duplicate()
 	_apply_pins(heights, pinned)
 	for pass_index in SMOOTH_PASSES:
@@ -55,7 +73,7 @@ static func compute(planar: Curve3D, start_height: float, end_height: float, sta
 		heights = smoothed
 
 	# Steigung begrenzen: abwechselnd von vorne und hinten, feste Punkte bleiben
-	for iteration in 8:
+	for iteration in 30:
 		for i in range(1, n + 1):
 			if not pinned.has(i):
 				heights[i] = clampf(heights[i], heights[i - 1] - max_step, heights[i - 1] + max_step)

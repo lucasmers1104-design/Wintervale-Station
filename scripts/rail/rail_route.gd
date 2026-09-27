@@ -17,5 +17,13 @@ var switch_positions: Dictionary[int, int] = {}
 var segment_blocks: Dictionary[int, int] = {}
 ## Wurde der Fahrweg schon befahren (Belegung erkannt)?
 var entered := false
+## Von einem Zug angefordert (statt automatisch vom Signal gebildet).
+var requested := false
+## Zug, dem der Fahrweg gehört (-1 = keinem bestimmten). Ein Fahrweg wird nie
+## an einen anderen Zug weitergereicht.
+var owner_id := -1
+## Blöcke, die der Zug schon befahren hat – werden nach dem Räumen einzeln
+## freigegeben (Teilauflösung), damit nachfolgende Züge früher fahren können.
+var seen_blocks: Dictionary[int, bool] = {}
 ## Grund, falls der Fahrweg nicht gebildet werden konnte ("" = gültig).
 var error := ""

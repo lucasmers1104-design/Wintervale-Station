@@ -15,6 +15,15 @@ extends StaticBody3D
 @export var with_bench := true
 @export var variation_seed := 3
 @export var material: Material
+@export_group("Bahnsteigdach")
+## Länge des Dachs in der Bahnsteigmitte (0 = kein Dach).
+@export var canopy_length := 0.0
+@export var canopy_height := 3.5
+## Helligkeit der warmen Hängelampen bei Nacht.
+@export var lamp_energy := 1.3
+
+var _lamp_lights: Array[OmniLight3D] = []
+var _lamp_glow: StandardMaterial3D
 
 @export_tool_button("Bahnsteig neu erzeugen", "Reload")
 var rebuild_action: Callable = rebuild
@@ -23,6 +32,17 @@ var rebuild_action: Callable = rebuild
 func _ready() -> void:
 	collision_layer = GameDefs.LAYER_OBJECTS
 	rebuild()
+	if not Engine.is_editor_hint():
+		WorldClock.darkness_changed.connect(_set_lamps)
+		_set_lamps(WorldClock.is_dark())
+
+
+## Hängelampen am Bahnsteigdach ein-/ausschalten.
+func _set_lamps(on: bool) -> void:
+	for light in _lamp_lights:
+		light.light_energy = lamp_energy if on else 0.0
+	if _lamp_glow:
+		_lamp_glow.emission_energy_multiplier = 3.0 if on else 0.3
 
 
 func rebuild() -> void:
@@ -44,7 +64,39 @@ func rebuild() -> void:
 	var board_y := StationMeshes.add_sign(st, Vector3(back_x, height, sign_z), 2.2)
 	if with_bench:
 		StationMeshes.add_bench(st, Vector3(back_x + 0.1, height, -length * 0.17), rng)
+	var lamps: Array[Vector3] = []
+	if canopy_length > 0.0:
+		lamps = StationMeshes.add_canopy(st, Vector3(0.0, height, 0.0), canopy_length, width + 0.6, canopy_height, rng)
 	var mesh := st.commit()
+
+	_lamp_lights.clear()
+	_lamp_glow = StandardMaterial3D.new()
+	_lamp_glow.albedo_color = Color(1.0, 0.86, 0.62)
+	_lamp_glow.emission_enabled = true
+	_lamp_glow.emission = Color(1.0, 0.72, 0.4)
+	_lamp_glow.emission_energy_multiplier = 0.3
+	for i in lamps.size():
+		var bulb := MeshInstance3D.new()
+		var sphere := SphereMesh.new()
+		sphere.radius = 0.07
+		sphere.height = 0.14
+		sphere.radial_segments = 8
+		sphere.rings = 4
+		sphere.material = _lamp_glow
+		bulb.mesh = sphere
+		bulb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		bulb.position = lamps[i] - Vector3(0.0, 0.06, 0.0)
+		_add_generated(bulb)
+		# Nur jede zweite Lampe bekommt ein echtes Licht (sparsam, wirkt trotzdem warm)
+		if i % 2 == 0:
+			var light := OmniLight3D.new()
+			light.position = lamps[i] - Vector3(0.0, 0.25, 0.0)
+			light.light_color = Color(1.0, 0.74, 0.45)
+			light.omni_range = 6.5
+			light.light_energy = 0.0
+			light.shadow_enabled = false
+			_add_generated(light)
+			_lamp_lights.append(light)
 
 	var mesh_instance := MeshInstance3D.new()
 	mesh_instance.mesh = mesh
@@ -52,7 +104,7 @@ func rebuild() -> void:
 	_add_generated(mesh_instance)
 
 	var collision := CollisionShape3D.new()
-	collision.shape = platform_mesh.create_trimesh_shape()
+	collision.shape = mesh.create_trimesh_shape()
 	_add_generated(collision)
 
 	for facing in [1.0, -1.0]:

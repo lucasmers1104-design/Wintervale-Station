@@ -29,6 +29,7 @@ func frames(n: int) -> void:
 func _ready() -> void:
 	main = load("res://scenes/main/main.tscn").instantiate()
 	add_child(main)
+	_use_empty_map(main)
 	terrain = main.get_node("World/Terrain")
 	network = main.get_node("World/Railway/RailNetwork")
 	interlocking = main.get_node("World/Railway/RailInterlocking")
@@ -83,10 +84,13 @@ func _test_terrain_adaptation() -> void:
 		"planned profile respects max grade (%.3f)" % RailGeometry.max_grade(candidate.curve))
 	check(candidate.max_earthwork <= RailConfig.MAX_EARTHWORK, "earthwork within limit (%.2f m)" % candidate.max_earthwork)
 
-	# Vorschau formt das Gelände schon vor dem Bauen
-	await frames(12)
+	# Vorschau formt das Gelände schon vor dem Bauen (sobald die Maus kurz ruht)
+	build.set_process(false)
+	tool.preview_at(target, true)
+	tool._settle_timer = 1.0
 	tool.preview_at(target, true)
 	terrain.flush_changes()
+	build.set_process(true)
 	var mid := candidate.curve.sample_baked(candidate.get_length() * 0.5, true)
 	var preview_error := absf(terrain.get_height(mid.x, mid.z) - (mid.y - TerrainDeformer.GROUND_OFFSET))
 	check(preview_error < 0.02, "preview adapts terrain (error %.3f m)" % preview_error)
@@ -471,3 +475,10 @@ func _same(a: Array, b: Array) -> bool:
 		if a[i] != b[i]:
 			return false
 	return true
+
+
+## Diese Tests prüfen den Bau auf leerer Karte: Startstrecke entfernen, Zugbetrieb aus.
+func _use_empty_map(scene: Node) -> void:
+	(scene.get_node("World/Railway/TrainDispatcher") as TrainDispatcher).enabled = false
+	(scene.get_node("World/Railway/RailNetwork") as RailNetwork).clear()
+	(scene.get_node("World/Terrain") as LowPolyTerrain).flush_changes()

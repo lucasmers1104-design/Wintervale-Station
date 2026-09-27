@@ -1,0 +1,11 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[resource]
+resource_name = "TrainGlass"
+albedo_color = Color(0.14, 0.18, 0.24, 1)
+metallic = 0.3
+metallic_specular = 0.9
+roughness = 0.06
+emission_enabled = true
+emission = Color(1, 0.78, 0.5, 1)
+emission_energy_multiplier = 0.0

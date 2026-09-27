@@ -18,8 +18,9 @@ const LIGHTS_MARGIN_HOURS := 0.75
 ## Stufen des Zeitraffers (Taste T).
 const TIME_SCALES: Array[float] = [1.0, 10.0, 60.0]
 
-## Echtzeit-Minuten für einen vollen Spieltag bei Zeitfaktor 1.
-@export var day_length_minutes := 24.0
+## Echtzeit-Minuten für einen vollen Spieltag bei Zeitfaktor 1
+## (48 → eine Spielminute dauert 2 Sekunden; genug Zeit für ruhige Zugfahrten).
+@export var day_length_minutes := 48.0
 
 ## Aktuelle Tageszeit in Stunden (0.0 bis < 24.0).
 var time_of_day := 15.0
@@ -76,6 +77,11 @@ func get_minute() -> int:
 
 func get_time_string() -> String:
 	return "%02d:%02d" % [get_hour(), get_minute()]
+
+
+## Rechnet Sekunden (Spielgeschwindigkeit ×1) in Spielstunden um.
+func seconds_to_hours(seconds: float) -> float:
+	return seconds * 24.0 / (day_length_minutes * 60.0)
 
 
 ## true zwischen Abenddämmerung und Morgendämmerung.

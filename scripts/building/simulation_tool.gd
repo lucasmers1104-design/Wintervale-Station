@@ -42,9 +42,9 @@ func click_at(point: Vector3) -> String:
 	var interlocking := context.interlocking
 	var rail_signal := network.find_signal_near(point, 1.6)
 	if rail_signal:
-		var halt := rail_signal.mode == RailSignal.Mode.AUTO
-		network.set_signal_mode(rail_signal.id, RailSignal.Mode.HALT if halt else RailSignal.Mode.AUTO)
-		return "Signal %d: %s" % [rail_signal.id, "Halt" if halt else "Automatik"]
+		var halt := rail_signal.mode != RailSignal.Mode.HALT
+		network.set_signal_mode(rail_signal.id, RailSignal.Mode.HALT if halt else rail_signal.resume_mode)
+		return "Signal %d: %s" % [rail_signal.id, "Halt" if halt else "wieder in Betrieb"]
 	var switch := network.find_switch_near(point, pick_radius)
 	if switch:
 		var refused := interlocking.request_switch_toggle(switch.node_id)
@@ -52,7 +52,7 @@ func click_at(point: Vector3) -> String:
 		return refused if refused != "" else "Weiche umgestellt"
 	var segment := network.find_segment_near(point, pick_radius)
 	if segment:
-		var occupied := not interlocking.is_segment_occupied(segment.id)
+		var occupied := not interlocking.is_segment_test_occupied(segment.id)
 		interlocking.set_segment_occupied(segment.id, occupied)
 		return "Gleis %d %s" % [segment.id, "belegt" if occupied else "frei"]
 	return ""

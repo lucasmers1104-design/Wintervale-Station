@@ -25,6 +25,7 @@ func _ready() -> void:
 
 	var main: Node3D = load("res://scenes/main/main.tscn").instantiate()
 	add_child(main)
+	_use_empty_map(main)
 	var player: PlayerController = main.get_node("Player")
 	var terrain: LowPolyTerrain = main.get_node("World/Terrain")
 	var vmc: ViewModeController = main.get_node("ViewModeController")
@@ -197,8 +198,8 @@ func _test_building(main: Node) -> void:
 	check(network.get_segment_count() == 2, "undo removes extension")
 
 	# Prüfregeln
-	tool.click_at(Vector3(-6, 0, 10))
-	tool.preview_at(Vector3(-6, 0, 0))
+	tool.click_at(Vector3(-9.5, 0, 10))
+	tool.preview_at(Vector3(-9.5, 0, -2))
 	check(not tool.is_candidate_valid() and tool.get_status() == "Hindernis im Weg",
 		"obstacle blocks (%s)" % tool.get_status())
 	tool.cancel()
@@ -236,3 +237,10 @@ func _test_building(main: Node) -> void:
 
 	build.set_active(false)
 	check(not build.active, "build mode off")
+
+
+## Diese Tests prüfen den Bau auf leerer Karte: Startstrecke entfernen, Zugbetrieb aus.
+func _use_empty_map(scene: Node) -> void:
+	(scene.get_node("World/Railway/TrainDispatcher") as TrainDispatcher).enabled = false
+	(scene.get_node("World/Railway/RailNetwork") as RailNetwork).clear()
+	(scene.get_node("World/Terrain") as LowPolyTerrain).flush_changes()

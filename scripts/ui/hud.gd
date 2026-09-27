@@ -20,6 +20,9 @@ var _toast_tween: Tween
 @onready var _status_label: Label = %StatusLabel
 @onready var _legend: KeyLegend = %Legend
 @onready var _toast_label: Label = %ToastLabel
+@onready var _follow_label: Label = %FollowLabel
+
+var _followed: Node
 
 
 func _ready() -> void:
@@ -33,6 +36,7 @@ func _ready() -> void:
 	Events.build_mode_changed.connect(_on_build_mode_changed)
 	Events.build_tool_changed.connect(_on_build_tool_changed)
 	Events.build_status_changed.connect(_on_build_status_changed)
+	Events.followed_train_changed.connect(_on_followed_train_changed)
 
 	var tool_group := ButtonGroup.new()
 	for entry: Dictionary in InputConfig.BUILD_TOOLS:
@@ -58,6 +62,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		_legend.set_expanded(not _legend.is_expanded())
 		GameSettings.set_legend_expanded(_legend.is_expanded())
 		get_viewport().set_input_as_handled()
+
+
+func _process(_delta: float) -> void:
+	if _followed and is_instance_valid(_followed) and _followed.has_method("get_info_text"):
+		_follow_label.text = _followed.get_info_text()
+	elif _follow_label.visible:
+		_follow_label.visible = false
+
+
+func _on_followed_train_changed(train: Node) -> void:
+	_followed = train
+	_follow_label.visible = train != null
 
 
 ## Zeigt kurz eine Nachricht oben in der Bildmitte.

@@ -32,6 +32,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed(&"release_mouse"):
 		GameInput.capture_mouse(false)
+		bird_eye.stop_following()
 		get_viewport().set_input_as_handled()
 	elif mode == GameDefs.ViewMode.EXPLORE and event.is_action_pressed(&"interact_primary") \
 			and not GameInput.is_mouse_captured():

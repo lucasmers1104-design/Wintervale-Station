@@ -28,7 +28,12 @@ extends Node3D
 @export_tool_button("Neu verteilen", "Reload")
 var rescatter_action: Callable = scatter
 
-## Jede Instanz: {"key", "index", "xform", "xz", "sink", "collider", "lift"} – damit
+## Nodes dieser Gruppe roden Natur in ihrer Umgebung (Methode clears(x, z) -> bool).
+const GROUP_CLEARING := &"prop_clearing"
+## Ab diesem Einfluss einer Gleistrasse wird gerodet.
+const CLEARING_INFLUENCE := 0.2
+
+## Jede Instanz: {"key", "index", "xform", "xz", "sink", "collider", "lift", "cleared"} – damit
 ## Bäume und Steine der Geländeanpassung folgen können.
 var _records: Array[Dictionary] = []
 var _multimeshes: Dictionary[String, MultiMesh] = {}
@@ -58,7 +63,7 @@ func scatter() -> void:
 
 	var colliders := StaticBody3D.new()
 	colliders.name = "Colliders"
-	colliders.collision_layer = GameDefs.LAYER_OBJECTS
+	colliders.collision_layer = GameDefs.LAYER_NATURE
 	add_child(colliders)
 
 	_scatter_trees(rng, forest_noise, colliders)
@@ -172,8 +177,11 @@ func _record(key: String, variant_transforms: Array, sink: float, collider: Coll
 
 ## Gelände hat sich verändert (z.B. durch ein Gleis): betroffene Bäume und
 ## Steine auf die neue Bodenhöhe setzen, damit nichts schwebt oder versinkt.
+## Auf Gleistrassen und an Tunnelportalen werden sie gerodet (ausgeblendet) –
+## wird das Gleis wieder entfernt, wachsen sie zurück.
 func _on_terrain_changed(region: Rect2) -> void:
 	var area := region.grow(1.0)
+	var clearings: Array = get_tree().get_nodes_in_group(GROUP_CLEARING) if is_inside_tree() else []
 	for record in _records:
 		var xz: Vector2 = record["xz"]
 		if not area.has_point(xz):
@@ -182,9 +190,31 @@ func _on_terrain_changed(region: Rect2) -> void:
 		var xform: Transform3D = record["xform"]
 		xform.origin.y = ground + float(record["sink"])
 		record["xform"] = xform
-		_multimeshes[record["key"]].set_instance_transform(record["index"], xform)
+		var cleared := terrain.get_track_influence(xz.x, xz.y) > CLEARING_INFLUENCE
+		for clearing in clearings:
+			if clearing.has_method("clears") and clearing.clears(xz.x, xz.y):
+				cleared = true
+		record["cleared"] = cleared
+		var shown := xform if not cleared else Transform3D(Basis().scaled(Vector3.ZERO), xform.origin)
+		_multimeshes[record["key"]].set_instance_transform(record["index"], shown)
 		var collider: CollisionShape3D = record["collider"]
 		collider.position.y = ground + float(record["lift"])
+		collider.disabled = cleared
+
+
+## Prüft alle Bäume und Steine erneut (z.B. nachdem ein Tunnelportal platziert wurde).
+func refresh_clearings() -> void:
+	var half := terrain.get_half_extent() if terrain else 0.0
+	_on_terrain_changed(Rect2(-half, -half, half * 2.0, half * 2.0))
+
+
+## Anzahl gerodeter Bäume und Steine (für Tests).
+func get_cleared_count() -> int:
+	var count := 0
+	for record in _records:
+		if record.get("cleared", false):
+			count += 1
+	return count
 
 
 ## Abstand jeder Instanz zum Boden (0 = sitzt korrekt) – für Tests.

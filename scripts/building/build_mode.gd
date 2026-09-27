@@ -137,10 +137,15 @@ func _select_tool_by_key(event: InputEvent) -> bool:
 	return false
 
 
-## In der normalen Vogelperspektive: Klick auf eine Weiche stellt sie um.
+## In der normalen Vogelperspektive: Klick auf einen Zug → Kamera fährt mit;
+## Klick auf eine Weiche stellt sie um.
 func _try_toggle_switch_outside_build(event: InputEvent) -> bool:
 	if view_mode_controller.mode != GameDefs.ViewMode.BIRD_EYE or not event.is_action_pressed(&"interact_primary"):
 		return false
+	var train := _pick_train()
+	if train:
+		bird_eye.follow(train)
+		return true
 	var point := context.get_mouse_ground_point()
 	if point == Vector3.INF:
 		return false
@@ -150,6 +155,24 @@ func _try_toggle_switch_outside_build(event: InputEvent) -> bool:
 	var refused := interlocking.request_switch_toggle(switch.node_id)
 	Events.notification_requested.emit(refused if refused != "" else "Weiche umgestellt")
 	return true
+
+
+## Zug unter dem Mauszeiger (Strahl gegen die Klickflächen der Wagen).
+func _pick_train() -> Train:
+	var camera := bird_eye.camera
+	var mouse := camera.get_viewport().get_mouse_position()
+	var origin := camera.project_ray_origin(mouse)
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + camera.project_ray_normal(mouse) * 600.0,
+		GameDefs.LAYER_TRAINS)
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	var hit := camera.get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return null
+	var node: Node = hit["collider"]
+	while node and not node is Train:
+		node = node.get_parent()
+	return node as Train
 
 
 func _on_view_mode_changed(mode: GameDefs.ViewMode) -> void:

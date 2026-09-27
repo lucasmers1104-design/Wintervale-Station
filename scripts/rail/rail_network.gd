@@ -268,6 +268,7 @@ func restore_segment(data: Dictionary) -> RailSegment:
 	var end_node := _ensure_node(int(data["end_node"]), points[3])
 	var segment := RailSegment.new(id, int(data["kind"]) as RailSegment.Kind, points, start_node.id,
 		end_node.id, heights)
+	segment.tunnel = bool(data.get("tunnel", false))
 	_segments[id] = segment
 	start_node.segment_ids.append(id)
 	end_node.segment_ids.append(id)
@@ -316,6 +317,8 @@ func get_segment_data(id: int, with_signals := true) -> Dictionary:
 		return {}
 	var data := _make_segment_data(segment.id, segment.kind, segment.control_points, segment.heights,
 		segment.start_node_id, segment.end_node_id)
+	if segment.tunnel:
+		data["tunnel"] = true
 	if with_signals:
 		var signals: Array = []
 		for rail_signal: RailSignal in _signals.values():
@@ -353,7 +356,10 @@ func plan_split(segment_id: int, offset: float) -> Dictionary:
 		points[0].y = heights[0]
 		points[3].y = heights[heights.size() - 1]
 		var kind := RailSegment.Kind.STRAIGHT if segment.kind == RailSegment.Kind.STRAIGHT else RailSegment.Kind.CURVE
-		parts.append(_make_segment_data(_reserve_segment_id(), kind, points, heights, nodes[i][0], nodes[i][1]))
+		var part := _make_segment_data(_reserve_segment_id(), kind, points, heights, nodes[i][0], nodes[i][1])
+		if segment.tunnel:
+			part["tunnel"] = true
+		parts.append(part)
 	return {"original": get_segment_data(segment_id), "parts": parts, "node": node_id}
 
 
@@ -427,6 +433,8 @@ func add_signal(data: Dictionary) -> RailSignal:
 	var id := int(data["id"])
 	var rail_signal := RailSignal.new(id, int(data["node"]), int(data["segment"]),
 		int(data.get("mode", RailSignal.Mode.AUTO)) as RailSignal.Mode)
+	if data.has("resume_mode"):
+		rail_signal.resume_mode = int(data["resume_mode"]) as RailSignal.Mode
 	_signals[id] = rail_signal
 	_next_signal_id = maxi(_next_signal_id, id + 1)
 	_changed()
@@ -466,6 +474,8 @@ func set_signal_mode(id: int, mode: RailSignal.Mode) -> void:
 	var rail_signal := get_signal(id)
 	if rail_signal and rail_signal.mode != mode:
 		rail_signal.mode = mode
+		if mode != RailSignal.Mode.HALT:
+			rail_signal.resume_mode = mode
 		signal_mode_changed.emit(id)
 
 

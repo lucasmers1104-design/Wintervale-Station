@@ -80,6 +80,7 @@ const LEGENDS := {
 		{"actions": [&"zoom_in"], "text": "Zoomen"},
 		{"actions": [&"camera_drag_rotate"], "text": "Ziehen: Drehen & Neigen"},
 		{"actions": [&"camera_drag_pan"], "text": "Ziehen: Verschieben"},
+		{"actions": [&"interact_primary"], "text": "Zug anklicken: mitfahren"},
 		{"actions": [&"interact_primary"], "text": "Weiche anklicken: umstellen"},
 		{"actions": [&"build_mode"], "text": "Bauen"},
 		{"actions": [&"toggle_view"], "text": "Zur Spielfigur"},
@@ -101,7 +102,7 @@ const LEGENDS := {
 	],
 	&"build_test": [
 		{"actions": [&"interact_primary"], "text": "Gleis belegen / freigeben"},
-		{"actions": [&"interact_primary"], "text": "Signal: Automatik / Halt"},
+		{"actions": [&"interact_primary"], "text": "Signal: Halt ein / aus"},
 	],
 	&"build_common": [
 		{"actions": [&"build_tool_rail", &"build_tool_switch", &"build_tool_signal", &"build_tool_remove",

@@ -1,0 +1,324 @@
+[gd_resource type="Resource" script_class="Timetable" format=3]
+
+[ext_resource type="Script" path="res://scripts/trains/timetable.gd" id="1_timetable"]
+[ext_resource type="Script" path="res://scripts/trains/timetable_entry.gd" id="2_entry"]
+[ext_resource type="Resource" path="res://assets/trains/regional_express.tres" id="3_re"]
+[ext_resource type="Resource" path="res://assets/trains/regional_bahn.tres" id="4_rb"]
+[ext_resource type="Resource" path="res://assets/trains/freight.tres" id="5_gz"]
+
+[sub_resource type="Resource" id="Entry_1"]
+script = ExtResource("2_entry")
+train_number = "RE 201"
+train_name = "Nordtal → Südtal"
+train_type = ExtResource("3_re")
+origin = "Nordtal"
+destination = "Südtal"
+station = "Wintervale"
+platform = 1
+arrival = "06:12"
+departure = "06:18"
+stops = true
+
+[sub_resource type="Resource" id="Entry_2"]
+script = ExtResource("2_entry")
+train_number = "RE 202"
+train_name = "Südtal → Nordtal"
+train_type = ExtResource("3_re")
+origin = "Südtal"
+destination = "Nordtal"
+station = "Wintervale"
+platform = 2
+arrival = "06:14"
+departure = "06:20"
+stops = true
+
+[sub_resource type="Resource" id="Entry_3"]
+script = ExtResource("2_entry")
+train_number = "GZ 801"
+train_name = "Nordtal → Südtal"
+train_type = ExtResource("5_gz")
+origin = "Nordtal"
+destination = "Südtal"
+station = "Wintervale"
+platform = 1
+arrival = "07:05"
+departure = "07:05"
+stops = false
+
+[sub_resource type="Resource" id="Entry_4"]
+script = ExtResource("2_entry")
+train_number = "RB 311"
+train_name = "Südtal → Nordtal"
+train_type = ExtResource("4_rb")
+origin = "Südtal"
+destination = "Nordtal"
+station = "Wintervale"
+platform = 2
+arrival = "07:40"
+departure = "07:46"
+stops = true
+
+[sub_resource type="Resource" id="Entry_5"]
+script = ExtResource("2_entry")
+train_number = "RB 312"
+train_name = "Nordtal → Südtal"
+train_type = ExtResource("4_rb")
+origin = "Nordtal"
+destination = "Südtal"
+station = "Wintervale"
+platform = 1
+arrival = "08:10"
+departure = "08:16"
+stops = true
+
+[sub_resource type="Resource" id="Entry_6"]
+script = ExtResource("2_entry")
+train_number = "RE 203"
+train_name = "Nordtal → Südtal"
+train_type = ExtResource("3_re")
+origin = "Nordtal"
+destination = "Südtal"
+station = "Wintervale"
+platform = 1
+arrival = "09:12"
+departure = "09:18"
+stops = true
+
+[sub_resource type="Resource" id="Entry_7"]
+script = ExtResource("2_entry")
+train_number = "RE 204"
+train_name = "Südtal → Nordtal"
+train_type = ExtResource("3_re")
+origin = "Südtal"
+destination = "Nordtal"
+station = "Wintervale"
+platform = 2
+arrival = "09:15"
+departure = "09:21"
+stops = true
+
+[sub_resource type="Resource" id="Entry_8"]
+script = ExtResource("2_entry")
+train_number = "GZ 802"
+train_name = "Südtal → Nordtal"
+train_type = ExtResource("5_gz")
+origin = "Südtal"
+destination = "Nordtal"
+station = "Wintervale"
+platform = 2
+arrival = "10:30"
+departure = "10:30"
+stops = false
+
+[sub_resource type="Resource" id="Entry_9"]
+script = ExtResource("2_entry")
+train_number = "RB 313"
+train_name = "Nordtal → Südtal"
+train_type = ExtResource("4_rb")
+origin = "Nordtal"
+destination = "Südtal"
+station = "Wintervale"
+platform = 1
+arrival = "11:40"
+departure = "11:46"
+stops = true
+
+[sub_resource type="Resource" id="Entry_10"]
+script = ExtResource("2_entry")
+train_number = "RB 314"
+train_name = "Südtal → Nordtal"
+train_type = ExtResource("4_rb")
+origin = "Südtal"
+destination = "Nordtal"
+station = "Wintervale"
+platform = 2
+arrival = "11:43"
+departure = "11:49"
+stops = true
+
+[sub_resource type="Resource" id="Entry_11"]
+script = ExtResource("2_entry")
+train_number = "RE 205"
+train_name = "Nordtal → Südtal"
+train_type = ExtResource("3_re")
+origin = "Nordtal"
+destination = "Südtal"
+station = "Wintervale"
+platform = 1
+arrival = "13:12"
+departure = "13:18"
+stops = true
+
+[sub_resource type="Resource" id="Entry_12"]
+script = ExtResource("2_entry")
+train_number = "RE 206"
+train_name = "Südtal → Nordtal"
+train_type = ExtResource("3_re")
+origin = "Südtal"
+destination = "Nordtal"
+station = "Wintervale"
+platform = 2
+arrival = "13:14"
+departure = "13:20"
+stops = true
+
+[sub_resource type="Resource" id="Entry_13"]
+script = ExtResource("2_entry")
+train_number = "GZ 803"
+train_name = "Nordtal → Südtal"
+train_type = ExtResource("5_gz")
+origin = "Nordtal"
+destination = "Südtal"
+station = "Wintervale"
+platform = 1
+arrival = "14:25"
+departure = "14:25"
+stops = false
+
+[sub_resource type="Resource" id="Entry_14"]
+script = ExtResource("2_entry")
+train_number = "RB 315"
+train_name = "Nordtal → Südtal"
+train_type = ExtResource("4_rb")
+origin = "Nordtal"
+destination = "Südtal"
+station = "Wintervale"
+platform = 1
+arrival = "15:06"
+departure = "15:12"
+stops = true
+
+[sub_resource type="Resource" id="Entry_15"]
+script = ExtResource("2_entry")
+train_number = "RB 316"
+train_name = "Südtal → Nordtal"
+train_type = ExtResource("4_rb")
+origin = "Südtal"
+destination = "Nordtal"
+station = "Wintervale"
+platform = 2
+arrival = "15:10"
+departure = "15:16"
+stops = true
+
+[sub_resource type="Resource" id="Entry_16"]
+script = ExtResource("2_entry")
+train_number = "RE 207"
+train_name = "Nordtal → Südtal"
+train_type = ExtResource("3_re")
+origin = "Nordtal"
+destination = "Südtal"
+station = "Wintervale"
+platform = 1
+arrival = "16:30"
+departure = "16:36"
+stops = true
+
+[sub_resource type="Resource" id="Entry_17"]
+script = ExtResource("2_entry")
+train_number = "RE 208"
+train_name = "Südtal → Nordtal"
+train_type = ExtResource("3_re")
+origin = "Südtal"
+destination = "Nordtal"
+station = "Wintervale"
+platform = 2
+arrival = "16:34"
+departure = "16:40"
+stops = true
+
+[sub_resource type="Resource" id="Entry_18"]
+script = ExtResource("2_entry")
+train_number = "RE 209"
+train_name = "Nordtal → Südtal"
+train_type = ExtResource("3_re")
+origin = "Nordtal"
+destination = "Südtal"
+station = "Wintervale"
+platform = 1
+arrival = "17:42"
+departure = "17:48"
+stops = true
+
+[sub_resource type="Resource" id="Entry_19"]
+script = ExtResource("2_entry")
+train_number = "GZ 804"
+train_name = "Südtal → Nordtal"
+train_type = ExtResource("5_gz")
+origin = "Südtal"
+destination = "Nordtal"
+station = "Wintervale"
+platform = 2
+arrival = "18:20"
+departure = "18:20"
+stops = false
+
+[sub_resource type="Resource" id="Entry_20"]
+script = ExtResource("2_entry")
+train_number = "RE 210"
+train_name = "Südtal → Nordtal"
+train_type = ExtResource("3_re")
+origin = "Südtal"
+destination = "Nordtal"
+station = "Wintervale"
+platform = 2
+arrival = "19:05"
+departure = "19:11"
+stops = true
+
+[sub_resource type="Resource" id="Entry_21"]
+script = ExtResource("2_entry")
+train_number = "RB 317"
+train_name = "Nordtal → Südtal"
+train_type = ExtResource("4_rb")
+origin = "Nordtal"
+destination = "Südtal"
+station = "Wintervale"
+platform = 1
+arrival = "20:10"
+departure = "20:16"
+stops = true
+
+[sub_resource type="Resource" id="Entry_22"]
+script = ExtResource("2_entry")
+train_number = "RB 318"
+train_name = "Südtal → Nordtal"
+train_type = ExtResource("4_rb")
+origin = "Südtal"
+destination = "Nordtal"
+station = "Wintervale"
+platform = 2
+arrival = "20:13"
+departure = "20:19"
+stops = true
+
+[sub_resource type="Resource" id="Entry_23"]
+script = ExtResource("2_entry")
+train_number = "RE 211"
+train_name = "Nordtal → Südtal"
+train_type = ExtResource("3_re")
+origin = "Nordtal"
+destination = "Südtal"
+station = "Wintervale"
+platform = 1
+arrival = "22:12"
+departure = "22:18"
+stops = true
+
+[sub_resource type="Resource" id="Entry_24"]
+script = ExtResource("2_entry")
+train_number = "RE 212"
+train_name = "Südtal → Nordtal"
+train_type = ExtResource("3_re")
+origin = "Südtal"
+destination = "Nordtal"
+station = "Wintervale"
+platform = 2
+arrival = "22:15"
+departure = "22:21"
+stops = true
+
+[resource]
+resource_name = "Wintervale"
+script = ExtResource("1_timetable")
+entries = Array[ExtResource("2_entry")]([SubResource("Entry_1"), SubResource("Entry_2"), SubResource("Entry_3"), SubResource("Entry_4"), SubResource("Entry_5"), SubResource("Entry_6"), SubResource("Entry_7"), SubResource("Entry_8"), SubResource("Entry_9"), SubResource("Entry_10"), SubResource("Entry_11"), SubResource("Entry_12"), SubResource("Entry_13"), SubResource("Entry_14"), SubResource("Entry_15"), SubResource("Entry_16"), SubResource("Entry_17"), SubResource("Entry_18"), SubResource("Entry_19"), SubResource("Entry_20"), SubResource("Entry_21"), SubResource("Entry_22"), SubResource("Entry_23"), SubResource("Entry_24")])

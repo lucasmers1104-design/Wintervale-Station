@@ -28,6 +28,8 @@ func clear_preview() -> void:
 
 
 func _on_segment_added(segment: RailSegment) -> void:
+	if segment.tunnel:
+		return  # Tunnelgleise liegen im Berg und formen kein Gelände
 	terrain.set_track_corridor(segment.id, segment.axis_points)
 
 

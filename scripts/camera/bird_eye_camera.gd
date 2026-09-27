@@ -32,6 +32,10 @@ const SAVE_ID := "bird_eye_camera"
 
 ## Nur wenn aktiv, reagiert die Kamera auf Eingaben.
 var active := false
+## Objekt, dem die Kamera gerade folgt (null = keinem).
+var follow_target: Node3D
+## Wie weich die Kamera einem Zug folgt (kleiner = ruhiger).
+@export var follow_smoothing := 2.2
 
 var _focus := Vector3.ZERO
 var _target_focus := Vector3.ZERO
@@ -78,9 +82,22 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	if active:
 		var input_vector := Input.get_vector(&"move_left", &"move_right", &"move_forward", &"move_back")
+		if follow_target and (input_vector != Vector2.ZERO or _drag_panning):
+			stop_following()
 		_target_focus += Basis(Vector3.UP, _target_yaw) * Vector3(input_vector.x, 0.0, input_vector.y) \
 			* _distance * pan_speed * delta
 		_target_yaw += Input.get_axis(&"camera_rotate_right", &"camera_rotate_left") * rotate_speed * delta
+
+	# Einem Zug folgen: der Fokus gleitet ruhig mit
+	var focus_weight := 1.0 - exp(-smoothing * delta)
+	if follow_target:
+		if not is_instance_valid(follow_target) or follow_target.is_queued_for_deletion():
+			stop_following()
+		else:
+			var point: Vector3 = follow_target.get_focus_point() if follow_target.has_method("get_focus_point") \
+				else follow_target.global_position
+			_target_focus = Vector3(point.x, 0.0, point.z)
+			focus_weight = 1.0 - exp(-follow_smoothing * delta)
 
 	if terrain:
 		var limit := terrain.get_half_extent() * 0.7
@@ -88,8 +105,8 @@ func _process(delta: float) -> void:
 		_target_focus.z = clampf(_target_focus.z, -limit, limit)
 
 	var weight := 1.0 - exp(-smoothing * delta)
-	_focus.x = lerpf(_focus.x, _target_focus.x, weight)
-	_focus.z = lerpf(_focus.z, _target_focus.z, weight)
+	_focus.x = lerpf(_focus.x, _target_focus.x, focus_weight)
+	_focus.z = lerpf(_focus.z, _target_focus.z, focus_weight)
 	_focus.y = lerpf(_focus.y, _ground_height(_focus.x, _focus.z), weight)
 	_yaw = lerpf(_yaw, _target_yaw, weight)
 	_pitch = lerpf(_pitch, _target_pitch, weight)
@@ -101,6 +118,20 @@ func set_active(value: bool) -> void:
 	active = value
 	_drag_rotating = false
 	_drag_panning = false
+	if not active:
+		stop_following()
+
+
+## Die Kamera folgt ruhig einem Objekt (z.B. einem Zug), bis man sie selbst bewegt.
+func follow(target: Node3D) -> void:
+	follow_target = target
+	Events.followed_train_changed.emit(target)
+
+
+func stop_following() -> void:
+	if follow_target != null:
+		follow_target = null
+		Events.followed_train_changed.emit(null)
 
 
 ## Richtet den Fokus auf einen Weltpunkt. Mit [param snap] ohne Übergang.

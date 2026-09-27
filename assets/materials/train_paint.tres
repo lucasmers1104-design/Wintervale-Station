@@ -1,0 +1,10 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[resource]
+resource_name = "TrainPaint"
+vertex_color_use_as_albedo = true
+roughness = 0.45
+metallic_specular = 0.55
+clearcoat_enabled = true
+clearcoat = 0.35
+clearcoat_roughness = 0.35

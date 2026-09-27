@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="TrainType" format=3]
+
+[ext_resource type="Script" path="res://scripts/trains/train_type.gd" id="1_type"]
+
+[resource]
+resource_name = "RegionalBahn"
+script = ExtResource("1_type")
+type_code = "RB"
+display_name = "Regionalbahn"
+category = 0
+consist = PackedStringArray("loco_regional", "coach", "coach")
+max_speed_kmh = 50.0
+acceleration = 0.4
+braking = 0.55
+min_dwell_seconds = 10.0
+primary_color = Color(0.2, 0.36, 0.55, 1)
+secondary_color = Color(0.93, 0.91, 0.85, 1)
+accent_color = Color(0.93, 0.62, 0.3, 1)
+roof_color = Color(0.38, 0.4, 0.43, 1)
+horn_pitch = 1.08

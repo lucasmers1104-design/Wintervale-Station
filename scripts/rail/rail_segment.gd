@@ -28,6 +28,8 @@ var start_connection := RailNode.ConnectionType.END
 var end_connection := RailNode.ConnectionType.END
 ## Gleisabschnitt (Block) für Signale und Belegung – Gleise zwischen Signalen.
 var block_id := -1
+## Liegt im Tunnel: formt kein Gelände (sonst entstünde ein Graben im Berg).
+var tunnel := false
 ## Abtastpunkte im Meterabstand (für Abstandsprüfungen und Auswahl).
 var polyline: PackedVector3Array
 ## Gleisachse im 2-m-Abstand (für die Geländeanpassung).

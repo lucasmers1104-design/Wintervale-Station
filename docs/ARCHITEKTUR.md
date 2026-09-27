@@ -152,3 +152,19 @@ scenes/main/main.tscn                     neue Nodes
 project.godot                             Autoload GameSettings
 tests/railway_test.*                 NEU  93 Prüfungen für Etappe 2 + 3
 ```
+
+## Etappe 3: Züge und Bahnhofsbetrieb
+
+Ausführlich in [ZUEGE.md](ZUEGE.md). Kurz:
+
+- Neue Nodes unter `World/Railway`: `StarterRailway` (baut beim ersten Start die Strecke Nordtal – Wintervale – Südtal), `TrainDispatcher` (Fahrplan und Züge), `NordtalPortal`/`SuedtalPortal` (Tunnelportale), `Platform1Stop`/`Platform2Stop` (Haltepunkte).
+- Bahnhof in `World/TestArea`: 44 m langer Mittelbahnsteig mit Dach und warmen Hängelampen, zwei Bahnhofsuhren, Abfahrtstafel, Laternen. Unter `Main` sorgt `Snowfall` für wechselndes Winterwetter.
+- Erweiterungen bestehender Systeme (nichts neu geschrieben):
+  - `RailInterlocking`: Fahrwege auf Anforderung eines Zuges (`request_route`, mit Besitzer), Teilauflösung, Zugbelegung getrennt von der Testbelegung.
+  - `RailSignal`: neuer Modus `ROUTE` (Zuglenkung – rot, bis ein Zug anfordert).
+  - `RailSegment`: Merkmal `tunnel` (formt kein Gelände).
+  - `RailProfile`: freie Enden folgen dem Gelände nur im Rahmen der Steigungsgrenze.
+  - `PropScatter`: rodet Bäume auf Gleistrassen und an Portalen (Ebene „Natur“ blockiert den Gleisbau nicht mehr).
+  - `BirdEyeCamera`: folgt einem angeklickten Zug ruhig.
+  - `WorldClock`: ein Spieltag dauert jetzt 48 Minuten (1 Spielminute = 2 Sekunden).
+- Physik-Ebenen neu: 5 „Natur“ (Bäume, Steine), 6 „Züge“ (Klickflächen).

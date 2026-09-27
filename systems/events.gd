@@ -24,3 +24,6 @@ signal build_tool_changed(tool_id: StringName)
 signal build_tool_requested(tool_id: StringName)
 ## Hinweis des aktiven Werkzeugs, z.B. warum eine Platzierung ungültig ist ("" = alles gut).
 signal build_status_changed(text: String)
+
+## Die Kamera folgt jetzt diesem Zug (null = keinem).
+signal followed_train_changed(train: Node)

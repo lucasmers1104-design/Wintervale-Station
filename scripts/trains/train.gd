@@ -1,0 +1,402 @@
+## Ein fahrender Zug.
+##
+## Der Zug bewegt sich entlang eines [TrainPath]: [member head] ist die Strecke
+## seiner Spitze ab Wegbeginn. Jeder Simulationsschritt
+## 1. sucht voraus nach Haltepunkten (Bahnsteig, rotes Signal, belegtes Gleis),
+## 2. berechnet daraus und aus den Kurven eine Zielgeschwindigkeit (Bremskurve),
+## 3. beschleunigt bzw. bremst sanft dorthin und meldet seine Belegung.
+## Signale werden rechtzeitig beim Stellwerk angefordert – ohne freien Fahrweg
+## hält der Zug vor dem Signal. Am Bahnsteig öffnen sich die Türen.
+class_name Train
+extends Node3D
+
+signal arrived(train: Train)
+signal departed(train: Train)
+
+enum State { RUNNING, DWELLING, DONE }
+enum Dwell { OPENING, WAITING, CLOSING }
+
+## So weit schaut der Zug voraus (Meter).
+const LOOKAHEAD := 240.0
+## Abstand, mit dem vor einem roten Signal gehalten wird.
+const SIGNAL_STOP_MARGIN := 4.0
+## Abstand vor einem fremd belegten Gleis (Fahren auf Sicht).
+const SIGHT_MARGIN := 14.0
+## Zulässige Querbeschleunigung in Kurven (m/s²) – bestimmt die Kurvengeschwindigkeit.
+const LATERAL_ACCEL := 0.9
+## Auflösung der Geschwindigkeitsgrenzen entlang des Weges.
+const LIMIT_STEP := 4.0
+const CREEP_SPEED := 0.6
+const DOOR_TIME := 1.8
+
+var train_id := 0
+var entry: TimetableEntry
+var train_type: TrainType
+var network: RailNetwork
+var interlocking: RailInterlocking
+var dispatcher: Node
+var path: TrainPath
+var cars: Array[TrainCar] = []
+var length := 0.0
+## Strecke der Zugspitze auf dem Weg.
+var head := 0.0
+var speed := 0.0
+var max_speed := 12.0
+var state := State.RUNNING
+var dwell_phase := Dwell.OPENING
+## Haltepunkt der Zugspitze am Bahnsteig (-1 = kein Halt mehr ausstehend).
+var stop_at := -1.0
+var platform_number := 0
+var platform_stop: PlatformStop
+## Ab dieser Strecke ist der Zug ganz im Zieltunnel und verschwindet.
+var despawn_at := INF
+## Hier verlässt die Zugspitze den Starttunnel.
+var emerge_at := -1.0
+## Kurzer Zustandstext, z.B. warum der Zug wartet.
+var status := ""
+var arrived_at := -1.0
+var departed_at := -1.0
+## Signale, für die ein Fahrweg gewährt wurde.
+var granted: Dictionary[int, bool] = {}
+
+var _limits := PackedFloat32Array()
+var _occupied: Array[int] = []
+var _stop_point := INF
+var _phase_time := 0.0
+var _waited := 0.0
+var _door_side := 1.0
+var _horn_pending := false
+var _brake_played := false
+var _emerged := false
+var _visual_head := 0.0
+var _replan_cooldown := 0.0
+var _rolling: AudioStreamPlayer3D
+var _voice: AudioStreamPlayer3D
+
+
+## Richtet den Zug ein und baut seine Fahrzeuge.
+func setup(p_id: int, p_entry: TimetableEntry, p_path: TrainPath, p_dispatcher: Node,
+		p_network: RailNetwork, p_interlocking: RailInterlocking, materials: Dictionary) -> void:
+	train_id = p_id
+	entry = p_entry
+	train_type = entry.train_type
+	path = p_path
+	dispatcher = p_dispatcher
+	network = p_network
+	interlocking = p_interlocking
+	max_speed = entry.get_max_speed()
+	name = "Train_%s" % entry.train_number.replace(" ", "_")
+
+	var offset := 0.0
+	var consist := train_type.consist
+	for i in consist.size():
+		var car := TrainCar.new()
+		add_child(car)
+		car.build(consist[i], train_type, i == 0, i == consist.size() - 1, materials, i)
+		car.offset_from_head = offset
+		offset += car.length + TrainMeshes.COUPLING_GAP
+		cars.append(car)
+	length = offset - TrainMeshes.COUPLING_GAP
+
+	head = length + 0.5
+	_visual_head = head
+	emerge_at = path.end_of(0)
+	_compute_limits()
+
+	_rolling = _make_player(cars[0], SoundLibrary.get_sound("rolling"), -14.0, 60.0)
+	_voice = _make_player(cars[0], null, -6.0, 120.0)
+
+
+## Setzt den Bahnsteighalt (Strecke der Zugspitze) und das Ziel im Tunnel.
+func set_stop(stop_distance: float, stop: PlatformStop, platform: int) -> void:
+	stop_at = stop_distance
+	platform_stop = stop
+	platform_number = platform
+
+
+func set_despawn(distance: float) -> void:
+	despawn_at = distance
+
+
+## Ein Simulationsschritt (Spielzeit [param dt] in Sekunden).
+func simulate(dt: float) -> void:
+	if state == State.DONE:
+		return
+	if not path.is_valid():
+		dispatcher.retire(self, "Strecke unterbrochen")
+		return
+	_replan_cooldown -= dt
+	if state == State.DWELLING:
+		_update_dwell(dt)
+		return
+
+	var target := _target_speed()
+	var rate := train_type.acceleration if target > speed else train_type.braking * 1.8
+	speed = move_toward(speed, target, rate * dt)
+	var next_head := head + speed * dt
+	if next_head >= _stop_point:
+		next_head = maxf(head, _stop_point)
+		speed = 0.0
+	head = next_head
+	update_occupancy()
+
+	if stop_at >= 0.0 and head >= stop_at - 0.02 and speed <= 0.01:
+		_arrive()
+	_update_sounds(target)
+	if head >= despawn_at:
+		dispatcher.retire(self, "")
+
+
+## Wagen positionieren, Räder drehen, Schnee aufwirbeln (einmal pro Bild).
+func update_visuals(_delta: float) -> void:
+	var moved := head - _visual_head
+	var previous := _visual_head
+	_visual_head = head
+	var clacks := WorldClock.time_scale <= 2.0 and moved > 0.0
+	for car in cars:
+		var front := head - car.offset_from_head - (car.length * 0.5 - car.bogie_offset)
+		var rear := front - car.bogie_offset * 2.0
+		car.place(path.position_at(front), path.direction_at(front), path.position_at(rear), path.direction_at(rear))
+		car.roll(moved)
+		if clacks:
+			var old_front := front - moved
+			if path.index_at(maxf(old_front, 0.0)) != path.index_at(maxf(front, 0.0)):
+				car.play_clack(speed / maxf(max_speed, 1.0))
+	cars[0].set_snow_spray(speed)
+	if previous < emerge_at + 6.0 and head >= emerge_at + 6.0 and not _emerged:
+		_emerged = true
+		_play_voice("horn", -12.0, train_type.horn_pitch * 1.05)
+
+
+func set_dark(dark: bool) -> void:
+	for car in cars:
+		car.set_light_level(dark)
+
+
+func get_rear() -> float:
+	return head - length
+
+
+## Zugmitte – dorthin schaut die Kamera beim Mitfahren.
+func get_focus_point() -> Vector3:
+	return path.position_at(clampf(head - length * 0.5, 0.0, path.total_length))
+
+
+func get_occupied_segments() -> Array[int]:
+	return _occupied
+
+
+## Kurzinfo für die Anzeige, z.B. "RE 201 · Nordtal → Südtal · 42 km/h · Gleis 1".
+func get_info_text() -> String:
+	var text := "%s · %s · %d km/h" % [entry.train_number, entry.train_name, roundi(speed * 3.6)]
+	if entry.stops and platform_number > 0:
+		text += " · Gleis %d" % platform_number
+	if state == State.DWELLING:
+		text += " · hält"
+	elif speed < 0.1 and status != "":
+		text += " · wartet: " + status
+	return text
+
+
+# --- Fahrdynamik ---------------------------------------------------------------
+
+## Zielgeschwindigkeit aus Höchstgeschwindigkeit, Kurven und Bremskurve zum nächsten Halt.
+func _target_speed() -> float:
+	var braking := train_type.braking
+	var target := max_speed
+	# Kurven: auch unter dem Zug (der ganze Zug muss langsam genug sein) und voraus
+	var first := maxi(0, int((head - length) / LIMIT_STEP))
+	var last := mini(_limits.size() - 1, int((head + LOOKAHEAD) / LIMIT_STEP))
+	for i in range(first, last + 1):
+		var distance := i * LIMIT_STEP - head
+		var allowed := _limits[i]
+		if distance > 0.0:
+			allowed = sqrt(allowed * allowed + 2.0 * braking * distance)
+		target = minf(target, allowed)
+	_stop_point = _find_stop_point()
+	return minf(target, _approach_speed(_stop_point - head, braking))
+
+
+## Geschwindigkeit, mit der man in [param distance] Metern gerade noch sanft zum Stehen kommt.
+func _approach_speed(distance: float, braking: float) -> float:
+	if distance <= 0.0:
+		return 0.0
+	var allowed := sqrt(2.0 * braking * maxf(distance - 0.1, 0.0))
+	if distance > 0.4:
+		return maxf(allowed, CREEP_SPEED)
+	return maxf(0.15, distance * 1.5)
+
+
+## Nächster Punkt, an dem der Zug halten muss (Bahnsteig, Signal, belegtes Gleis, Wegende).
+func _find_stop_point() -> float:
+	var stop := path.total_length - 0.5
+	if stop_at >= 0.0:
+		stop = minf(stop, stop_at)
+	var index := path.index_at(head)
+	for j in range(index, path.segment_ids.size() - 1):
+		var node_distance := path.end_of(j)
+		if node_distance - head > LOOKAHEAD:
+			break
+		var next_id := path.segment_ids[j + 1]
+		var rail_signal := network.get_signal_for(path.exit_node(j), next_id)
+		if rail_signal and not _is_cleared(rail_signal, j + 1, node_distance):
+			stop = minf(stop, node_distance - SIGNAL_STOP_MARGIN)
+			break
+		var other := interlocking.get_train_on_segment(next_id)
+		if (other >= 0 and other != train_id) or interlocking.is_segment_test_occupied(next_id):
+			status = "Gleis voraus belegt"
+			stop = minf(stop, node_distance - SIGHT_MARGIN)
+			break
+	return stop
+
+
+## Darf der Zug an diesem Signal vorbei? Fordert bei Bedarf den Fahrweg an.
+func _is_cleared(rail_signal: RailSignal, path_index: int, node_distance: float) -> bool:
+	var remaining := path.ids_from(path_index)
+	if granted.get(rail_signal.id, false) and interlocking.is_route_for_path(rail_signal.id, remaining, train_id):
+		return true
+	granted.erase(rail_signal.id)
+	# Erst am Bahnsteig halten, dann die Ausfahrt anfordern
+	if stop_at >= 0.0 and node_distance > stop_at + 0.5:
+		return false
+	var reason := interlocking.request_route(rail_signal.id, remaining, train_id)
+	if reason == "":
+		granted[rail_signal.id] = true
+		status = ""
+		dispatcher.on_route_granted(self, remaining)
+		return true
+	status = reason
+	if (stop_at >= 0.0 or not entry.stops) and _replan_cooldown <= 0.0:
+		_replan_cooldown = 3.0
+		dispatcher.try_other_platform(self)
+	return false
+
+
+## Kurvengeschwindigkeit entlang des Weges vorausberechnen (v = √(a·r)).
+func _compute_limits() -> void:
+	_limits = PackedFloat32Array()
+	var count := int(path.total_length / LIMIT_STEP) + 2
+	for i in count:
+		var s := i * LIMIT_STEP
+		var a := RailGeometry.flat(path.position_at(clampf(s - LIMIT_STEP, 0.0, path.total_length)))
+		var b := RailGeometry.flat(path.position_at(clampf(s, 0.0, path.total_length)))
+		var c := RailGeometry.flat(path.position_at(clampf(s + LIMIT_STEP, 0.0, path.total_length)))
+		var area := (b - a).cross(c - a).length() * 0.5
+		var limit := max_speed
+		if area > 0.0005:
+			var radius := a.distance_to(b) * b.distance_to(c) * c.distance_to(a) / (4.0 * area)
+			limit = minf(limit, sqrt(LATERAL_ACCEL * radius))
+		_limits.append(limit)
+
+
+## Nach einem Gleiswechsel (anderer Bahnsteig) die Grenzen neu berechnen.
+func path_changed() -> void:
+	_compute_limits()
+
+
+## Meldet dem Stellwerk die Gleise unter dem Zug (auch sofort beim Einsetzen).
+func update_occupancy() -> void:
+	var segments := path.segments_between(head - length, head)
+	if segments != _occupied:
+		_occupied = segments
+		interlocking.set_train_occupancy(train_id, segments)
+
+
+# --- Bahnhofshalt -------------------------------------------------------------------
+
+func _arrive() -> void:
+	state = State.DWELLING
+	dwell_phase = Dwell.OPENING
+	_phase_time = 0.0
+	stop_at = -1.0
+	speed = 0.0
+	arrived_at = WorldClock.time_of_day
+	_door_side = _platform_side()
+	for car in cars:
+		if car.has_doors():
+			car.play_door_sound(true)
+	arrived.emit(self)
+
+
+func _update_dwell(dt: float) -> void:
+	_phase_time += dt
+	match dwell_phase:
+		Dwell.OPENING:
+			_set_doors(_phase_time / DOOR_TIME)
+			if _phase_time >= DOOR_TIME:
+				dwell_phase = Dwell.WAITING
+				_waited = 0.0
+		Dwell.WAITING:
+			_waited += dt
+			if _waited >= train_type.min_dwell_seconds and _departure_due():
+				dwell_phase = Dwell.CLOSING
+				_phase_time = 0.0
+				for car in cars:
+					if car.has_doors():
+						car.play_door_sound(false)
+		Dwell.CLOSING:
+			_set_doors(1.0 - _phase_time / DOOR_TIME)
+			if _phase_time >= DOOR_TIME:
+				_set_doors(0.0)
+				state = State.RUNNING
+				departed_at = WorldClock.time_of_day
+				_horn_pending = true
+				_brake_played = false
+				departed.emit(self)
+
+
+func _departure_due() -> bool:
+	var hours_left := fposmod(entry.get_departure_hours() - WorldClock.time_of_day + 12.0, 24.0) - 12.0
+	return hours_left <= 0.0
+
+
+func _set_doors(amount: float) -> void:
+	for car in cars:
+		car.set_doors(amount, _door_side)
+
+
+## Auf welcher Seite (±1, in Fahrtrichtung) liegt der Bahnsteig?
+func _platform_side() -> float:
+	if platform_stop == null:
+		return 1.0
+	var direction := path.direction_at(head)
+	var right := direction.cross(Vector3.UP)
+	return 1.0 if right.dot(platform_stop.get_platform_direction()) >= 0.0 else -1.0
+
+
+# --- Klang --------------------------------------------------------------------
+
+func _update_sounds(target: float) -> void:
+	var level := clampf(speed / maxf(max_speed, 1.0), 0.0, 1.0)
+	if speed > 0.3:
+		if not _rolling.playing:
+			_rolling.play()
+		_rolling.volume_db = -20.0 + level * 12.0
+		_rolling.pitch_scale = 0.75 + level * 0.45
+	elif _rolling.playing:
+		_rolling.stop()
+	if _horn_pending and speed > 0.4:
+		_horn_pending = false
+		_play_voice("horn", -7.0, train_type.horn_pitch)
+	if not _brake_played and speed > 2.0 and speed < 9.0 and target < speed - 0.3 and _stop_point - head < 35.0:
+		_brake_played = true
+		_play_voice("brake", -12.0, randf_range(0.95, 1.05))
+
+
+func _play_voice(sound_name: String, volume: float, pitch: float) -> void:
+	if WorldClock.time_scale > 2.0:
+		return
+	_voice.stream = SoundLibrary.get_sound(sound_name)
+	_voice.volume_db = volume
+	_voice.pitch_scale = pitch
+	_voice.play()
+
+
+func _make_player(parent: Node3D, stream: AudioStream, volume: float, distance: float) -> AudioStreamPlayer3D:
+	var player := AudioStreamPlayer3D.new()
+	player.stream = stream
+	player.volume_db = volume
+	player.max_distance = distance
+	player.unit_size = 8.0
+	parent.add_child(player)
+	return player
