@@ -433,7 +433,8 @@ func _test_legend() -> void:
 	check(legend.get_mode() == &"build_signal", "legend follows build tool (%s)" % legend.get_mode())
 	check(_legend_has(legend, "Signal setzen", ["Linksklick"]), "build legend shows signal placement")
 	check(_legend_has(legend, "Rückgängig", ["Strg+Z"]), "build legend shows Strg+Z")
-	check(_legend_has(legend, "Werkzeug", ["1", "2", "3", "4", "5"]), "build legend shows tool keys 1–5")
+	check(_legend_has(legend, "Bahn-Werkzeug", ["1", "2", "3", "4", "5"]), "build legend shows tool keys 1–5")
+	check(_legend_has(legend, "Dorf bauen", ["6", "7", "8", "9", "0"]), "build legend shows village keys 6–0")
 	build.select_tool(&"switch")
 	check(_legend_has(legend, "Auf Weiche: umstellen", ["Linksklick"]), "legend shows switch controls")
 

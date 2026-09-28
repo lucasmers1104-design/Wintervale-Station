@@ -232,3 +232,8 @@ func _empty_lists(count: int) -> Array[Array]:
 	for i in count:
 		lists.append([])
 	return lists
+
+
+## Rodung in einem Bereich neu prüfen (z.B. nachdem im Dorf etwas gebaut wurde).
+func refresh_area(region: Rect2) -> void:
+	_on_terrain_changed(region)

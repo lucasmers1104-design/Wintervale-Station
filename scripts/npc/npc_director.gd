@@ -36,7 +36,10 @@ signal passenger_alighted(npc: Npc, train: Train)
 
 var _npcs: Array[Npc] = []
 var _travellers: Array[Npc] = []
-var _homes: Dictionary[String, NpcHome] = {}
+var _homes: Dictionary = {}
+## Bewohner gebauter Häuser (erfunden, nicht aus assets/npcs).
+var _generated: Dictionary = {}
+var _set_up := false
 var _spots: Array[StationSpot] = []
 var _platform_points: Array[Vector3] = []
 var _arrivals_seen: Dictionary[int, bool] = {}
@@ -83,11 +86,8 @@ func _setup() -> void:
 		for i in path.size() - 1:
 			_walk_distance += path[i].distance_to(path[i + 1])
 	for i in profiles.size():
-		var npc := Npc.new()
-		add_child(npc)
-		npc.setup(self, profiles[i], profiles[i].appearance, i * 7 + 3)
-		_npcs.append(npc)
-		_relay_signals(npc)
+		_create_npc(profiles[i], i * 7 + 3 if not _generated.has(profiles[i]) else hash(profiles[i].display_name))
+	_set_up = true
 	resume_all()
 
 
@@ -595,8 +595,79 @@ func random_platform_point(rng: RandomNumberGenerator) -> Vector3:
 
 
 func get_home(home_name: String) -> NpcHome:
-	var home: NpcHome = _homes.get(home_name)
-	return home if is_instance_valid(home) else null
+	var cached = _homes.get(home_name)
+	if is_instance_valid(cached) and not (cached as NpcHome).is_queued_for_deletion() \
+			and (cached as NpcHome).home_name == home_name:
+		return cached as NpcHome
+	# Häuser können gebaut und abgerissen werden: im Zweifel neu suchen
+	_homes.erase(home_name)
+	if not is_inside_tree():
+		return null
+	for node in get_tree().get_nodes_in_group(NpcHome.GROUP):
+		var candidate := node as NpcHome
+		if candidate.home_name == home_name and not candidate.is_queued_for_deletion():
+			_homes[home_name] = candidate
+			return candidate
+	return null
+
+
+# --- Bewohner der Dorfhäuser ------------------------------------------------------------
+
+## Gibt es für diese Familie Steckbriefe (z.B. Berger aus assets/npcs)?
+func has_family(home_name: String) -> bool:
+	for profile in profiles:
+		if profile.home_name == home_name and not _generated.has(profile):
+			return true
+	return false
+
+
+## Familiennamen aller bekannten Bewohner.
+func get_family_names() -> Array[String]:
+	var names: Array[String] = []
+	for profile in profiles:
+		if not names.has(profile.home_name):
+			names.append(profile.home_name)
+	return names
+
+
+## Bekannte Familien, deren Haus es gerade nicht gibt – sie ziehen gern in ein neues Haus.
+func get_homeless_families() -> Array[String]:
+	var homeless: Array[String] = []
+	for profile in profiles:
+		if not _generated.has(profile) and not homeless.has(profile.home_name) and get_home(profile.home_name) == null:
+			homeless.append(profile.home_name)
+	return homeless
+
+
+## Neuer Bewohner eines gebauten Hauses. Vor dem Start wird er vorgemerkt.
+func add_resident(profile: NpcProfile) -> Npc:
+	profiles.append(profile)
+	_generated[profile] = true
+	if not _set_up:
+		return null
+	return _create_npc(profile, hash(profile.display_name))
+
+
+## Bewohner zieht aus (sein Haus wurde abgerissen).
+func remove_resident(profile: NpcProfile) -> void:
+	profiles.erase(profile)
+	_generated.erase(profile)
+	for npc in _npcs.duplicate():
+		if npc.profile == profile:
+			_npcs.erase(npc)
+			leave_queues(npc)
+			npc.queue_free()
+
+
+func _create_npc(profile: NpcProfile, seed_value: int) -> Npc:
+	var npc := Npc.new()
+	add_child(npc)
+	npc.setup(self, profile, profile.appearance, seed_value)
+	_npcs.append(npc)
+	_relay_signals(npc)
+	if _set_up:
+		npc.resume(WorldClock.time_of_day)
+	return npc
 
 
 func get_exit_point() -> Vector3:

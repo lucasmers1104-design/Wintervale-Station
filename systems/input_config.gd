@@ -34,6 +34,14 @@ const KEY_BINDINGS := {
 	&"build_tool_signal": [KEY_3],
 	&"build_tool_remove": [KEY_4],
 	&"build_tool_test": [KEY_5],
+	&"build_tool_houses": [KEY_6],
+	&"build_tool_paths": [KEY_7],
+	&"build_tool_nature": [KEY_8],
+	&"build_tool_lighting": [KEY_9],
+	&"build_tool_decor": [KEY_0],
+	&"build_rotate": [KEY_R],
+	&"build_next_item": [KEY_F],
+	&"build_variant": [KEY_C],
 	&"build_free_angle": [KEY_ALT],
 	&"build_cancel": [KEY_ESCAPE],
 }
@@ -60,6 +68,11 @@ const BUILD_TOOLS: Array[Dictionary] = [
 	{"id": &"signal", "action": &"build_tool_signal", "label": "Signal"},
 	{"id": &"remove", "action": &"build_tool_remove", "label": "Entfernen"},
 	{"id": &"test", "action": &"build_tool_test", "label": "Test"},
+	{"id": &"village_houses", "action": &"build_tool_houses", "label": "Häuser", "group": "village"},
+	{"id": &"village_paths", "action": &"build_tool_paths", "label": "Wege", "group": "village"},
+	{"id": &"village_nature", "action": &"build_tool_nature", "label": "Natur", "group": "village"},
+	{"id": &"village_lighting", "action": &"build_tool_lighting", "label": "Licht", "group": "village"},
+	{"id": &"village_decor", "action": &"build_tool_decor", "label": "Deko", "group": "village"},
 ]
 
 ## Legende je Modus. "actions": Tasten aus der Input Map, "literal": fester Text
@@ -98,7 +111,13 @@ const LEGENDS := {
 		{"literal": ["Mausseite"], "text": "Fahrtrichtung"},
 	],
 	&"build_remove": [
-		{"actions": [&"interact_primary"], "text": "Gleis / Signal entfernen"},
+		{"actions": [&"interact_primary"], "text": "Gleis, Signal oder Dorfobjekt entfernen"},
+	],
+	&"build_village": [
+		{"actions": [&"interact_primary"], "text": "Setzen / Linie: Start und Ende"},
+		{"actions": [&"build_rotate"], "text": "Drehen"},
+		{"actions": [&"build_variant"], "text": "Farbe"},
+		{"actions": [&"build_next_item"], "text": "Nächstes Objekt"},
 	],
 	&"build_test": [
 		{"actions": [&"interact_primary"], "text": "Gleis belegen / freigeben"},
@@ -106,7 +125,9 @@ const LEGENDS := {
 	],
 	&"build_common": [
 		{"actions": [&"build_tool_rail", &"build_tool_switch", &"build_tool_signal", &"build_tool_remove",
-			&"build_tool_test"], "text": "Werkzeug"},
+			&"build_tool_test"], "text": "Bahn-Werkzeug"},
+		{"actions": [&"build_tool_houses", &"build_tool_paths", &"build_tool_nature", &"build_tool_lighting",
+			&"build_tool_decor"], "text": "Dorf bauen"},
 		{"actions": [&"move_forward", &"move_left", &"move_back", &"move_right", &"camera_rotate_left",
 			&"camera_rotate_right"], "text": "Kamera"},
 		{"actions": [&"zoom_in"], "text": "Zoomen"},

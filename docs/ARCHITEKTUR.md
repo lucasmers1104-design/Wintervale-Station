@@ -206,3 +206,17 @@ Ausführlich in [NPCS.md](NPCS.md) (Animationen, Passagier-System) und [ZUEGE.md
 - **Klang:** neue Klänge (Entriegeln, Trittstufe aus/ein, leises Bremsquietschen, Wind, Bahnsteig-Gemurmel, Vögel), gedämpftere Türen; neue Klangkulisse `AmbientSoundscape`. `SoundLibrary.play()` spielt ohne Audioausgabe (headless) nichts ab.
 - **Leistung:** Bodenabtastung der Bewohner nur alle zwei Physik-Schritte und nur in Bewegung; Namensschilder nur bei Bedarf; kleine Figurdetails (Augen, Knöpfe, Brille …) ohne Schatten und ab 45 m ausgeblendet; kleine Bahnhofsdetails ab 110 m ausgeblendet; Materialien geteilt. Gemessen auf dem schwachen Entwicklungs-Laptop (Intel HD 520, Kompatibilitätsmodus): gleiche Bildrate wie Etappe 4, in der Nahansicht ~30 % weniger Draw-Calls (767 → 531).
 - `tests/npc_test.*`: jetzt 98 Prüfungen.
+
+## Etappe 6: Dorf und Bausystem
+
+Ausführlich in [DORF.md](DORF.md). Kurz:
+
+- **Neu:** `World/Village` (`VillageManager`) mit Häusern (`VillageHouse`), Wegen (`VillagePath`) und Objekten (`VillageObject`); Katalog `VillageCatalog`; Modelle `HouseMeshes` (8 Häuser), `VillageMeshes`, `PathMeshes`; Startdorf `StarterVillage`; Bewohner `VillageResidents`; Bauwerkzeug `VillagePlaceTool` (5 Kategorien, Tasten 6–0); Atmosphäre `BirdFlock`, `AmbientMotes`.
+- **Erweiterungen bestehender Systeme (nichts neu geschrieben):**
+  - `WalkGraph`: gewichtetes A* mit dynamischem Teil (`set_dynamic`) – gebaute Wege sind günstiger, Bewohner bevorzugen sie; Rückfall aufs feste Netz, wenn etwas nicht verbunden ist.
+  - `NpcDirector`: `add_resident`/`remove_resident`, `has_family`, `get_homeless_families`; `get_home` findet auch neu gebaute Häuser (und ignoriert abgerissene).
+  - `RailRemoveTool` entfernt auch Dorf-Objekte; `BuildMode`/`BuildContext` kennen das Dorf; `InputConfig`: Tasten 6–0, R (drehen), F (nächstes Objekt), C (Farbe); HUD: zweite Werkzeugzeile und Objektleiste; `Events`: `village_items_changed`, `village_item_requested`.
+  - `PropScatter.refresh_area()`; `FootstepPlayer`: Stein auf Wegen; `main.gd` baut das Startdorf.
+  - Die Platzhalter-Häuser (`NpcHome`) der fünf Familien sind durch echte Häuser ersetzt; `NpcHome` bleibt als Basisklasse.
+- **Spielsymbol** neu (`assets/ui/icon.png`, aus der Vorlage des Creative Directors zugeschnitten, runde Ecken).
+- `tests/village_test.*`: 87 Prüfungen; `railway_test` prüft zusätzlich die Dorf-Tasten in der Legende (94).

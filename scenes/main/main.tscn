@@ -42,7 +42,10 @@
 [ext_resource type="Script" path="res://scripts/props/station_prop.gd" id="40_prop"]
 [ext_resource type="Script" path="res://scripts/npc/station_spot.gd" id="41_spot"]
 [ext_resource type="Script" path="res://scripts/npc/walk_graph.gd" id="42_graph"]
-[ext_resource type="Script" path="res://scripts/npc/npc_home.gd" id="43_home"]
+[ext_resource type="Script" path="res://scripts/village/village_manager.gd" id="43_village"]
+[ext_resource type="Script" path="res://scripts/building/village_place_tool.gd" id="46_village_tool"]
+[ext_resource type="Script" path="res://scripts/world/bird_flock.gd" id="47_birds"]
+[ext_resource type="Script" path="res://scripts/world/ambient_motes.gd" id="48_motes"]
 [ext_resource type="Script" path="res://scripts/npc/npc_director.gd" id="44_director"]
 [ext_resource type="Script" path="res://scripts/audio/ambient_soundscape.gd" id="45_ambient"]
 
@@ -75,13 +78,14 @@ fog_sky_affect = 0.3
 adjustment_enabled = true
 adjustment_saturation = 1.06
 
-[node name="Main" type="Node3D" node_paths=PackedStringArray("terrain", "player", "network", "starter_railway", "nature")]
+[node name="Main" type="Node3D" node_paths=PackedStringArray("terrain", "player", "network", "starter_railway", "nature", "village")]
 script = ExtResource("1_main")
 terrain = NodePath("World/Terrain")
 player = NodePath("Player")
 network = NodePath("World/Railway/RailNetwork")
 starter_railway = NodePath("World/Railway/StarterRailway")
 nature = NodePath("World/Nature")
+village = NodePath("World/Village")
 player_spawn = Vector3(-11, 0, 12)
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
@@ -316,13 +320,6 @@ kind = 3
 material = ExtResource("5_nature")
 arrows = PackedStringArray("Bahnsteig 1 · 2|0", "Dorf|180", "Südtal|-90")
 
-[node name="SignpostVillage" type="StaticBody3D" parent="World/TestArea"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -26, 0, 9.4)
-script = ExtResource("40_prop")
-kind = 3
-material = ExtResource("5_nature")
-arrows = PackedStringArray("Bahnhof|0", "Dorfrand|180")
-
 [node name="TimetableCase" type="StaticBody3D" parent="World/TestArea"]
 transform = Transform3D(-3.67321e-06, 0, 1, 0, 1, 0, -1, 0, -3.67321e-06, 0, 0.55, -26.2)
 script = ExtResource("40_prop")
@@ -425,44 +422,16 @@ kind = 3
 [node name="LanternVillageA" parent="World/TestArea" instance=ExtResource("9_lantern")]
 position = Vector3(-12.5, 0, 10.3)
 
-[node name="LanternVillageB" parent="World/TestArea" instance=ExtResource("9_lantern")]
-position = Vector3(-30, 0, 13.9)
-
 [node name="LanternCrossing" parent="World/TestArea" instance=ExtResource("9_lantern")]
 position = Vector3(-7.6, 0, 15.4)
 
-[node name="Village" type="Node3D" parent="World" node_paths=PackedStringArray("terrain")]
-script = ExtResource("8_snapper")
+[node name="Village" type="Node3D" parent="World" node_paths=PackedStringArray("terrain", "walk_graph", "npc_director", "nature", "rail_network")]
+script = ExtResource("43_village")
 terrain = NodePath("../Terrain")
-
-[node name="HomeBerger" type="Node3D" parent="World/Village"]
-transform = Transform3D(-1, 0, 2.65359e-06, 0, 1, 0, -2.65359e-06, 0, -1, -20, 0, 6.5)
-script = ExtResource("43_home")
-home_name = "Berger"
-material = ExtResource("5_nature")
-
-[node name="HomeKellner" type="Node3D" parent="World/Village"]
-transform = Transform3D(-1, 0, 2.65359e-06, 0, 1, 0, -2.65359e-06, 0, -1, -28, 0, 6.5)
-script = ExtResource("43_home")
-home_name = "Kellner"
-material = ExtResource("5_nature")
-
-[node name="HomeSommer" type="Node3D" parent="World/Village"]
-transform = Transform3D(-1, 0, 2.65359e-06, 0, 1, 0, -2.65359e-06, 0, -1, -36, 0, 6.5)
-script = ExtResource("43_home")
-home_name = "Sommer"
-material = ExtResource("5_nature")
-
-[node name="HomeWinter" type="Node3D" parent="World/Village"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -24, 0, 18)
-script = ExtResource("43_home")
-home_name = "Winter"
-material = ExtResource("5_nature")
-
-[node name="HomeHofer" type="Node3D" parent="World/Village"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -32, 0, 18)
-script = ExtResource("43_home")
-home_name = "Hofer"
+walk_graph = NodePath("../WalkGraph")
+npc_director = NodePath("../../NpcDirector")
+nature = NodePath("../Nature")
+rail_network = NodePath("../Railway/RailNetwork")
 material = ExtResource("5_nature")
 
 [node name="WalkGraph" type="Node3D" parent="World"]
@@ -616,14 +585,6 @@ kind = 9
 material = ExtResource("5_nature")
 variation_seed = 48
 
-[node name="SeatingVillage" type="StaticBody3D" parent="World/TestArea"]
-position = Vector3(-27.5, 0, 17.2)
-rotation = Vector3(0, 1.4, 0)
-script = ExtResource("40_prop")
-kind = 9
-material = ExtResource("5_nature")
-variation_seed = 49
-
 [node name="ChatA1" type="Marker3D" parent="World/TestArea" node_paths=PackedStringArray("partner")]
 position = Vector3(-12.2, 0, 18.2)
 rotation = Vector3(0, -2.18, 0)
@@ -669,7 +630,7 @@ player = NodePath("../Player")
 bird_eye = NodePath("../BirdEyeCamera")
 transition_camera = NodePath("../TransitionCamera")
 
-[node name="BuildMode" type="Node" parent="." node_paths=PackedStringArray("view_mode_controller", "bird_eye", "terrain", "rail_network", "rail_view", "interlocking", "terrain_adapter")]
+[node name="BuildMode" type="Node" parent="." node_paths=PackedStringArray("view_mode_controller", "bird_eye", "terrain", "rail_network", "rail_view", "interlocking", "terrain_adapter", "village")]
 script = ExtResource("19_build")
 view_mode_controller = NodePath("../ViewModeController")
 bird_eye = NodePath("../BirdEyeCamera")
@@ -678,6 +639,7 @@ rail_network = NodePath("../World/Railway/RailNetwork")
 rail_view = NodePath("../World/Railway/RailNetworkView")
 interlocking = NodePath("../World/Railway/RailInterlocking")
 terrain_adapter = NodePath("../World/Railway/RailTerrainAdapter")
+village = NodePath("../World/Village")
 
 [node name="RailPlaceTool" type="Node3D" parent="BuildMode"]
 script = ExtResource("20_place")
@@ -708,6 +670,46 @@ highlight_material = ExtResource("23_ghost_invalid")
 script = ExtResource("29_simulation")
 tool_id = &"test"
 
+[node name="VillageHousesTool" type="Node3D" parent="BuildMode"]
+script = ExtResource("46_village_tool")
+tool_id = &"village_houses"
+category = &"houses"
+valid_material = ExtResource("22_ghost_valid")
+invalid_material = ExtResource("23_ghost_invalid")
+marker_material = ExtResource("24_marker")
+
+[node name="VillagePathsTool" type="Node3D" parent="BuildMode"]
+script = ExtResource("46_village_tool")
+tool_id = &"village_paths"
+category = &"paths"
+valid_material = ExtResource("22_ghost_valid")
+invalid_material = ExtResource("23_ghost_invalid")
+marker_material = ExtResource("24_marker")
+
+[node name="VillageNatureTool" type="Node3D" parent="BuildMode"]
+script = ExtResource("46_village_tool")
+tool_id = &"village_nature"
+category = &"nature"
+valid_material = ExtResource("22_ghost_valid")
+invalid_material = ExtResource("23_ghost_invalid")
+marker_material = ExtResource("24_marker")
+
+[node name="VillageLightingTool" type="Node3D" parent="BuildMode"]
+script = ExtResource("46_village_tool")
+tool_id = &"village_lighting"
+category = &"lighting"
+valid_material = ExtResource("22_ghost_valid")
+invalid_material = ExtResource("23_ghost_invalid")
+marker_material = ExtResource("24_marker")
+
+[node name="VillageDecorTool" type="Node3D" parent="BuildMode"]
+script = ExtResource("46_village_tool")
+tool_id = &"village_decor"
+category = &"decor"
+valid_material = ExtResource("22_ghost_valid")
+invalid_material = ExtResource("23_ghost_invalid")
+marker_material = ExtResource("24_marker")
+
 [node name="HUD" parent="." instance=ExtResource("14_hud")]
 
 [node name="NpcDirector" type="Node3D" parent="." node_paths=PackedStringArray("dispatcher", "walk_graph", "terrain", "player")]
@@ -721,3 +723,9 @@ player = NodePath("../Player")
 script = ExtResource("45_ambient")
 npc_director = NodePath("../NpcDirector")
 snowfall = NodePath("../Snowfall")
+
+[node name="BirdFlock" type="Node3D" parent="."]
+script = ExtResource("47_birds")
+
+[node name="AmbientMotes" type="GPUParticles3D" parent="."]
+script = ExtResource("48_motes")

@@ -12,6 +12,7 @@ var rail_view: RailNetworkView
 var interlocking: RailInterlocking
 var terrain_adapter: RailTerrainAdapter
 var undo_redo: UndoRedo
+var village: VillageManager
 
 
 ## Punkt auf dem Gelände unter dem Mauszeiger (Vector3.INF = keiner).

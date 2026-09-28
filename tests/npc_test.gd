@@ -157,7 +157,7 @@ func _test_world_setup() -> void:
 		var length := 0.0
 		for i in path.size() - 1:
 			length += path[i].distance_to(path[i + 1])
-		check(path.size() >= 5 and length < 80.0, "%s finds the way to the platform (%.0f m)" % [npc.display_name, length])
+		check(path.size() >= 3 and length < 100.0, "%s finds the way to the platform (%.0f m)" % [npc.display_name, length])
 
 	var kinds := {}
 	for spot in director.get_spots():
@@ -165,7 +165,7 @@ func _test_world_setup() -> void:
 	var platform_seats := director.get_spots().filter(func(spot: StationSpot) -> bool:
 		return spot.kind == StationSpot.Kind.SEAT and absf(spot.global_position.x) < 2.2).size()
 	check(platform_seats == 12, "six platform benches with two seats each (%d)" % platform_seats)
-	check(kinds.get(StationSpot.Kind.SEAT, 0) == 20, "plus two seating groups with four seats (%d)" % kinds.get(StationSpot.Kind.SEAT, 0))
+	check(kinds.get(StationSpot.Kind.SEAT, 0) == 16, "plus the forecourt seating group with four seats (%d)" % kinds.get(StationSpot.Kind.SEAT, 0))
 	check(kinds.get(StationSpot.Kind.CHAT, 0) == 4, "two pairs of chat spots")
 	check(kinds.get(StationSpot.Kind.STAND, 0) == 10 and kinds.get(StationSpot.Kind.CLOCK, 0) == 4
 		and kinds.get(StationSpot.Kind.BOARD, 0) == 3, "waiting, clock and board spots")

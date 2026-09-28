@@ -12,6 +12,9 @@ var _build_active := false
 var _build_tool: StringName = &"rail"
 var _tool_buttons: Dictionary[StringName, Button] = {}
 var _toast_tween: Tween
+var _village_row: HBoxContainer
+var _item_row: HFlowContainer
+var _item_buttons: Dictionary[String, Button] = {}
 
 @onready var _clock_label: Label = %ClockLabel
 @onready var _speed_label: Label = %SpeedLabel
@@ -39,6 +42,19 @@ func _ready() -> void:
 	Events.followed_train_changed.connect(_on_followed_train_changed)
 
 	var tool_group := ButtonGroup.new()
+	# Zweite Zeile für die Dorf-Werkzeuge, darunter die Objekte der gewählten Kategorie
+	_village_row = HBoxContainer.new()
+	_village_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_village_row.add_theme_constant_override("separation", 6)
+	_tool_row.add_sibling(_village_row)
+	_item_row = HFlowContainer.new()
+	_item_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_item_row.custom_minimum_size = Vector2(560, 0)
+	_item_row.add_theme_constant_override("h_separation", 4)
+	_item_row.add_theme_constant_override("v_separation", 4)
+	_item_row.visible = false
+	_village_row.add_sibling(_item_row)
+	Events.village_items_changed.connect(_on_village_items_changed)
 	for entry: Dictionary in InputConfig.BUILD_TOOLS:
 		var button := Button.new()
 		button.text = entry["label"]
@@ -47,7 +63,10 @@ func _ready() -> void:
 		button.button_group = tool_group
 		button.tooltip_text = "Taste %s" % InputConfig.get_action_label(entry["action"])
 		button.pressed.connect(Events.build_tool_requested.emit.bind(entry["id"]))
-		_tool_row.add_child(button)
+		if entry.get("group", "") == "village":
+			_village_row.add_child(button)
+		else:
+			_tool_row.add_child(button)
 		_tool_buttons[entry["id"]] = button
 
 	_toast_label.modulate.a = 0.0
@@ -94,7 +113,8 @@ func get_legend() -> KeyLegend:
 ## Legende passend zum aktuellen Modus (Erkunden, Vogelperspektive, Werkzeug).
 func _update_legend() -> void:
 	if _build_active:
-		_legend.show_mode(StringName("build_" + String(_build_tool)))
+		var tool_name := String(_build_tool)
+		_legend.show_mode(&"build_village" if tool_name.begins_with("village_") else StringName("build_" + tool_name))
 	elif _view_mode == GameDefs.ViewMode.BIRD_EYE:
 		_legend.show_mode(&"bird_eye")
 	else:
@@ -133,6 +153,7 @@ func _on_build_mode_changed(active: bool) -> void:
 
 func _on_build_tool_changed(tool_id: StringName) -> void:
 	_build_tool = tool_id
+	_item_row.visible = String(tool_id).begins_with("village_")
 	for id: StringName in _tool_buttons:
 		_tool_buttons[id].set_pressed_no_signal(id == tool_id)
 	_update_legend()
@@ -149,3 +170,23 @@ func _on_game_saved(_slot: String) -> void:
 
 func _on_game_loaded(_slot: String) -> void:
 	show_toast("Spielstand geladen")
+
+
+## Objekte der gewählten Dorf-Kategorie als kleine Buttons.
+func _on_village_items_changed(_category: StringName, items: Array[String], selected: String) -> void:
+	for child in _item_row.get_children():
+		child.queue_free()
+	_item_buttons.clear()
+	var group := ButtonGroup.new()
+	for item_id in items:
+		var button := Button.new()
+		button.text = VillageCatalog.get_label(item_id)
+		button.toggle_mode = true
+		button.focus_mode = Control.FOCUS_NONE
+		button.button_group = group
+		button.add_theme_font_size_override("font_size", 13)
+		button.button_pressed = item_id == selected
+		button.pressed.connect(Events.village_item_requested.emit.bind(item_id))
+		_item_row.add_child(button)
+		_item_buttons[item_id] = button
+	_item_row.visible = _build_active and String(_build_tool).begins_with("village_")

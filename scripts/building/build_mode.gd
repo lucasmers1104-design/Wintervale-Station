@@ -17,6 +17,7 @@ extends Node
 @export var rail_view: RailNetworkView
 @export var interlocking: RailInterlocking
 @export var terrain_adapter: RailTerrainAdapter
+@export var village: VillageManager
 @export var default_tool: StringName = &"rail"
 ## So nah muss ein Klick an einer Weiche liegen, um sie umzustellen.
 @export var switch_pick_radius := 2.5
@@ -37,11 +38,14 @@ func _ready() -> void:
 	context.interlocking = interlocking
 	context.terrain_adapter = terrain_adapter
 	context.undo_redo = undo_redo
+	context.village = village
 
 	for child in get_children():
 		var tool := child as BuildTool
 		if tool:
 			_tools[tool.tool_id] = tool
+			if tool is VillagePlaceTool:
+				(tool as VillagePlaceTool).village = village
 			tool.setup(context)
 
 	Events.view_mode_changed.connect(_on_view_mode_changed)

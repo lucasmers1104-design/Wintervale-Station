@@ -1,5 +1,6 @@
-## Werkzeug "Entfernen": Gleis oder Signal unter dem Mauszeiger rot markieren
-## und per Klick abreißen. Signale haben Vorrang, weil sie kleiner sind.
+## Werkzeug "Entfernen": Gleis, Signal oder Dorf-Objekt unter dem Mauszeiger rot
+## markieren und per Klick abreißen. Signale haben Vorrang, weil sie kleiner sind,
+## danach Dorf-Objekte (Häuser, Bäume, Wege …), zuletzt Gleise.
 ## Beim Entfernen eines Gleises verschwinden auch seine Signale (Undo stellt
 ## alles wieder her, auch die Geländeanpassung).
 class_name RailRemoveTool
@@ -12,6 +13,7 @@ extends BuildTool
 
 var _hovered_id := -1
 var _hovered_signal := -1
+var _hovered_village = null
 
 
 func deactivate() -> void:
@@ -42,6 +44,10 @@ func hover_at(point: Vector3) -> void:
 	if rail_signal:
 		_set_hovered(-1, rail_signal.id)
 		return
+	var village_object = context.village.pick(point) if context.village else null
+	if village_object:
+		_set_hovered(-1, -1, village_object)
+		return
 	var segment := network.find_segment_near(point, pick_radius)
 	_set_hovered(segment.id if segment else -1, -1)
 
@@ -51,6 +57,17 @@ func remove_at(point: Vector3) -> bool:
 	hover_at(point)
 	var network := context.rail_network
 	var undo_redo := context.undo_redo
+	if _hovered_village and is_instance_valid(_hovered_village):
+		var village := context.village
+		var object_id: int = _hovered_village.object_id
+		var label := VillageCatalog.get_label(_hovered_village.item_id)
+		_set_hovered(-1, -1)
+		var object_data: Dictionary = village.get_object(object_id).get_data()
+		undo_redo.create_action("%s entfernen" % label)
+		undo_redo.add_do_method(village.remove.bind(object_id))
+		undo_redo.add_undo_method(village.place.bind(object_data))
+		undo_redo.commit_action()
+		return true
 	if _hovered_signal >= 0:
 		var signal_id := _hovered_signal
 		_set_hovered(-1, -1)
@@ -72,7 +89,13 @@ func remove_at(point: Vector3) -> bool:
 	return true
 
 
-func _set_hovered(segment_id: int, signal_id: int) -> void:
+func _set_hovered(segment_id: int, signal_id: int, village_object = null) -> void:
+	if village_object != _hovered_village:
+		if _hovered_village and is_instance_valid(_hovered_village):
+			_hovered_village.set_highlight(null)
+		_hovered_village = village_object
+		if village_object:
+			village_object.set_highlight(highlight_material)
 	var view := context.rail_view
 	if segment_id != _hovered_id:
 		var old_segment := view.get_segment_view(_hovered_id)

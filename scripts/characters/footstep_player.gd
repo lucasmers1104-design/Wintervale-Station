@@ -45,6 +45,10 @@ func get_surface() -> String:
 	var collider: Object = hit["collider"]
 	if collider is RailwayPlatform or collider is StationProp:
 		return "stone"
+	# Gebaute Wege und der Dorfplatz sind geräumt – dort klingt es nach Stein
+	var village := get_tree().get_first_node_in_group(VillageManager.GROUP) as VillageManager
+	if village and village.is_on_path(global_position):
+		return "stone"
 	return "snow"
 
 

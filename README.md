@@ -3,7 +3,7 @@
 Ein gemütliches Low-Poly Eisenbahn- und Dorfbau-Spiel im Winter.
 Engine: **Godot 4.7** (GDScript, Renderer Forward+).
 
-Aktueller Stand: **Etappe 5 – Living Passengers & Animation Polish**: Züge rollen sanft aus, fahren eine Trittstufe aus, Fahrgäste stellen sich an den Türen an und steigen nacheinander aus und ein; weiche, lebendige Animationen und eine dezente Klangkulisse aus Wind, Vögeln und Bahnsteig-Gemurmel.
+Aktueller Stand: **Etappe 6 – Cozy Village & Building System**: Hinter dem Bahnhof liegt ein kleines Dorf mit Dorfplatz; im Build-Mode baut man Häuser (8 Formen), Wege, Natur, Beleuchtung und Dekoration. Jedes neue Haus bekommt eine Familie, die morgens über die Wege zum Bahnhof geht und mit dem Zug fährt.
 Das Spiel startet in der Vogelperspektive über dem Bahnhof. Unten rechts zeigt eine Legende immer die passenden Tasten.
 
 ## Starten
@@ -44,8 +44,9 @@ Voraussetzung: Eine Grafikkarte mit aktuellem Vulkan-Treiber (Forward+).
 | 1 Schiene | Klick: Start, Klick: Gleis bauen – danach geht es direkt weiter. Rastet an Gleisenden ein. |
 | 2 Weiche | Klick auf ein Gleis setzt eine Weiche, dann den Abzweig zur Seite ziehen. Klick auf eine Weiche stellt sie um. |
 | 3 Signal | Klick neben ein Gleis. Die Seite bestimmt die Fahrtrichtung (Signal steht rechts vom Zug). |
-| 4 Entfernen | Klick auf Gleis oder Signal |
+| 4 Entfernen | Klick auf Gleis, Signal oder Dorf-Objekt |
 | 5 Test | Klick auf Gleis: belegen/freigeben · auf Signal: Halt ein/aus · auf Weiche: umstellen |
+| 6–0 Dorf | Häuser · Wege · Natur · Licht · Deko – Objekt per Button oder F, R drehen, C Farbe, Klick setzen (Linien: Start und Ende) |
 | Alt (halten) | Freier Winkel und freie Länge statt 15°-/Meter-Raster |
 | Strg+Z / Strg+Y | Rückgängig / Wiederholen |
 | Rechtsklick / Esc | Abbrechen (zweites Esc beendet den Build-Mode) |
@@ -64,6 +65,7 @@ godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn
 godot --headless --path . --fixed-fps 60 res://tests/railway_test.tscn
 godot --headless --path . --fixed-fps 60 res://tests/train_test.tscn
 godot --headless --path . --fixed-fps 60 res://tests/npc_test.tscn
+godot --headless --path . --fixed-fps 60 res://tests/village_test.tscn
 ```
 
 Exit-Code 0 = alle Prüfungen bestanden.
@@ -73,4 +75,5 @@ Exit-Code 0 = alle Prüfungen bestanden.
 - [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md) – Aufbau, Gleisnetz, Stellwerk, Geländeanpassung, Dateien
 - [docs/ZUEGE.md](docs/ZUEGE.md) – Züge, Fahrplan, Bahnhofsbetrieb, neue Züge erstellen
 - [docs/NPCS.md](docs/NPCS.md) – Figuren, Bewohner, Tagesablauf, neue Bewohner erstellen
+- [docs/DORF.md](docs/DORF.md) – Dorf, Häuser, Wege, Bauen, Bewohner neuer Häuser
 - [CLAUDE.md](CLAUDE.md) – Projektregeln & Vision

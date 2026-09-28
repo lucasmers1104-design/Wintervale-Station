@@ -15,7 +15,7 @@ config/description="Cozy Railway Village – ein gemütliches Low-Poly Eisenbahn
 config/version="0.1.0"
 run/main_scene="res://scenes/main/main.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
-config/icon="res://icon.svg"
+config/icon="res://assets/ui/icon.png"
 
 [autoload]
 

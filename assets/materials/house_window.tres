@@ -1,0 +1,12 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://assets/materials/house_window.gdshader" id="1_window"]
+
+[resource]
+resource_name = "HouseWindow"
+shader = ExtResource("1_window")
+shader_parameter/glass_color = Color(0.1, 0.12, 0.16, 1)
+shader_parameter/sky_tint = Color(0.55, 0.62, 0.78, 1)
+shader_parameter/light_color = Color(1, 0.72, 0.4, 1)
+shader_parameter/glow = 0.0
+shader_parameter/glow_energy = 2.2

@@ -24,6 +24,10 @@ signal build_tool_changed(tool_id: StringName)
 signal build_tool_requested(tool_id: StringName)
 ## Hinweis des aktiven Werkzeugs, z.B. warum eine Platzierung ungültig ist ("" = alles gut).
 signal build_status_changed(text: String)
+## Ein Dorf-Werkzeug zeigt seine Objekte (für die Auswahlleiste im HUD).
+signal village_items_changed(category: StringName, items: Array[String], selected: String)
+## Die UI möchte ein Dorf-Objekt wählen (Klick auf einen Button).
+signal village_item_requested(item_id: String)
 
 ## Die Kamera folgt jetzt diesem Zug (null = keinem).
 signal followed_train_changed(train: Node)

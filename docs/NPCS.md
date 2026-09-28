@@ -205,3 +205,9 @@ Alle Animationen sind prozedural und werden weich überblendet – nichts spring
 Jeder Bewohner geht etwas anders: `gait_energy` (aus Gehtempo und Zufall) macht den Gang
 gemütlicher oder munterer. Die Spielfigur macht nach einer Weile Stillstehen gelegentlich
 selbst eine kleine Geste (Hände wärmen, Uhr, strecken).
+
+## Bewohner gebauter Häuser (ab Etappe 6)
+
+Neue Häuser bekommen erfundene Familien (`VillageResidents`), die genauso funktionieren wie die
+Bewohner mit Steckbrief – nur werden sie aus dem Startwert des Hauses abgeleitet statt aus
+einer Datei. Details in [DORF.md](DORF.md).

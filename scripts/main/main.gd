@@ -1,7 +1,7 @@
 ## Einstiegspunkt der Spielwelt (scenes/main/main.tscn).
 ##
 ## Setzt die Spielfigur auf den Startpunkt, baut beim ersten Start die
-## Strecke Nordtal – Wintervale – Südtal und verarbeitet globale
+## Strecke Nordtal – Wintervale – Südtal sowie das Startdorf und verarbeitet globale
 ## Spielaktionen: Zeitraffer, Schnellspeichern und Schnellladen.
 extends Node3D
 
@@ -10,6 +10,7 @@ extends Node3D
 @export var network: RailNetwork
 @export var starter_railway: StarterRailway
 @export var nature: PropScatter
+@export var village: VillageManager
 ## Startpunkt der Spielfigur (Höhe wird automatisch auf das Terrain gesetzt).
 @export var player_spawn := Vector3(0.0, 0.0, 6.0)
 
@@ -22,6 +23,8 @@ func _ready() -> void:
 
 	if starter_railway:
 		starter_railway.build_if_empty()
+	if village:
+		StarterVillage.build_if_empty(village)
 	network.topology_changed.connect(_align_portals)
 	_align_portals()
 	if nature:
