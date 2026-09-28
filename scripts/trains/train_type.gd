@@ -14,7 +14,8 @@ enum Category { PASSENGER, FREIGHT }
 @export var display_name := "Regional-Express"
 @export var category := Category.PASSENGER
 ## Wagenreihung von vorne nach hinten, z.B. ["loco_regional", "coach", "coach"].
-## Verfügbar: loco_regional, coach, loco_freight, wagon_timber, wagon_container, wagon_hopper
+## Verfügbar: loco_regional, coach, loco_freight, wagon_timber, wagon_container, wagon_hopper,
+## wagon_flat, wagon_stake (Güterwagen kommen beladen an, siehe TrainMeshes.CARGO)
 @export var consist: PackedStringArray = PackedStringArray(["loco_regional", "coach", "coach"])
 
 @export_group("Fahrverhalten")

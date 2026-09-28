@@ -74,6 +74,45 @@ const ITEMS := {
 	"sled": {"category": &"decor", "label": "Schlitten", "kind": "point", "radius": 0.6},
 }
 
+## Baukosten: Geld ("money") und Material (Schlüssel wie in assets/goods/).
+## "per_m" = zusätzlich je Meter (Wege, Zäune, Hecken, Lichterketten).
+## Häuser haben außerdem "hours" = Bauzeit in Arbeitsstunden (06–20 Uhr).
+const COSTS := {
+	"house_cottage": {"money": 350, "wood": 30, "brick": 12, "glass": 8, "hours": 5.0},
+	"house_chalet": {"money": 450, "wood": 45, "brick": 6, "glass": 10, "steel": 2, "hours": 6.0},
+	"house_townhouse": {"money": 600, "wood": 20, "brick": 36, "glass": 12, "steel": 4, "stone": 6, "hours": 7.0},
+	"house_farmhouse": {"money": 650, "wood": 50, "brick": 18, "glass": 10, "stone": 12, "hours": 7.0},
+	"house_tower": {"money": 700, "wood": 24, "brick": 24, "glass": 14, "steel": 6, "stone": 16, "hours": 8.0},
+	"house_aframe": {"money": 380, "wood": 40, "glass": 12, "hours": 4.0},
+	"house_barn": {"money": 520, "wood": 55, "brick": 12, "glass": 6, "steel": 4, "hours": 6.0},
+	"house_villa": {"money": 800, "wood": 36, "brick": 30, "glass": 16, "steel": 4, "stone": 10, "hours": 8.0},
+	"path_gravel": {"per_m": {"money": 3, "stone": 0.5}},
+	"path_stone": {"per_m": {"money": 5, "stone": 1.0}},
+	"path_road": {"per_m": {"money": 8, "stone": 1.5}},
+	"tree_pine_tall": {"money": 30}, "tree_fir_full": {"money": 35}, "tree_spruce_snowy": {"money": 35},
+	"tree_birch": {"money": 30}, "tree_round": {"money": 35}, "tree_small": {"money": 15},
+	"bush_round": {"money": 12}, "bush_holly": {"money": 15}, "bush_juniper": {"money": 12}, "bush_snowy": {"money": 12},
+	"flower_bed": {"money": 20, "wood": 2},
+	"hedge": {"per_m": {"money": 5}},
+	"fence": {"per_m": {"money": 3, "wood": 1.0}},
+	"rocks_small": {"money": 10, "stone": 4},
+	"log_pile": {"money": 5, "wood": 6},
+	"grass_tuft": {"money": 3},
+	"lantern": {"money": 30, "steel": 2},
+	"garden_lamp": {"money": 20, "steel": 1},
+	"street_lamp": {"money": 60, "steel": 3, "glass": 1},
+	"string_lights": {"money": 20, "per_m": {"money": 2, "glass": 0.25}},
+	"plaza": {"money": 500, "stone": 40, "wood": 10, "steel": 4},
+	"bench": {"money": 30, "wood": 4, "steel": 1},
+	"fountain": {"money": 120, "stone": 12, "steel": 1},
+	"signpost": {"money": 15, "wood": 2},
+	"bike_rack": {"money": 25, "steel": 2},
+	"mailbox": {"money": 15, "steel": 1},
+	"planter": {"money": 15, "stone": 2},
+	"snowman": {},
+	"sled": {"money": 10, "wood": 2},
+}
+
 const SWAY_MATERIAL := preload("res://assets/materials/foliage.tres")
 const GLOW_MATERIAL := preload("res://assets/materials/village_glow.tres")
 const WINDOW_MATERIAL := preload("res://assets/materials/house_window.tres")
@@ -105,6 +144,27 @@ static func get_items(category: StringName) -> Array[String]:
 		if ITEMS[item_id]["category"] == category:
 			items.append(item_id)
 	return items
+
+
+## Baukosten eines Objekts ({"money": …, "<material>": …}); [param length] für Linien.
+static func get_cost(item_id: String, length := 0.0) -> Dictionary:
+	var entry: Dictionary = COSTS.get(item_id, {})
+	var cost := {}
+	for key: String in entry:
+		if key != "per_m" and key != "hours":
+			cost[key] = int(entry[key])
+	var per_m: Dictionary = entry.get("per_m", {})
+	for key: String in per_m:
+		cost[key] = int(cost.get(key, 0)) + ceili(float(per_m[key]) * maxf(length, 0.0))
+	for key: String in cost.keys():
+		if int(cost[key]) <= 0:
+			cost.erase(key)
+	return cost
+
+
+## Bauzeit eines Hauses in Arbeitsstunden (0 = sofort fertig).
+static func get_build_hours(item_id: String) -> float:
+	return float((COSTS.get(item_id, {}) as Dictionary).get("hours", 0.0))
 
 
 static func is_line(item_id: String) -> bool:

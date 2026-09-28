@@ -243,4 +243,9 @@ func _test_building(main: Node) -> void:
 func _use_empty_map(scene: Node) -> void:
 	(scene.get_node("World/Railway/TrainDispatcher") as TrainDispatcher).enabled = false
 	(scene.get_node("World/Railway/RailNetwork") as RailNetwork).clear()
+	# Etappe 8: Der Güterbahnhof steht dort, wo diese Tests ihre Testgleise bauen
+	var yard := scene.get_node_or_null("World/FreightYard")
+	if yard:
+		yard.get_parent().remove_child(yard)
+		yard.queue_free()
 	(scene.get_node("World/Terrain") as LowPolyTerrain).flush_changes()

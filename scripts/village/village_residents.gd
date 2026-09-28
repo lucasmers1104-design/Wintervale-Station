@@ -63,8 +63,43 @@ static func generate(home_name: String, seed_value: int, count: int) -> Array[Np
 		# In jeder Familie pendelt mindestens die erste erwachsene Person
 		var commuter := (i == 0 or rng.randf() < 0.5) and profile.appearance.height_scale > 0.8
 		profile.routines = _commuter_day(rng) if commuter else _homebody_day(rng)
+		_add_daily_rhythm(profile, commuter, seed_value * 31 + i)
 		profiles.append(profile)
+	# Die Familie zieht gemeinsam aus Nordtal oder Südtal zu (kommt mit diesem Zug an)
+	var origin := DESTINATIONS[posmod(seed_value >> 3, DESTINATIONS.size())]
+	for profile in profiles:
+		profile.came_from = origin
 	return profiles
+
+
+## Tagesrhythmus und Rolle: Spaziergang zum Lieblingsplatz, Beschreibung fürs Notizbuch.
+## Eigener Zufall (hängt nicht von der Reihenfolge oben ab), damit Familien gleich bleiben.
+static func _add_daily_rhythm(profile: NpcProfile, commuter: bool, seed_value: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var child := profile.appearance.height_scale < 0.8
+	var first: NpcRoutine = profile.routines[0] if not profile.routines.is_empty() else null
+	var leave := first.get_start_hours() if first else 9.0
+	if commuter and first:
+		profile.role = "pendelt nach %s" % first.destination
+		profile.rhythm = ("früh auf den Beinen" if leave < 7.4 else "lässt den Morgen ruhig angehen") \
+			+ ", zurück ab %s" % first.return_after
+		if rng.randf() < 0.55:
+			profile.routines.append(_stroll(18.9 + rng.randi_range(0, 3) * 0.25, rng.randf_range(0.6, 1.0)))
+	else:
+		profile.role = "Kind" if child else ["arbeitet daheim", "kümmert sich ums Haus", "im Ruhestand"][rng.randi() % 3]
+		profile.rhythm = "geht gern zum Bahnhof und schaut den Zügen zu"
+		if rng.randf() < 0.75:
+			profile.routines.append(_stroll(12.5 + rng.randi_range(0, 4) * 0.25, rng.randf_range(0.7, 1.2)))
+			profile.rhythm += ", mittags ein Spaziergang"
+
+
+static func _stroll(start: float, hours: float) -> NpcRoutine:
+	var routine := NpcRoutine.new()
+	routine.activity = NpcRoutine.Activity.STROLL
+	routine.start = TimetableEntry.format_time(start)
+	routine.until = TimetableEntry.format_time(start + hours)
+	return routine
 
 
 static func _commuter_day(rng: RandomNumberGenerator) -> Array[NpcRoutine]:

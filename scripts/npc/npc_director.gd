@@ -640,12 +640,35 @@ func get_homeless_families() -> Array[String]:
 
 
 ## Neuer Bewohner eines gebauten Hauses. Vor dem Start wird er vorgemerkt.
-func add_resident(profile: NpcProfile) -> Npc:
+## Mit [param arriving_from] (Tunnelportal) kommt er gerade mit dem Zug an –
+## keine zufälligen Spawnpunkte: Er steigt aus dem nächsten Zug von dort aus.
+func add_resident(profile: NpcProfile, arriving_from := "") -> Npc:
 	profiles.append(profile)
 	_generated[profile] = true
 	if not _set_up:
 		return null
-	return _create_npc(profile, hash(profile.display_name))
+	var npc := _create_npc(profile, hash(profile.display_name))
+	if arriving_from != "":
+		npc.arrive_by_train(arriving_from)
+	return npc
+
+
+## Freier Sitzplatz im Dorf (Dorfplatz, Bänke) möglichst nahe [param near].
+func claim_stroll_spot(npc: Npc, near: Vector3) -> StationSpot:
+	var best: StationSpot = null
+	var best_distance := INF
+	for node in get_tree().get_nodes_in_group(StationSpot.GROUP):
+		var spot := node as StationSpot
+		if spot.station_name == station_name or spot.kind != StationSpot.Kind.SEAT or not spot.is_free():
+			continue
+		var d := spot.global_position.distance_to(near) if near != Vector3.INF else 0.0
+		if d < best_distance:
+			best_distance = d
+			best = spot
+	if best and best_distance < 60.0:
+		best.reserve(npc)
+		return best
+	return null
 
 
 ## Bewohner zieht aus (sein Haus wurde abgerissen).

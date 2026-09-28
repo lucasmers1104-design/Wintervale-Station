@@ -15,6 +15,13 @@ var _toast_tween: Tween
 var _village_row: HBoxContainer
 var _item_row: HFlowContainer
 var _item_buttons: Dictionary[String, Button] = {}
+var _cost_row: HBoxContainer
+var _money_label: Label
+var _money_tween: Tween
+var _shown_money := -1
+
+const COIN_ICON := preload("res://assets/ui/icons/coin.svg")
+const NOTEBOOK_ICON := preload("res://assets/ui/icons/notebook.svg")
 
 @onready var _clock_label: Label = %ClockLabel
 @onready var _speed_label: Label = %SpeedLabel
@@ -55,6 +62,14 @@ func _ready() -> void:
 	_item_row.visible = false
 	_village_row.add_sibling(_item_row)
 	Events.village_items_changed.connect(_on_village_items_changed)
+	# Baukosten des Objekts unter dem Mauszeiger (Icons, fehlendes rot)
+	_cost_row = HBoxContainer.new()
+	_cost_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cost_row.add_theme_constant_override("separation", 6)
+	_cost_row.visible = false
+	_item_row.add_sibling(_cost_row)
+	Events.build_cost_changed.connect(_on_build_cost_changed)
+	_build_money_display()
 	for entry: Dictionary in InputConfig.BUILD_TOOLS:
 		var button := Button.new()
 		button.text = entry["label"]
@@ -148,12 +163,15 @@ func _on_build_mode_changed(active: bool) -> void:
 	_build_panel.visible = active
 	if not active:
 		_on_build_status_changed("")
+		_cost_row.visible = false
 	_update_legend()
 
 
 func _on_build_tool_changed(tool_id: StringName) -> void:
 	_build_tool = tool_id
 	_item_row.visible = String(tool_id).begins_with("village_")
+	if not _item_row.visible:
+		_cost_row.visible = false
 	for id: StringName in _tool_buttons:
 		_tool_buttons[id].set_pressed_no_signal(id == tool_id)
 	_update_legend()
@@ -172,6 +190,89 @@ func _on_game_loaded(_slot: String) -> void:
 	show_toast("Spielstand geladen")
 
 
+## Gemeindekasse (Münze + Betrag) und ein Knopf fürs Notizbuch neben der Uhr.
+func _build_money_display() -> void:
+	var clock_row := _clock_label.get_parent() as HBoxContainer
+	var coin := TextureRect.new()
+	coin.texture = COIN_ICON
+	coin.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	coin.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	coin.custom_minimum_size = Vector2(24, 24)
+	coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clock_row.add_child(coin)
+	clock_row.move_child(coin, 0)
+	_money_label = Label.new()
+	_money_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.5))
+	clock_row.add_child(_money_label)
+	clock_row.move_child(_money_label, 1)
+	var dot := Label.new()
+	dot.text = "·"
+	clock_row.add_child(dot)
+	clock_row.move_child(dot, 2)
+	var book := Button.new()
+	book.icon = NOTEBOOK_ICON
+	book.expand_icon = true
+	book.flat = true
+	book.focus_mode = Control.FOCUS_NONE
+	book.custom_minimum_size = Vector2(34, 30)
+	book.tooltip_text = "Notizbuch (Taste %s)" % InputConfig.get_action_label(&"toggle_notebook")
+	book.pressed.connect(Events.notebook_requested.emit.bind(""))
+	clock_row.add_child(book)
+	Economy.money_changed.connect(_on_money_changed)
+	_on_money_changed(Economy.money)
+
+
+## Der Betrag zählt weich zum neuen Wert (kein hektisches Springen).
+func _on_money_changed(money: int) -> void:
+	if _shown_money < 0:
+		_shown_money = money
+		_money_label.text = Economy.format_money(money, false)
+		return
+	if _money_tween and _money_tween.is_valid():
+		_money_tween.kill()
+	_money_tween = create_tween()
+	_money_tween.tween_method(func(value: float) -> void:
+		_shown_money = roundi(value)
+		_money_label.text = Economy.format_money(_shown_money, false), float(_shown_money), float(money), 0.6)
+
+
+func get_money_text() -> String:
+	return _money_label.text
+
+
+func _on_build_cost_changed(cost: Dictionary) -> void:
+	for child in _cost_row.get_children():
+		child.queue_free()
+	_cost_row.visible = not cost.is_empty() and _build_active
+	if cost.is_empty():
+		return
+	var missing := Economy.get_missing(cost)
+	var title := Label.new()
+	title.text = "Kosten:"
+	title.add_theme_font_size_override("font_size", 14)
+	_cost_row.add_child(title)
+	var entries: Array = []
+	if int(cost.get("money", 0)) > 0:
+		entries.append([COIN_ICON, int(cost["money"]), missing.has("money")])
+	for goods in Economy.get_goods():
+		if int(cost.get(goods.id, 0)) > 0:
+			entries.append([goods.icon, int(cost[goods.id]), missing.has(goods.id)])
+	for entry: Array in entries:
+		var icon := TextureRect.new()
+		icon.texture = entry[0]
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(22, 22)
+		_cost_row.add_child(icon)
+		var amount := Label.new()
+		amount.text = str(entry[1])
+		amount.add_theme_font_size_override("font_size", 14)
+		amount.add_theme_color_override("font_color", Color(1.0, 0.55, 0.45) if entry[2] else Color(0.98, 0.94, 0.86))
+		_cost_row.add_child(amount)
+	if cost.size() == 0 or entries.is_empty():
+		title.text = "Kostenlos"
+
+
 ## Objekte der gewählten Dorf-Kategorie als kleine Buttons.
 func _on_village_items_changed(_category: StringName, items: Array[String], selected: String) -> void:
 	for child in _item_row.get_children():
@@ -186,6 +287,8 @@ func _on_village_items_changed(_category: StringName, items: Array[String], sele
 		button.button_group = group
 		button.add_theme_font_size_override("font_size", 13)
 		button.button_pressed = item_id == selected
+		var cost_text := Economy.format_cost(VillageCatalog.get_cost(item_id, 10.0 if VillageCatalog.is_line(item_id) else 0.0))
+		button.tooltip_text = ("Kosten%s: %s" % [" je 10 m" if VillageCatalog.is_line(item_id) else "", cost_text]) if cost_text != "" else "kostenlos"
 		button.pressed.connect(Events.village_item_requested.emit.bind(item_id))
 		_item_row.add_child(button)
 		_item_buttons[item_id] = button

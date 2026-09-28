@@ -211,3 +211,11 @@ selbst eine kleine Geste (Hände wärmen, Uhr, strecken).
 Neue Häuser bekommen erfundene Familien (`VillageResidents`), die genauso funktionieren wie die
 Bewohner mit Steckbrief – nur werden sie aus dem Startwert des Hauses abgeleitet statt aus
 einer Datei. Details in [DORF.md](DORF.md).
+
+## Zuzug, Tagesrhythmus und Lieblingswege (ab Etappe 8)
+
+- **Zuzug mit dem Zug:** Ist ein Haus fertig, kommt die Familie aus Nordtal oder Südtal mit dem nächsten Zug von dort (`NpcDirector.add_resident(profile, arriving_from)` → `Npc.arrive_by_train()`), steigt mit Koffern aus und geht ins neue Haus. Weitere Angehörige kommen an den folgenden Tagen. Es gibt keine zufälligen Spawnpunkte.
+- **Haushalt:** 1–4 Personen je Haus (`VillageManager.household_size()`), Rolle je Person (pendelt, arbeitet daheim, Kind …).
+- **Spaziergang** (`NpcRoutine.Activity.STROLL`): mittags oder abends zu einer freien Bank im Dorf (Dorfplatz, Bänke), eine Weile sitzen, dann heim (`Npc.State.STROLLING`).
+- **Lieblingsweg** (`NpcProfile.favourite_via`/`favourite_way`): Auf längeren Wegen gehen Bewohner gern über ihren Lieblingsort, wenn der Umweg höchstens 50 % länger ist.
+- `Npc.get_status_text()` beschreibt fürs Notizbuch, was jemand gerade tut.

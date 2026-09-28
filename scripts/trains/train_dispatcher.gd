@@ -25,6 +25,8 @@ const MAX_LATE_HOURS := 0.5
 @export_group("Materialien")
 @export var paint_material: Material
 @export var glass_material: Material
+## Ladung der Güterwagen (matt, Vertexfarben) – dieselben Stücke liegen im Güterbahnhof.
+@export var cargo_material: Material = preload("res://assets/materials/cargo.tres")
 ## Leuchtstärke der Fenster bei Nacht (warmes Licht von innen).
 @export var window_glow := 1.2
 ## Auch tagsüber brennt drinnen ein wenig Licht – die Fenster wirken warm statt grau.
@@ -48,6 +50,7 @@ func _ready() -> void:
 		"lamp_white": _lamp_material(Color(1.0, 0.92, 0.75), 6.0),
 		"lamp_red": _lamp_material(Color(1.0, 0.12, 0.08), 4.0),
 		"snow": _snow_material(),
+		"cargo": cargo_material,
 	}
 	WorldClock.darkness_changed.connect(_on_darkness_changed)
 	_on_darkness_changed(WorldClock.is_dark())
@@ -147,6 +150,7 @@ func retire(train: Train, reason: String) -> void:
 		return
 	train.state = Train.State.DONE
 	interlocking.clear_train_occupancy(train.train_id)
+	interlocking.release_routes_of(train.train_id)
 	_trains.erase(train)
 	train.queue_free()
 	if reason != "":

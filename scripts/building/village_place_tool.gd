@@ -136,7 +136,7 @@ func preview_at(point: Vector3) -> void:
 	point = _snap(point)
 	# Nur neu prüfen, wenn sich etwas geändert hat (die Prüfung kostet Physik- und Wegetests)
 	var check_key := "%s|%d|%s|%s|%.3f|%d" % [item_id, _variant, point.snapped(Vector3.ONE * 0.05), _start,
-		_current_angle(point), village.get_object_count()]
+		_current_angle(point), village.get_object_count() * 100000 + Economy.revision % 100000]
 	if check_key == _check_key and _ghost:
 		return
 	_check_key = check_key
@@ -156,9 +156,24 @@ func preview_at(point: Vector3) -> void:
 		var angle := _current_angle(point)
 		reason = village.check_placement(item_id, point, angle, _variant)
 		_show_ghost(item_id, point, angle, Vector3.INF)
+	# Kosten: Geld und Material müssen vorhanden sein
+	var cost := get_cost_at(point)
+	Events.build_cost_changed.emit(cost)
+	if reason == "":
+		reason = Economy.describe_missing(cost)
 	_valid = reason == ""
 	set_status(reason)
 	_set_ghost_material(valid_material if _valid else invalid_material)
+
+
+## Was das gewählte Objekt an dieser Stelle kostet (Linien: je nach Länge).
+func get_cost_at(point: Vector3) -> Dictionary:
+	var item_id := get_item()
+	var length := 0.0
+	if VillageCatalog.is_line(item_id) and _start != Vector3.INF and point != Vector3.INF:
+		var end := _clamp_length(item_id, _start, point)
+		length = Vector2(_start.x, _start.z).distance_to(Vector2(end.x, end.z))
+	return VillageCatalog.get_cost(item_id, length)
 
 
 func is_valid() -> bool:
@@ -171,14 +186,20 @@ func has_start() -> bool:
 
 # --- Intern ---------------------------------------------------------------------------
 
+## Bauen über Undo/Redo: bezahlen + setzen bzw. abreißen + erstatten.
+## Häuser beginnen als Baustelle (Fortschritt 0).
 func _commit(data: Dictionary) -> void:
 	var id := int(data["id"])
+	data["paid"] = true
+	if VillageCatalog.get_kind(String(data["item"])) == "house":
+		data["build"] = 0.0
 	var undo_redo := context.undo_redo
 	undo_redo.create_action("%s bauen" % VillageCatalog.get_label(String(data["item"])))
-	undo_redo.add_do_method(village.place.bind(data))
-	undo_redo.add_undo_method(village.remove.bind(id))
+	undo_redo.add_do_method(village.build.bind(data))
+	undo_redo.add_undo_method(village.demolish.bind(id))
 	undo_redo.commit_action()
 	_ghost_key = ""
+	_check_key = ""
 
 
 ## Häuser drehen sich mit der Tür (-Z) zum nächsten Weg, bis man selbst dreht.
@@ -279,6 +300,8 @@ func _set_ghost_material(material: Material) -> void:
 
 
 func _clear_ghost() -> void:
+	if _check_key != "":
+		Events.build_cost_changed.emit({})
 	_check_key = ""
 	if _ghost:
 		_ghost.queue_free()

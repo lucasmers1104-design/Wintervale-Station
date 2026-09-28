@@ -28,6 +28,10 @@ signal build_status_changed(text: String)
 signal village_items_changed(category: StringName, items: Array[String], selected: String)
 ## Die UI möchte ein Dorf-Objekt wählen (Klick auf einen Button).
 signal village_item_requested(item_id: String)
+## Kosten des Objekts unter dem Mauszeiger ({"money", "<material>": Menge}; leer = ausblenden).
+signal build_cost_changed(cost: Dictionary)
+## Das Notizbuch soll auf- oder zugehen (z.B. per Button im HUD); page "" = zuletzt offene Seite.
+signal notebook_requested(page: String)
 
 ## Die Kamera folgt jetzt diesem Zug (null = keinem).
 signal followed_train_changed(train: Node)

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GoodsType" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/economy/goods_type.gd" id="1_goods"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/goods_stone.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_goods")
+id = "stone"
+display_name = "Stein"
+icon = ExtResource("2_icon")
+origin = "Steinbruch Südtal"
+origin_portal = "Südtal"
+max_stock = 120
+start_stock = 60
+unit_price = 1
+color = Color(0.52, 0.5, 0.47, 1)
+sort_order = 4
+description = "Bruchstein für Wege, Sockel und den Dorfplatz. Kommt lose im Schüttgutwagen."

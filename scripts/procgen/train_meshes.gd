@@ -23,7 +23,32 @@ const SPECS := {
 	"wagon_timber": {"length": 9.0, "bogie": 3.1, "wheel_base": 1.8},
 	"wagon_container": {"length": 9.6, "bogie": 3.3, "wheel_base": 1.8},
 	"wagon_hopper": {"length": 8.4, "bogie": 2.9, "wheel_base": 1.8},
+	"wagon_flat": {"length": 9.6, "bogie": 3.3, "wheel_base": 1.8},
+	"wagon_stake": {"length": 10.2, "bogie": 3.5, "wheel_base": 1.8},
 }
+## Ladung der Güterwagen: Material, Menge je Stück, Modell des Stücks und
+## Ladeplätze (Mitte der Unterkante, lokal zum Wagen).
+## "empty" = Leergut, das auf frei gewordene Plätze zurückgeladen werden kann;
+## "bulk" = Schüttgut, das der Kran mit dem Greifer in so vielen Portionen entlädt.
+const CARGO := {
+	"wagon_timber": {"goods": "wood", "amount": 10, "piece": "wood_bundle",
+		"slots": [Vector3(0.0, 1.36, -2.95), Vector3(0.0, 1.36, 0.0), Vector3(0.0, 1.36, 2.95)]},
+	"wagon_flat": {"goods": "brick", "amount": 6, "piece": "brick_pallet", "empty": "pallet_stack",
+		"slots": [Vector3(-0.62, 1.26, -3.2), Vector3(0.62, 1.26, -3.2), Vector3(-0.62, 1.26, 0.0),
+			Vector3(0.62, 1.26, 0.0), Vector3(-0.62, 1.26, 3.2), Vector3(0.62, 1.26, 3.2)]},
+	"wagon_container": {"goods": "glass", "amount": 8, "piece": "glass_container", "empty": "container_empty",
+		"slots": [Vector3(0.0, 1.32, -2.2), Vector3(0.0, 1.32, 2.2)]},
+	"wagon_stake": {"goods": "steel", "amount": 4, "piece": "steel_bundle",
+		"slots": [Vector3(0.0, 1.36, -3.3), Vector3(0.0, 1.36, 0.0), Vector3(0.0, 1.36, 3.3)]},
+	"wagon_hopper": {"goods": "stone", "amount": 8, "piece": "stone_pile", "bulk": 3,
+		"slots": [Vector3.ZERO]},
+}
+## So tief sinkt die Schüttgut-Oberfläche im Trichterwagen, bis er leer ist.
+const BULK_DEPTH := 1.75
+const CARGO_WOOD := Color(0.36, 0.25, 0.17)
+const PALLET := Color(0.72, 0.58, 0.4)
+const BRICK := Color(0.68, 0.3, 0.2)
+const STEEL := Color(0.42, 0.47, 0.53)
 ## Abstand zwischen zwei Wagenkästen (Puffer berühren sich).
 const COUPLING_GAP := 0.84
 const WHEEL_RADIUS := 0.42
@@ -89,6 +114,10 @@ static func build_car(kind: String, livery: Dictionary, variant := 0) -> Diction
 			result = _build_wagon_container(rng)
 		"wagon_hopper":
 			result = _build_wagon_hopper(rng)
+		"wagon_flat":
+			result = _build_wagon_flat(rng)
+		"wagon_stake":
+			result = _build_wagon_stake(rng)
 		_:
 			result = _build_coach(livery, rng)
 	var spec := get_spec(kind)
@@ -290,53 +319,69 @@ static func _build_loco_freight(livery: Dictionary, rng: RandomNumberGenerator) 
 	}
 
 
+## Rungenwagen für Holz: Rungen, Querhölzer; die Stammbündel sind Ladung ([constant CARGO]).
 static func _build_wagon_timber(rng: RandomNumberGenerator) -> Dictionary:
 	var paint := _new_st()
 	var half := 4.5
 	_flat_wagon_base(paint, half, rng)
-	# Rungen und Holzstämme mit hellen Schnittflächen
 	for side: float in [-1.0, 1.0]:
 		for i in 5:
 			LowPolyBuilder.add_box(paint, Vector3(side * 1.22, 2.05, -3.6 + i * 1.8), Vector3(0.09, 1.5, 0.09), UNDER)
-	var rows := [[-0.87, -0.29, 0.29, 0.87], [-0.58, 0.0, 0.58], [-0.29, 0.29]]
-	for row_index in rows.size():
-		for x: float in rows[row_index]:
-			var y := 1.62 + row_index * 0.5
-			var log_half := 4.1 - rng.randf() * 0.25
-			var radius := rng.randf_range(0.26, 0.3)
-			var bark := BARK.lerp(Color(0.42, 0.3, 0.2), rng.randf())
-			LowPolyBuilder.add_cylinder_between(paint, Vector3(x, y, -log_half), Vector3(x, y, log_half), radius, 9, bark)
-			for end: float in [-1.0, 1.0]:
-				LowPolyBuilder.add_cylinder_between(paint, Vector3(x, y, end * log_half), Vector3(x, y, end * (log_half + 0.02)),
-					radius * 0.92, 9, LOG_END.lerp(Color(0.9, 0.78, 0.6), rng.randf()))
-	LowPolyBuilder.add_box(paint, Vector3(0.0, 2.9, 0.0), Vector3(0.62, 0.05, 7.4), SNOW)
-	LowPolyBuilder.add_box(paint, Vector3(0.0, 2.43, 0.0), Vector3(1.5, 0.04, 7.0), SNOW)
+			LowPolyBuilder.add_box(paint, Vector3(side * 1.22, 2.82, -3.6 + i * 1.8), Vector3(0.12, 0.04, 0.12), SNOW)
+	# Querhölzer, auf denen die Bündel liegen
+	for z: float in [-3.8, -2.1, -0.85, 0.85, 2.1, 3.8]:
+		LowPolyBuilder.add_box(paint, Vector3(0.0, 1.31, z), Vector3(2.3, 0.1, 0.16), BARK)
 	return {"paint": paint.commit(), "glass": null, "doors": [], "lamps_front": [],
 		"lamps_rear": [Vector3(-0.95, 1.3, half + 0.02), Vector3(0.95, 1.3, half + 0.02)]}
 
 
+## Containertragwagen: Boden mit Verriegelungszapfen; die Container sind Ladung.
 static func _build_wagon_container(rng: RandomNumberGenerator) -> Dictionary:
 	var paint := _new_st()
 	var half := 4.8
 	_flat_wagon_base(paint, half, rng)
-	var palette := [Color(0.18, 0.45, 0.48), Color(0.62, 0.24, 0.16), Color(0.8, 0.6, 0.2), Color(0.26, 0.36, 0.52)]
 	for z_center: float in [-2.2, 2.2]:
-		var color: Color = palette[rng.randi() % palette.size()]
-		var ribs := color.darkened(0.15)
-		LowPolyBuilder.add_box(paint, Vector3(0.0, 2.55, z_center), Vector3(2.4, 2.45, 4.1), color)
-		# Wellblech: senkrechte Rippen an den Seiten
-		for side: float in [-1.0, 1.0]:
-			for i in 15:
-				LowPolyBuilder.add_box(paint, Vector3(side * 1.215, 2.55, z_center - 1.85 + i * 0.265), Vector3(0.04, 2.25, 0.1), ribs)
-		# Türseite mit Verschlussstangen, Eckbeschläge
-		var door_z: float = z_center + 2.06 * signf(z_center)
-		for x: float in [-0.8, -0.3, 0.3, 0.8]:
-			LowPolyBuilder.add_box(paint, Vector3(x, 2.55, door_z), Vector3(0.05, 2.3, 0.04), METAL)
-		for corner_x: float in [-1.17, 1.17]:
-			for corner_y: float in [1.36, 3.74]:
-				for corner_z in [z_center - 2.02, z_center + 2.02]:
-					LowPolyBuilder.add_box(paint, Vector3(corner_x, corner_y, corner_z), Vector3(0.12, 0.1, 0.12), UNDER)
-		LowPolyBuilder.add_box(paint, Vector3(0.0, 3.8, z_center), Vector3(2.2, 0.04, 3.8), SNOW)
+		for corner_x: float in [-1.1, 1.1]:
+			for corner_z: float in [z_center - 1.95, z_center + 1.95]:
+				LowPolyBuilder.add_box(paint, Vector3(corner_x, 1.29, corner_z), Vector3(0.14, 0.06, 0.14), STEP_YELLOW)
+	LowPolyBuilder.add_box(paint, Vector3(0.0, 1.27, 0.0), Vector3(2.5, 0.02, 0.2), SNOW)
+	return {"paint": paint.commit(), "glass": null, "doors": [], "lamps_front": [],
+		"lamps_rear": [Vector3(-0.95, 1.3, half + 0.02), Vector3(0.95, 1.3, half + 0.02)]}
+
+
+## Flachwagen mit niedrigen Bordwänden für Ziegelpaletten.
+static func _build_wagon_flat(rng: RandomNumberGenerator) -> Dictionary:
+	var paint := _new_st()
+	var half := 4.8
+	_flat_wagon_base(paint, half, rng)
+	var board := Color(0.36, 0.43, 0.35)
+	for side: float in [-1.0, 1.0]:
+		LowPolyBuilder.add_box(paint, Vector3(side * 1.25, 1.47, 0.0), Vector3(0.06, 0.42, half * 2.0 - 0.1), board)
+		LowPolyBuilder.add_box(paint, Vector3(side * 1.26, 1.66, 0.0), Vector3(0.08, 0.05, half * 2.0 - 0.1), board.darkened(0.25))
+		# Bordwandscharniere und Rungentaschen
+		for i in 7:
+			var z := -half + 0.6 + i * ((half * 2.0 - 1.2) / 6.0)
+			LowPolyBuilder.add_box(paint, Vector3(side * 1.29, 1.4, z), Vector3(0.04, 0.3, 0.1), UNDER)
+		LowPolyBuilder.add_box(paint, Vector3(side * 1.25, 1.69, 0.0), Vector3(0.1, 0.03, half * 2.0 - 0.3), SNOW)
+	for end: float in [-1.0, 1.0]:
+		LowPolyBuilder.add_box(paint, Vector3(0.0, 1.47, end * (half - 0.05)), Vector3(2.5, 0.42, 0.06), board)
+	return {"paint": paint.commit(), "glass": null, "doors": [], "lamps_front": [],
+		"lamps_rear": [Vector3(-0.95, 1.3, half + 0.02), Vector3(0.95, 1.3, half + 0.02)]}
+
+
+## Rungenwagen für Stahlträger: hohe, rot-weiß gestreifte Rungen, Kanthölzer.
+static func _build_wagon_stake(rng: RandomNumberGenerator) -> Dictionary:
+	var paint := _new_st()
+	var half := 5.1
+	_flat_wagon_base(paint, half, rng)
+	for side: float in [-1.0, 1.0]:
+		for i in 6:
+			var z := -half + 0.7 + i * ((half * 2.0 - 1.4) / 5.0)
+			LowPolyBuilder.add_box(paint, Vector3(side * 1.22, 1.85, z), Vector3(0.1, 1.2, 0.1), Color(0.55, 0.16, 0.12))
+			LowPolyBuilder.add_box(paint, Vector3(side * 1.22, 2.3, z), Vector3(0.105, 0.14, 0.105), Color(0.92, 0.9, 0.85))
+			LowPolyBuilder.add_box(paint, Vector3(side * 1.22, 2.47, z), Vector3(0.13, 0.04, 0.13), SNOW)
+	for z: float in [-4.3, -2.0, -1.0, 1.0, 2.0, 4.3]:
+		LowPolyBuilder.add_box(paint, Vector3(0.0, 1.31, z), Vector3(2.3, 0.1, 0.14), WOOD_DECK.darkened(0.2))
 	return {"paint": paint.commit(), "glass": null, "doors": [], "lamps_front": [],
 		"lamps_rear": [Vector3(-0.95, 1.3, half + 0.02), Vector3(0.95, 1.3, half + 0.02)]}
 
@@ -362,8 +407,188 @@ static func _build_wagon_hopper(rng: RandomNumberGenerator) -> Dictionary:
 		for i in 8:
 			var z := -half + 0.75 + i * ((half * 2.0 - 1.5) / 7.0)
 			LowPolyBuilder.add_box(paint, Vector3(side * 1.37, 2.95, z), Vector3(0.06, 0.8, 0.1), body_color.darkened(0.25))
-	# Ladung: Schotter mit Schneehaube, Auslaufschurren unten
-	var st_load := paint
+	# Innenwände (sichtbar, sobald die Ladung entladen ist), Auslaufschurren unten
+	var inner := body_color.darkened(0.45)
+	var z_in := half - 0.36
+	for k in profile.size() - 1:
+		var a := profile[k]
+		var b := profile[k + 1]
+		var inward := Vector3(-(a.x + b.x) * 0.5, 2.8 - (a.y + b.y) * 0.5, 0.0)
+		LowPolyBuilder.add_quad_facing(paint, Vector3(a.x, a.y, -z_in), Vector3(b.x, b.y, -z_in), Vector3(b.x, b.y, z_in),
+			Vector3(a.x, a.y, z_in), inner, inward)
+	for end: float in [-1.0, 1.0]:
+		for k in range(1, profile.size() - 1):
+			LowPolyBuilder.add_triangle_facing(paint, Vector3(profile[0].x, profile[0].y, end * z_in),
+				Vector3(profile[k].x, profile[k].y, end * z_in), Vector3(profile[k + 1].x, profile[k + 1].y, end * z_in),
+				inner.darkened(0.1), Vector3(0.0, 0.0, -end))
+	for z: float in [-1.2, 1.2]:
+		LowPolyBuilder.add_box(paint, Vector3(0.0, 1.15, z), Vector3(1.1, 0.3, 0.8), body_color.darkened(0.3))
+	for end: float in [-1.0, 1.0]:
+		_add_buffers(paint, end * half, end)
+		LowPolyBuilder.add_box(paint, Vector3(0.0, 1.05, end * (half - 0.05)), Vector3(2.5, 0.3, 0.1), UNDER)
+	return {"paint": paint.commit(), "glass": null, "doors": [], "lamps_front": [],
+		"lamps_rear": [Vector3(-0.95, 1.3, half + 0.02), Vector3(0.95, 1.3, half + 0.02)]}
+
+
+# --- Ladung --------------------------------------------------------------------------
+
+## Ein Ladungsstück. Ursprung = Mitte der Unterkante, Länge entlang Z (Ausnahme
+## "stone_pile": Ursprung = Wagenmitte auf Schienenoberkante). Wird auch im
+## Güterbahnhof für die Lagerbestände benutzt – dort liegen dieselben Stücke.
+## Stücke: wood_bundle, brick_pallet, pallet_stack, glass_container, container_empty,
+## steel_bundle, stone_pile, stone_scoop, stone_heap.
+static func create_cargo(piece: String, variant := 0) -> ArrayMesh:
+	var key := "cargo|%s|%d" % [piece, variant]
+	if _cache.has(key):
+		return _cache[key]
+	var st := _new_st()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(key)
+	match piece:
+		"wood_bundle":
+			_cargo_wood_bundle(st, rng)
+		"brick_pallet":
+			_cargo_pallet(st, Vector3.ZERO, rng)
+			_cargo_bricks(st, rng)
+		"pallet_stack":
+			for i in 5:
+				_cargo_pallet(st, Vector3(rng.randf_range(-0.03, 0.03), i * 0.145, rng.randf_range(-0.04, 0.04)), rng)
+			LowPolyBuilder.add_box(st, Vector3(0.0, 0.745, 0.0), Vector3(1.0, 0.04, 1.15), SNOW)
+		"glass_container":
+			var palette := [Color(0.18, 0.45, 0.48), Color(0.26, 0.36, 0.52), Color(0.55, 0.26, 0.18), Color(0.3, 0.44, 0.34)]
+			_cargo_container(st, palette[variant % palette.size()], true)
+		"container_empty":
+			_cargo_container(st, Color(0.52, 0.5, 0.46), false)
+		"steel_bundle":
+			_cargo_steel_bundle(st, rng)
+		"stone_pile":
+			_cargo_stone_pile(st, rng)
+		"stone_scoop":
+			for i in 5:
+				LowPolyBuilder.add_rock(st, rng, Vector3(rng.randf_range(-0.35, 0.35), 0.18 + rng.randf() * 0.2,
+					rng.randf_range(-0.3, 0.3)), rng.randf_range(0.22, 0.32), GRAVEL.lerp(Color(0.6, 0.57, 0.52), rng.randf()), GRAVEL)
+		"stone_heap":
+			_cargo_stone_heap(st, rng)
+	var mesh := st.commit()
+	_cache[key] = mesh
+	return mesh
+
+
+## Bündel aus neun Stämmen (4-3-2) auf zwei Kanthölzern, zwei Spanngurte, Schnee obenauf.
+static func _cargo_wood_bundle(st: SurfaceTool, rng: RandomNumberGenerator) -> void:
+	var half := 1.3
+	for z: float in [-0.85, 0.85]:
+		LowPolyBuilder.add_box(st, Vector3(0.0, 0.05, z), Vector3(2.1, 0.1, 0.14), CARGO_WOOD)
+	var rows := [[-0.78, -0.26, 0.26, 0.78], [-0.52, 0.0, 0.52], [-0.26, 0.26]]
+	var top := 0.0
+	for row_index in rows.size():
+		for x: float in rows[row_index]:
+			var radius := rng.randf_range(0.24, 0.27)
+			var y := 0.1 + 0.26 + row_index * 0.44
+			var z0 := -half - rng.randf() * 0.08
+			var z1 := half + rng.randf() * 0.08
+			var bark := BARK.lerp(Color(0.42, 0.3, 0.2), rng.randf())
+			LowPolyBuilder.add_cylinder_between(st, Vector3(x, y, z0), Vector3(x, y, z1), radius, 9, bark)
+			for z_end: float in [z0, z1]:
+				var out := signf(z_end)
+				LowPolyBuilder.add_cylinder_between(st, Vector3(x, y, z_end), Vector3(x, y, z_end + out * 0.015),
+					radius * 0.93, 9, LOG_END.lerp(Color(0.9, 0.78, 0.6), rng.randf()))
+				LowPolyBuilder.add_cylinder_between(st, Vector3(x, y, z_end + out * 0.015), Vector3(x, y, z_end + out * 0.02),
+					radius * 0.45, 7, LOG_END.darkened(0.22))
+			top = maxf(top, y + radius)
+	# Spanngurte (gelb) über das Bündel
+	for z: float in [-0.7, 0.7]:
+		LowPolyBuilder.add_box(st, Vector3(0.0, top + 0.01, z), Vector3(0.62, 0.03, 0.08), STEP_YELLOW)
+		for side: float in [-1.0, 1.0]:
+			LowPolyBuilder.add_beam(st, Vector3(side * 0.3, top + 0.01, z), Vector3(side * 1.06, 0.36, z), 0.04, STEP_YELLOW)
+	# Schneehaube, an den Schultern dünner
+	LowPolyBuilder.add_box(st, Vector3(0.0, top + 0.03, 0.0), Vector3(0.5, 0.07, half * 2.0 - 0.2), SNOW)
+	for side: float in [-1.0, 1.0]:
+		LowPolyBuilder.add_box(st, Vector3(side * 0.5, top - 0.14, 0.0), Vector3(0.34, 0.05, half * 2.0 - 0.5), SNOW)
+
+
+## Europalette: drei Kufen, Klötze, fünf Deckbretter. [param base] = Unterkante Mitte.
+static func _cargo_pallet(st: SurfaceTool, base: Vector3, rng: RandomNumberGenerator) -> void:
+	var wood := PALLET.lerp(PALLET.darkened(0.2), rng.randf())
+	for x: float in [-0.48, 0.0, 0.48]:
+		LowPolyBuilder.add_box(st, base + Vector3(x, 0.012, 0.0), Vector3(0.12, 0.024, 1.2), wood.darkened(0.1))
+		for z: float in [-0.52, 0.0, 0.52]:
+			LowPolyBuilder.add_box(st, base + Vector3(x, 0.064, z), Vector3(0.12, 0.08, 0.14), wood.darkened(0.25))
+	for z: float in [-0.52, -0.26, 0.0, 0.26, 0.52]:
+		LowPolyBuilder.add_box(st, base + Vector3(0.0, 0.124, z), Vector3(1.08, 0.024, 0.12), wood)
+
+
+## Ziegelstapel auf der Palette: Lagen mit Fugen, Spannbänder, Schneehaube.
+static func _cargo_bricks(st: SurfaceTool, rng: RandomNumberGenerator) -> void:
+	var layers := 7
+	var y := 0.136
+	for layer in layers:
+		var rows := 4
+		for row in rows:
+			var z := -0.45 + row * 0.3 + (0.075 if layer % 2 == 1 else 0.0)
+			var length := 0.28 if (layer % 2 == 0 or row < rows - 1) else 0.14
+			for col in 4:
+				var x := -0.39 + col * 0.26
+				var color := BRICK.lerp(Color(0.78, 0.4, 0.26), rng.randf()).darkened(rng.randf() * 0.12)
+				LowPolyBuilder.add_box(st, Vector3(x, y + 0.042, z), Vector3(0.245, 0.078, length - 0.02), color)
+		y += 0.09
+	# Fugenmörtel innen (verhindert Durchsicht zwischen den Steinen)
+	LowPolyBuilder.add_box(st, Vector3(0.0, 0.136 + layers * 0.045, 0.02), Vector3(0.98, layers * 0.09 - 0.02, 1.08), Color(0.78, 0.72, 0.64))
+	for z: float in [-0.3, 0.3]:
+		LowPolyBuilder.add_box(st, Vector3(0.0, y + 0.004, z), Vector3(1.06, 0.012, 0.05), Color(0.2, 0.32, 0.55))
+		for side: float in [-1.0, 1.0]:
+			LowPolyBuilder.add_box(st, Vector3(side * 0.53, 0.136 + (y - 0.136) * 0.5, z), Vector3(0.012, y - 0.136, 0.05),
+				Color(0.2, 0.32, 0.55))
+	LowPolyBuilder.add_box(st, Vector3(0.0, y + 0.03, 0.0), Vector3(0.96, 0.05, 1.12), SNOW)
+	LowPolyBuilder.add_box(st, Vector3(0.12, y + 0.07, -0.08), Vector3(0.55, 0.04, 0.7), SNOW)
+
+
+## 20-Fuß-Container (2,4 × 2,45 × 4,1 m) mit Wellblech, Türen, Eckbeschlägen.
+## [param full] = Glas geladen (Plombe und Aufkleber an der Tür).
+static func _cargo_container(st: SurfaceTool, color: Color, full: bool) -> void:
+	var ribs := color.darkened(0.15)
+	LowPolyBuilder.add_box(st, Vector3(0.0, 1.225, 0.0), Vector3(2.4, 2.45, 4.1), color)
+	for side: float in [-1.0, 1.0]:
+		for i in 15:
+			LowPolyBuilder.add_box(st, Vector3(side * 1.215, 1.225, -1.85 + i * 0.265), Vector3(0.04, 2.25, 0.1), ribs)
+	# Türseite (+Z) mit Verschlussstangen
+	for x: float in [-0.8, -0.3, 0.3, 0.8]:
+		LowPolyBuilder.add_box(st, Vector3(x, 1.225, 2.06), Vector3(0.05, 2.3, 0.04), METAL)
+	if full:
+		LowPolyBuilder.add_box(st, Vector3(0.55, 1.3, 2.08), Vector3(0.5, 0.36, 0.01), Color(0.95, 0.93, 0.86))
+		LowPolyBuilder.add_box(st, Vector3(0.55, 1.3, 2.085), Vector3(0.3, 0.2, 0.01), Color(0.55, 0.78, 0.88))
+	for corner_x: float in [-1.17, 1.17]:
+		for corner_y: float in [0.05, 2.4]:
+			for corner_z: float in [-2.02, 2.02]:
+				LowPolyBuilder.add_box(st, Vector3(corner_x, corner_y, corner_z), Vector3(0.12, 0.1, 0.12), UNDER)
+	LowPolyBuilder.add_box(st, Vector3(0.0, 2.47, 0.0), Vector3(2.2, 0.04, 3.8), SNOW)
+	LowPolyBuilder.add_box(st, Vector3(-0.3, 2.5, 0.4), Vector3(1.2, 0.04, 2.0), SNOW)
+
+
+## Sechs Doppel-T-Träger in zwei Lagen, dazwischen Kanthölzer, Schnee obenauf.
+static func _cargo_steel_bundle(st: SurfaceTool, rng: RandomNumberGenerator) -> void:
+	var half := 1.4
+	var y := 0.0
+	for layer in 2:
+		for z: float in [-0.9, 0.9]:
+			LowPolyBuilder.add_box(st, Vector3(0.0, y + 0.05, z), Vector3(2.0, 0.1, 0.12), CARGO_WOOD)
+		y += 0.1
+		for x: float in [-0.6, 0.0, 0.6]:
+			var tint := STEEL.lerp(Color(0.5, 0.36, 0.28), rng.randf() * 0.35)
+			var length := half - rng.randf() * 0.1
+			LowPolyBuilder.add_box(st, Vector3(x, y + 0.02, 0.0), Vector3(0.36, 0.04, length * 2.0), tint)
+			LowPolyBuilder.add_box(st, Vector3(x, y + 0.2, 0.0), Vector3(0.05, 0.32, length * 2.0), tint.darkened(0.15))
+			LowPolyBuilder.add_box(st, Vector3(x, y + 0.38, 0.0), Vector3(0.36, 0.04, length * 2.0), tint.lightened(0.08))
+			if layer == 1:
+				LowPolyBuilder.add_box(st, Vector3(x + 0.04, y + 0.405, 0.2), Vector3(0.16, 0.012, length * 1.2), SNOW)
+		y += 0.4
+	for z: float in [-0.5, 0.5]:
+		LowPolyBuilder.add_box(st, Vector3(0.0, y + 0.03, z), Vector3(1.9, 0.02, 0.06), STEP_YELLOW)
+
+
+## Schüttgut im Trichterwagen: unregelmäßige Oberfläche aus Bruchstein mit Schneeflecken.
+static func _cargo_stone_pile(st: SurfaceTool, rng: RandomNumberGenerator) -> void:
+	var half := 4.2
 	var cells := 8
 	for i in cells:
 		for j in 3:
@@ -372,16 +597,43 @@ static func _build_wagon_hopper(rng: RandomNumberGenerator) -> Dictionary:
 			var x0 := -1.3 + j * (2.6 / 3.0)
 			var x1 := x0 + 2.6 / 3.0
 			var top := 3.25 + (0.18 if j == 1 else 0.0) + rng.randf_range(-0.05, 0.05)
-			var color := SNOW if rng.randf() < 0.45 else GRAVEL.lerp(Color(0.32, 0.3, 0.28), rng.randf())
-			LowPolyBuilder.add_quad_facing(st_load, Vector3(x0, top, z0), Vector3(x1, top, z0), Vector3(x1, top, z1),
+			var color := SNOW if rng.randf() < 0.35 else GRAVEL.lerp(Color(0.32, 0.3, 0.28), rng.randf())
+			LowPolyBuilder.add_quad_facing(st, Vector3(x0, top, z0), Vector3(x1, top, z0), Vector3(x1, top, z1),
 				Vector3(x0, top, z1), color, Vector3.UP)
-	for z: float in [-1.2, 1.2]:
-		LowPolyBuilder.add_box(paint, Vector3(0.0, 1.15, z), Vector3(1.1, 0.3, 0.8), body_color.darkened(0.3))
-	for end: float in [-1.0, 1.0]:
-		_add_buffers(paint, end * half, end)
-		LowPolyBuilder.add_box(paint, Vector3(0.0, 1.05, end * (half - 0.05)), Vector3(2.5, 0.3, 0.1), UNDER)
-	return {"paint": paint.commit(), "glass": null, "doors": [], "lamps_front": [],
-		"lamps_rear": [Vector3(-0.95, 1.3, half + 0.02), Vector3(0.95, 1.3, half + 0.02)]}
+	for i in 6:
+		LowPolyBuilder.add_rock(st, rng, Vector3(rng.randf_range(-0.9, 0.9), 3.35, rng.randf_range(-3.2, 3.2)),
+			rng.randf_range(0.18, 0.28), GRAVEL.lerp(Color(0.55, 0.52, 0.48), rng.randf()), SNOW)
+	# Seitenschürze, damit man beim Absenken nicht unter die Oberfläche sieht
+	for side: float in [-1.0, 1.0]:
+		LowPolyBuilder.add_quad_facing(st, Vector3(side * 1.3, 3.25, -half + 0.45), Vector3(side * 1.3, 3.25, half - 0.45),
+			Vector3(side * 1.3, 2.6, half - 0.45), Vector3(side * 1.3, 2.6, -half + 0.45), GRAVEL.darkened(0.2), Vector3(-side, 0, 0))
+
+
+## Kegelförmiger Steinhaufen fürs Lager (Einheitsgröße, wird skaliert).
+static func _cargo_stone_heap(st: SurfaceTool, rng: RandomNumberGenerator) -> void:
+	var rings := [[1.0, 0.0], [0.72, 0.42], [0.4, 0.78], [0.0, 1.0]]
+	var segments := 10
+	for r in rings.size() - 1:
+		for s in segments:
+			var a0 := TAU * s / segments
+			var a1 := TAU * (s + 1) / segments
+			var lower_r: float = rings[r][0]
+			var upper_r: float = rings[r + 1][0]
+			var lower_y: float = rings[r][1]
+			var upper_y: float = rings[r + 1][1]
+			var p0 := Vector3(cos(a0) * lower_r, lower_y, sin(a0) * lower_r)
+			var p1 := Vector3(cos(a1) * lower_r, lower_y, sin(a1) * lower_r)
+			var p2 := Vector3(cos(a1) * upper_r, upper_y, sin(a1) * upper_r)
+			var p3 := Vector3(cos(a0) * upper_r, upper_y, sin(a0) * upper_r)
+			var color := SNOW if r == rings.size() - 2 and rng.randf() < 0.7 else GRAVEL.lerp(Color(0.62, 0.58, 0.53), rng.randf())
+			var outward := Vector3(cos((a0 + a1) * 0.5), 0.6, sin((a0 + a1) * 0.5))
+			LowPolyBuilder.add_triangle_facing(st, p0, p1, p2, color, outward)
+			if upper_r > 0.0:
+				LowPolyBuilder.add_triangle_facing(st, p0, p2, p3, color, outward)
+	for i in 5:
+		var a := rng.randf() * TAU
+		LowPolyBuilder.add_rock(st, rng, Vector3(cos(a) * 0.8, 0.12, sin(a) * 0.8), rng.randf_range(0.1, 0.16),
+			GRAVEL.lerp(Color(0.6, 0.57, 0.52), rng.randf()), SNOW)
 
 
 # --- Drehgestelle --------------------------------------------------------------------

@@ -152,3 +152,12 @@ assets/materials/village_glow.tres               leuchtende Lampengläser
 assets/ui/icon.png                               Spielsymbol
 tests/village_test.*                   87 Prüfungen
 ```
+
+## Kosten und Baustellen (ab Etappe 8)
+
+Jedes Objekt kostet Geld und Material (`VillageCatalog.COSTS`); die Kosten stehen mit Icons
+unter der Objektleiste, fehlt etwas, ist die Vorschau rot. Häuser entstehen als Baustelle
+(`ConstructionSite`: Bauzaun, Gerüst, Materialstapel, Baukran, Bauarbeiter) und wachsen
+tagsüber von unten nach oben; erst wenn sie fertig sind, zieht die Familie ein – mit dem
+Zug. Auf dem Güterbahnhof wird nichts gebaut. Abriss und Rückgängig erstatten selbst
+Gebautes vollständig. Alles Weitere: [WIRTSCHAFT.md](WIRTSCHAFT.md).

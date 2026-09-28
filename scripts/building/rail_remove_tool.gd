@@ -62,10 +62,10 @@ func remove_at(point: Vector3) -> bool:
 		var object_id: int = _hovered_village.object_id
 		var label := VillageCatalog.get_label(_hovered_village.item_id)
 		_set_hovered(-1, -1)
-		var object_data: Dictionary = village.get_object(object_id).get_data()
+		var object_data := village.get_object_data(object_id)
 		undo_redo.create_action("%s entfernen" % label)
-		undo_redo.add_do_method(village.remove.bind(object_id))
-		undo_redo.add_undo_method(village.place.bind(object_data))
+		undo_redo.add_do_method(village.demolish.bind(object_id))
+		undo_redo.add_undo_method(village.build.bind(object_data))
 		undo_redo.commit_action()
 		return true
 	if _hovered_signal >= 0:

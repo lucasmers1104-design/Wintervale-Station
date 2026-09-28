@@ -15,13 +15,22 @@ class_name VillageManager
 extends Node3D
 
 signal changed
+## Eine Baustelle kam hinzu, ging voran oder wurde fertig (für das Notizbuch).
+signal projects_changed
+## Ein Haus ist fertig gebaut.
+signal construction_finished(house: VillageHouse)
+## Eine Familie zieht ein (Bewohner kommen mit dem Zug an).
+signal residents_arriving(home_name: String, count: int)
 
 const SAVE_ID := "village"
 const GROUP := &"village_manager"
 ## Korridor-IDs für eingeebnetes Gelände (weit weg von Gleis-IDs).
 const CORRIDOR_BASE := 7000000
 ## Höchstens so viele erfundene Bewohner (Leistung, gemütliches Dorf statt Stadt).
-const MAX_GENERATED_RESIDENTS := 18
+const MAX_GENERATED_RESIDENTS := 24
+## Gebaut wird tagsüber (Spielstunden).
+const WORK_START := 6.0
+const WORK_END := 20.0
 ## Höhenunterschied, den ein Haus noch einebnen darf.
 const MAX_HOUSE_SLOPE := 3.0
 
@@ -35,9 +44,16 @@ const MAX_HOUSE_SLOPE := 3.0
 ## ID → Objekt ([VillageHouse], [VillagePath] oder [VillageObject] – gleiche Schnittstelle).
 var _objects: Dictionary = {}
 var _residents: Dictionary[int, Array] = {}
+## Ganzer Haushalt je Haus (auch Mitglieder, die erst später nachziehen).
+var _households: Dictionary[int, Array] = {}
+## Zuletzt fertiggestellte Häuser: [{"home", "item", "day"}], neueste zuerst.
+var _finished_log: Array[Dictionary] = []
+## Objekte, die mit Geld und Material bezahlt wurden (nur diese werden beim Abriss erstattet).
+var _paid: Dictionary[int, bool] = {}
 var _next_id := 1
 var _dark := false
 var _network_dirty := false
+var _project_timer := 0.0
 
 
 func _ready() -> void:
@@ -46,8 +62,85 @@ func _ready() -> void:
 	if not Engine.is_editor_hint():
 		_dark = WorldClock.is_dark()
 		WorldClock.darkness_changed.connect(_on_darkness_changed)
+		WorldClock.day_changed.connect(_on_day_changed)
 	if terrain:
 		terrain.terrain_changed.connect(_on_terrain_changed)
+
+
+# --- Bauprojekte ------------------------------------------------------------------------
+
+## Baustellen gehen tagsüber voran; dabei wird das reservierte Material verbaut.
+func _process(delta: float) -> void:
+	if Engine.is_editor_hint() or WorldClock.paused:
+		return
+	var hours := WorldClock.seconds_to_hours(delta * WorldClock.time_scale)
+	var working := is_work_time()
+	var any := false
+	for house in get_projects():
+		any = true
+		var progress := house.build_progress
+		if working:
+			progress += hours / maxf(VillageCatalog.get_build_hours(house.item_id), 0.1)
+		advance_project(house, progress, working)
+	if any:
+		_project_timer -= delta
+		if _project_timer <= 0.0:
+			_project_timer = 1.0
+			projects_changed.emit()
+
+
+## Wird gerade gebaut (06–20 Uhr)?
+static func is_work_time() -> bool:
+	return WorldClock.time_of_day >= WORK_START and WorldClock.time_of_day < WORK_END
+
+
+## Setzt den Baufortschritt eines Hauses und verbaut das dazu nötige Material
+## (bis 90 % Fortschritt ist alles verbaut, danach folgt der Innenausbau).
+func advance_project(house: VillageHouse, progress: float, working := true) -> void:
+	var key := cost_key(house.object_id)
+	var cost := VillageCatalog.get_cost(house.item_id)
+	var share := clampf(progress / 0.9, 0.0, 1.0)
+	for goods_id: String in cost:
+		if goods_id == "money":
+			continue
+		var remaining := int(Economy.get_reservation(key).get(goods_id, 0))
+		var used := int(cost[goods_id]) - remaining
+		var target := floori(int(cost[goods_id]) * share)
+		if target > used and Economy.has_reservation(key):
+			Economy.consume(key, goods_id, target - used)
+	house.set_build_progress(progress, Economy.get_reservation(key), working)
+
+
+## Häuser im Bau.
+func get_projects() -> Array[VillageHouse]:
+	var list: Array[VillageHouse] = []
+	for obj in _objects.values():
+		if obj is VillageHouse and not (obj as VillageHouse).is_finished():
+			list.append(obj)
+	return list
+
+
+## Noch verbleibende Bauzeit in Spielstunden (nur Arbeitsstunden).
+func get_project_hours_left(house: VillageHouse) -> float:
+	return (1.0 - house.build_progress) * VillageCatalog.get_build_hours(house.item_id)
+
+
+func get_finished_log() -> Array[Dictionary]:
+	return _finished_log
+
+
+func _on_house_finished(house: VillageHouse) -> void:
+	Economy.finish_build(cost_key(house.object_id))
+	_finished_log.push_front({"home": house.home_name, "item": house.item_id, "day": WorldClock.day})
+	if _finished_log.size() > 8:
+		_finished_log.resize(8)
+	_move_in(house, true)
+	if not Engine.is_editor_hint():
+		Events.notification_requested.emit("%s ist fertig – Familie %s ist unterwegs" % [
+			VillageCatalog.get_label(house.item_id), house.home_name])
+	construction_finished.emit(house)
+	projects_changed.emit()
+	changed.emit()
 
 
 # --- Objekte ------------------------------------------------------------------------
@@ -129,14 +222,81 @@ func place(data: Dictionary):
 			thing.configure(data, material)
 			obj = thing
 	_objects[id] = obj
+	if bool(data.get("paid", false)):
+		_paid[id] = true
+	else:
+		_paid.erase(id)
 	add_child(obj)
 	if obj.has_method("set_dark") and _dark:
 		obj.set_dark(true)
 	_level_terrain(obj)
 	if obj is VillageHouse:
-		_move_in(obj as VillageHouse)
+		var house := obj as VillageHouse
+		house.finished.connect(_on_house_finished)
+		if house.is_finished():
+			_move_in(house, false)
+		else:
+			projects_changed.emit()
 	_after_change(obj)
 	return obj
+
+
+## Bauen mit Kosten (Bauwerkzeug, Rückgängig/Wiederholen): Geld wird bezahlt,
+## Material für Häuser reserviert (Baustelle) bzw. sofort verbaut. Nur Daten mit
+## "paid" werden berechnet (das Startdorf war ein Geschenk). Rückgabe: das Objekt
+## oder null, wenn etwas fehlt (dann wird nichts gebaut).
+func build(data: Dictionary):
+	if bool(data.get("paid", false)):
+		var item_id := String(data["item"])
+		var key := cost_key(int(data["id"]))
+		var cost := VillageCatalog.get_cost(item_id, _data_length(data))
+		var label := "Bau: %s" % VillageCatalog.get_label(item_id)
+		var construction := VillageCatalog.get_kind(item_id) == "house" and float(data.get("build", 1.0)) < 1.0
+		var ok := Economy.charge_build(key, cost, label) if construction else Economy.charge_instant(key, cost, label)
+		if not ok:
+			if not Engine.is_editor_hint():
+				Events.notification_requested.emit(Economy.describe_missing(cost))
+			return null
+	return place(data)
+
+
+## Abriss (Entfernen-Werkzeug, Rückgängig): Bezahlte Objekte geben Geld und
+## Material vollständig zurück. Rückgabe: die Daten (mit "paid") für Rückgängig.
+func demolish(id: int) -> Dictionary:
+	var obj = _objects.get(id)
+	if obj == null:
+		return {}
+	var data := get_object_data(id)
+	if bool(data.get("paid", false)):
+		var item_id := String(data["item"])
+		Economy.refund_build(cost_key(id), VillageCatalog.get_cost(item_id, _data_length(data)),
+			"Abriss: %s" % VillageCatalog.get_label(item_id))
+	remove(id)
+	return data
+
+
+## Daten eines Objekts inkl. "paid" (wurde es bezahlt?).
+func get_object_data(id: int) -> Dictionary:
+	var obj = _objects.get(id)
+	if obj == null:
+		return {}
+	var data: Dictionary = obj.get_data()
+	if _paid.has(id):
+		data["paid"] = true
+	return data
+
+
+## Schlüssel der Reservierung im Materiallager.
+static func cost_key(id: int) -> String:
+	return "village:%d" % id
+
+
+func _data_length(data: Dictionary) -> float:
+	if not data.has("end"):
+		return 0.0
+	var a := SaveUtils.array_to_vec3(data.get("pos"))
+	var b := SaveUtils.array_to_vec3(data.get("end"))
+	return Vector2(a.x, a.z).distance_to(Vector2(b.x, b.z))
 
 
 ## Entfernt ein Objekt. Rückgabe: seine Daten (für Undo) oder {}.
@@ -149,6 +309,7 @@ func remove(id: int) -> Dictionary:
 		_move_out(obj as VillageHouse)
 	_unlevel_terrain(id)
 	_objects.erase(id)
+	_paid.erase(id)
 	var footprint: Dictionary = obj.get_footprint()
 	remove_child(obj)
 	obj.queue_free()
@@ -197,9 +358,15 @@ func check_placement(item_id: String, position: Vector3, angle: float, variant :
 			return "Zu lang (höchstens %d m)" % int(VillageCatalog.get_item(item_id)["max_length"])
 	var half_extent := terrain.get_half_extent() * 0.88 if terrain else 1000.0
 	var heights: Array[float] = []
+	var yards: Array = []
+	if is_inside_tree():
+		yards = get_tree().get_nodes_in_group(FreightYard.GROUP)
 	for p in VillageFootprint.samples(fp, 1.5):
 		if absf(p.x) > half_extent or absf(p.y) > half_extent:
 			return "Außerhalb des Gebiets"
+		for yard: FreightYard in yards:
+			if yard.covers(p.x, p.y):
+				return "Gehört zum Güterbahnhof"
 		if terrain and terrain.is_in_lake(p.x, p.y):
 			return "Im zugefrorenen See"
 		if rail_network and rail_network.find_segment_near(Vector3(p.x, 0, p.y), 3.0 if kind == "house" else 2.2):
@@ -427,23 +594,56 @@ func get_generated_resident_count() -> int:
 	return count
 
 
-## Ein Haus bezieht seine Bewohner: bekannte Familie (Steckbrief) oder neue Familie.
-func _move_in(house: VillageHouse) -> void:
+## Haushaltsgröße eines Hauses (aus Hausgröße und Startwert: 1–4 Personen).
+static func household_size(house: VillageHouse) -> int:
+	return clampi(house.get_capacity() + posmod(house.resident_seed, 2), 1, 4)
+
+
+## Der ganze Haushalt (Steckbriefe, zwischengespeichert – gleicher Startwert = gleiche Familie).
+func get_household(house: VillageHouse) -> Array:
+	if not _households.has(house.object_id):
+		var list: Array = []
+		list.assign(VillageResidents.generate(house.home_name, house.resident_seed, household_size(house)))
+		for profile: NpcProfile in list:
+			_assign_favourite_way(profile, house)
+		_households[house.object_id] = list
+	return _households[house.object_id]
+
+
+## An welchem Tag ein Haushaltsmitglied einzieht: die ersten beiden sofort,
+## weitere Angehörige (Kinder, Großeltern) an den folgenden Tagen.
+static func join_day(house: VillageHouse, index: int) -> int:
+	return house.finished_day + maxi(0, index - 1)
+
+
+## Ein fertiges Haus bezieht seine Bewohner: bekannte Familie (Steckbrief) oder
+## neue Familie. [param arriving] = sie kommen gerade mit dem Zug an (sonst sind
+## sie schon da, z.B. nach dem Laden).
+func _move_in(house: VillageHouse, arriving: bool) -> void:
 	if npc_director == null:
 		return
 	if npc_director.has_family(house.home_name):
 		return  # z.B. Familie Berger – ihre Steckbriefe liegen in assets/npcs
-	var free := MAX_GENERATED_RESIDENTS - get_generated_resident_count()
-	var count := mini(mini(house.get_capacity(), 2), free)
-	if count <= 0:
-		return
-	var profiles: Array = []
-	for profile in VillageResidents.generate(house.home_name, house.resident_seed, count):
-		npc_director.add_resident(profile)
-		profiles.append(profile)
-	_residents[house.object_id] = profiles
-	if not Engine.is_editor_hint():
-		Events.notification_requested.emit("Familie %s zieht ein (%d)" % [house.home_name, count])
+	var household := get_household(house)
+	var present: Array = _residents.get(house.object_id, [])
+	var added := 0
+	for i in household.size():
+		var profile: NpcProfile = household[i]
+		if present.has(profile) or join_day(house, i) > WorldClock.day:
+			continue
+		if get_generated_resident_count() >= MAX_GENERATED_RESIDENTS:
+			break
+		npc_director.add_resident(profile, profile.came_from if arriving else "")
+		present.append(profile)
+		added += 1
+	_residents[house.object_id] = present
+	if added > 0:
+		if arriving:
+			residents_arriving.emit(house.home_name, added)
+			if not Engine.is_editor_hint():
+				Events.notification_requested.emit("Familie %s kommt mit dem Zug aus %s (%d)" % [
+					house.home_name, (household[0] as NpcProfile).came_from, added])
+		changed.emit()
 
 
 func _move_out(house: VillageHouse) -> void:
@@ -452,6 +652,58 @@ func _move_out(house: VillageHouse) -> void:
 	for profile in _residents.get(house.object_id, []):
 		npc_director.remove_resident(profile)
 	_residents.erase(house.object_id)
+	_households.erase(house.object_id)
+
+
+## Neuer Tag: Angehörige ziehen nach (sie kommen mit dem Zug).
+func _on_day_changed(_day: int) -> void:
+	for house in get_houses():
+		if house.is_finished() and house.finished_day > 0:
+			_move_in(house, true)
+
+
+## Einwohner insgesamt (bekannte Familien und Zugezogene) und Haushalte.
+func get_population() -> int:
+	return (npc_director.get_npcs().size() if npc_director else 0)
+
+
+## Lieblingsweg: ein schöner Ort in der Nähe (Dorfplatz, Brunnen, Bank, Weg),
+## über den der Bewohner gern zum Bahnhof und zurück geht.
+func _assign_favourite_way(profile: NpcProfile, house: VillageHouse) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(profile.display_name) + house.resident_seed
+	var home := house.get_front_point()
+	var candidates: Array = []
+	for obj in _objects.values():
+		var name_text := ""
+		var point := Vector3.INF
+		if obj is VillageObject:
+			match (obj as VillageObject).item_id:
+				"plaza":
+					name_text = "über den Dorfplatz"
+				"fountain":
+					name_text = "am Brunnen vorbei"
+				"bench":
+					name_text = "an der Bank vorbei"
+				"street_lamp", "lantern":
+					name_text = "unter den Laternen entlang"
+			point = obj.position
+		elif obj is VillagePath:
+			var path := obj as VillagePath
+			name_text = "den %s entlang" % VillageCatalog.get_label(path.item_id)
+			point = path.start_point.lerp(path.end_point, 0.5)
+		if name_text == "" or point == Vector3.INF:
+			continue
+		var distance := Vector2(point.x, point.z).distance_to(Vector2(home.x, home.z))
+		if distance > 6.0 and distance < 45.0:
+			candidates.append([name_text, point])
+	if candidates.is_empty():
+		profile.favourite_way = "auf dem kürzesten Weg"
+		profile.favourite_via = Vector3.INF
+		return
+	var pick: Array = candidates[rng.randi() % candidates.size()]
+	profile.favourite_way = pick[0]
+	profile.favourite_via = pick[1]
 
 
 func _new_home_name(seed_value: int) -> String:
@@ -607,8 +859,8 @@ func save_state() -> Dictionary:
 	var ids := _objects.keys()
 	ids.sort()
 	for id in ids:
-		list.append(_objects[id].get_data())
-	return {"objects": list, "next_id": _next_id}
+		list.append(get_object_data(id))
+	return {"objects": list, "next_id": _next_id, "finished_log": _finished_log.duplicate(true)}
 
 
 func load_state(data: Dictionary) -> void:
@@ -617,6 +869,14 @@ func load_state(data: Dictionary) -> void:
 		if entry is Dictionary and VillageCatalog.has_item(String(entry.get("item", ""))):
 			place(entry)
 	_next_id = maxi(_next_id, int(data.get("next_id", _next_id)))
+	_finished_log.clear()
+	for entry: Variant in data.get("finished_log", []):
+		if entry is Dictionary:
+			_finished_log.append(entry)
+	# Lieblingswege erst bestimmen, wenn alle Wege und Plätze wieder stehen
+	for house in get_houses():
+		for profile: NpcProfile in _households.get(house.object_id, []):
+			_assign_favourite_way(profile, house)
 	if terrain:
 		terrain.flush_changes()
 	rebuild_walk_network()

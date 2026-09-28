@@ -228,3 +228,19 @@ Neu: `StationAcoustics` (Bahnhofshall), `snow_terrain.gdshader` (Schneeglitzern)
 Geändert (erweitert, nicht neu geschrieben): Gleis-, Baum-, Bahnsteig-, Fenster- und Figurenmodelle,
 Laternen, Klänge, Ausweichen der Bewohner, Kamera-Kollision, Lichter mit Ausblenden in der Ferne.
 `TrainDispatcher.glass_material` akzeptiert jetzt auch Shader-Materialien (`get_window_glow()`).
+
+## Etappe 8: Güterbahnhof, Wirtschaft und lebendiges Dorf
+
+Ausführlich in [WIRTSCHAFT.md](WIRTSCHAFT.md) (Architektur, Materialfluss, Kosten, Fehlerliste, Leistung). Kurz:
+
+- **Neu:** Autoload `Economy` (Geld, Lager, Reservierungen, Kassenbuch); Materialien als `GoodsType`-Dateien in `assets/goods/`; `World/FreightYard` (Güterbahnhof mit Portalkran, Lagerflächen, Güterschuppen, Lagerhalle); `TownFinances` (Fahrkarten, Gemeindeabgaben); `Notebook` (Taste N); Baustellen `ConstructionSite`; Modelle `FreightMeshes`, `ConstructionMeshes`; eigene Icons in `assets/ui/icons/`.
+- **Gleisanlage:** Gleis 3 (Güterbahnhof) östlich von Gleis 1, zwei neue Weichen auf dem Hauptgleis, Ausfahrsignale in beide Richtungen, Haltepunkt `World/Railway/FreightStop` (Bahnhof „Güterbahnhof“). Die Güterzüge halten dort statt durchzufahren.
+- **Erweiterungen bestehender Systeme (nichts neu geschrieben):**
+  - `RailInterlocking`: `release_routes_of()` und Zielgleis-Auflösung (siehe Fehlerliste).
+  - `Train`: `hold_departure()`/`release_departure()` (Ladearbeiten), Abgaswolken der Güterlok.
+  - `TrainCar`: Ladeplätze (abnehmen, aufsetzen, Schüttgut-Portionen, Leergut).
+  - `TrainMeshes`: Ladung vom Wagen getrennt (`CARGO`, `create_cargo()`), neue Wagen `wagon_flat`, `wagon_stake`.
+  - `VillageManager`: `build()`/`demolish()` mit Kosten, Baufortschritt, Haushalte, Zuzug per Zug, Lieblingswege.
+  - `VillageHouse`: Bauzustand; `NpcRoutine`: `STROLL`; `Npc`: Spaziergang, Ankunft mit dem Zug, Lieblingsweg.
+  - HUD: Gemeindekasse neben der Uhr, Notizbuch-Knopf, Kostenzeile; `InputConfig`: Taste N.
+- `tests/economy_test.*`: neue Prüfungen für Etappe 8.

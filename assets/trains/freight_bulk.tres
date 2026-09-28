@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="TrainType" format=3]
+
+[ext_resource type="Script" path="res://scripts/trains/train_type.gd" id="1_type"]
+
+[resource]
+resource_name = "FreightBulk"
+script = ExtResource("1_type")
+type_code = "GZ"
+display_name = "Schüttgutzug"
+category = 1
+consist = PackedStringArray("loco_freight", "wagon_hopper", "wagon_hopper", "wagon_flat")
+max_speed_kmh = 40.0
+acceleration = 0.3
+braking = 0.45
+min_dwell_seconds = 6.0
+primary_color = Color(0.62, 0.52, 0.2, 1)
+secondary_color = Color(0.93, 0.86, 0.7, 1)
+accent_color = Color(0.96, 0.78, 0.2, 1)
+roof_color = Color(0.3, 0.3, 0.32, 1)
+horn_pitch = 0.78

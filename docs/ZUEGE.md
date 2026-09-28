@@ -66,7 +66,7 @@ Ein Spieltag dauert 48 Echtzeit-Minuten, eine Spielminute also 2 Sekunden. Der Z
    - **Klang**: Tonhöhe des Horns.
 3. In einer Fahrplanzeile als Zuggattung auswählen.
 
-Verfügbare Fahrzeuge: `loco_regional`, `coach`, `loco_freight`, `wagon_timber`, `wagon_container`, `wagon_hopper`.
+Verfügbare Fahrzeuge: `loco_regional`, `coach`, `loco_freight`, `wagon_timber` (Holz), `wagon_container` (Glas), `wagon_hopper` (Stein), `wagon_flat` (Ziegel), `wagon_stake` (Stahl). Güterwagen kommen beladen an; ihre Ladung steht in `TrainMeshes.CARGO`.
 
 ### Neues Fahrzeugmodell (Programmierung)
 
@@ -115,3 +115,20 @@ Bewohner und Reisende steigen über die Trittstufen ein und aus (siehe [NPCS.md]
 - `hold_doors()`/`release_doors()`: Solange sich an einer Tür etwas tut, bleiben die Türen offen – höchstens `MAX_DOOR_HOLD` = 8 Simulationssekunden (≈ 4 Spielminuten) über die Abfahrtszeit hinaus.
 
 Die Trittstufe (`TrainMeshes.create_step_upper/lower`, animiert in `TrainCar.set_steps`) besteht aus einer oberen Stufe mit Führungsschiene und einer über ein Scharnier klappbaren unteren Stufe, beide mit Riffelblech und gelber Sicherheitskante. Beim Ausfahren gleitet die Einheit erst heraus (55 %), dann klappt die untere Stufe herunter.
+
+## Güterverkehr (ab Etappe 8)
+
+Güterzüge fahren nicht mehr durch, sondern halten am **Güterbahnhof** (Gleis 3, Bahnhof
+„Güterbahnhof“, Haltepunkt `World/Railway/FreightStop`). Es gibt vier Gattungen mit
+unterschiedlicher Länge und Ladung (Holzzug, Baustoffzug, Güterzug, Schüttgutzug).
+
+- Der `FreightYard` hält den Zug mit `Train.hold_departure()` fest, bis der Kran fertig ist
+  (Sicherheitsgrenze `Train.MAX_CARGO_HOLD` ≈ 3 Spielstunden), und gibt ihn mit
+  `release_departure()` frei. Die Infozeile zeigt dann „wird be- und entladen“.
+- Die Ladung sind eigene Stücke am Wagen (`TrainCar.get_cargo()`, `detach_cargo()`,
+  `attach_cargo()`, `take_bulk_portion()`), damit der Kran sie sichtbar abheben kann.
+- Die Güterlok stößt kleine Abgaswolken aus (beim Anfahren mehr).
+- Stellwerk: Steht ein Zug vollständig im Zielabschnitt seines Fahrwegs, wird der Fahrweg
+  aufgelöst (Zielgleis-Auflösung) – das Einfahrsignal ist dann für andere Züge frei.
+
+Details, Materialfluss und Fahrplan der Güterzüge: [WIRTSCHAFT.md](WIRTSCHAFT.md).

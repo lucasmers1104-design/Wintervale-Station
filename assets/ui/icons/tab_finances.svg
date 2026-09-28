@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Finanzen: kleiner Stapel Taler und eine aufrechte Münze -->
+  <g stroke="#3b2a20" stroke-width="2.4" stroke-linejoin="round">
+    <ellipse cx="22" cy="52" rx="15" ry="5" fill="#b8862c"/>
+    <rect x="7" y="44" width="30" height="8" fill="#d9a53c"/>
+    <ellipse cx="22" cy="44" rx="15" ry="5" fill="#f0c55a"/>
+    <rect x="7" y="36" width="30" height="8" fill="#d9a53c"/>
+    <ellipse cx="22" cy="36" rx="15" ry="5" fill="#f5d06a"/>
+    <circle cx="44" cy="30" r="15" fill="#f0c55a"/>
+    <circle cx="44" cy="30" r="10" fill="#e2ad44"/>
+  </g>
+  <path d="M40 24 C41 21 47 21 48 24 M44 22 V38 M40 35 C41 38 47 38 48 35" fill="none" stroke="#7a5518" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M34 22 C37 17 42 15 46 15.5" fill="none" stroke="#fff4c8" stroke-width="2.4" stroke-linecap="round"/>
+</svg>

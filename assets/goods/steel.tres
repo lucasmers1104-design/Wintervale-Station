@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GoodsType" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/economy/goods_type.gd" id="1_goods"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/goods_steel.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_goods")
+id = "steel"
+display_name = "Stahl"
+icon = ExtResource("2_icon")
+origin = "Stahlwerk Südtal"
+origin_portal = "Südtal"
+max_stock = 48
+start_stock = 16
+unit_price = 6
+color = Color(0.4, 0.46, 0.54, 1)
+sort_order = 3
+description = "Träger und Beschläge für Laternen, Gerüste und große Häuser. Kommt gebündelt auf Rungenwagen."

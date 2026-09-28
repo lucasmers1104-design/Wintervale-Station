@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Taler: Münze mit Tannenprägung -->
+  <circle cx="32" cy="32" r="26" fill="#f0c55a" stroke="#3b2a20" stroke-width="3"/>
+  <circle cx="32" cy="32" r="19" fill="#e2ad44" stroke="#b8862c" stroke-width="2"/>
+  <path d="M32 16 L41 30 H36 L43 41 H21 L28 30 H23 Z" fill="#b8862c" stroke="#7a5518" stroke-width="1.6" stroke-linejoin="round"/>
+  <rect x="30" y="41" width="4" height="6" fill="#7a5518"/>
+  <path d="M15 22 C19 14 26 10 33 10" fill="none" stroke="#fff4c8" stroke-width="3" stroke-linecap="round"/>
+</svg>

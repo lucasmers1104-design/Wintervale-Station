@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Glas: Scheibe im Holzrahmen mit Himmelsspiegelung und Glanzstreifen -->
+  <rect x="10" y="8" width="44" height="48" rx="4" fill="#9a6a42" stroke="#3b2a20" stroke-width="2.6"/>
+  <rect x="15" y="13" width="34" height="38" rx="2" fill="#bfe0ef" stroke="#3b2a20" stroke-width="2"/>
+  <path d="M15 13 H49 V26 C40 22 26 22 15 27 Z" fill="#dff1f8"/>
+  <g stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" opacity="0.95">
+    <line x1="21" y1="42" x2="33" y2="19"/>
+    <line x1="29" y1="45" x2="36" y2="32"/>
+  </g>
+  <line x1="32" y1="13" x2="32" y2="51" stroke="#3b2a20" stroke-width="1.6" opacity="0.35"/>
+  <path d="M8 9 C12 4 52 4 56 9 C50 11 44 9 40 11 C34 9 20 12 8 9 Z"
+        fill="#f4f7fb" stroke="#3b2a20" stroke-width="2" stroke-linejoin="round"/>
+</svg>

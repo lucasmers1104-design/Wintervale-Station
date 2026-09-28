@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GoodsType" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/economy/goods_type.gd" id="1_goods"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/goods_glass.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_goods")
+id = "glass"
+display_name = "Glas"
+icon = ExtResource("2_icon")
+origin = "Glashütte Nordtal"
+origin_portal = "Nordtal"
+max_stock = 64
+start_stock = 24
+unit_price = 5
+color = Color(0.42, 0.62, 0.72, 1)
+sort_order = 2
+description = "Fensterscheiben, gut verpackt in Containern – zerbrechlich, deshalb teuer."

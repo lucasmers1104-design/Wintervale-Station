@@ -89,6 +89,9 @@ var _door_holds: Dictionary[int, bool] = {}
 var _hold_time := 0.0
 var _drive_time := 0.0
 var _squeal_played := false
+## Lade- und Entladearbeiten (Güterbahnhof): Solange ein Eintrag besteht, fährt der Zug nicht ab.
+var _cargo_holds: Dictionary[String, bool] = {}
+var _cargo_hold_time := 0.0
 
 
 ## Richtet den Zug ein und baut seine Fahrzeuge.
@@ -183,6 +186,7 @@ func update_visuals(_delta: float) -> void:
 			if path.index_at(maxf(old_front, 0.0)) != path.index_at(maxf(front, 0.0)):
 				car.play_clack(speed / maxf(max_speed, 1.0))
 	cars[0].set_snow_spray(speed)
+	cars[0].set_exhaust(speed, speed > 0.05 and _drive_time < START_RAMP_TIME * 1.5)
 	if previous < emerge_at + 6.0 and head >= emerge_at + 6.0 and not _emerged:
 		_emerged = true
 		_play_voice("horn", -12.0, train_type.horn_pitch * 1.05)
@@ -211,7 +215,9 @@ func get_info_text() -> String:
 	var text := "%s · %s · %d km/h" % [entry.train_number, entry.train_name, roundi(speed * 3.6)]
 	if entry.stops and platform_number > 0:
 		text += " · Gleis %d" % platform_number
-	if state == State.DWELLING:
+	if state == State.DWELLING and is_departure_held():
+		text += " · wird be- und entladen"
+	elif state == State.DWELLING:
 		text += " · hält"
 	elif speed < 0.1 and status != "":
 		text += " · wartet: " + status
@@ -367,7 +373,8 @@ func _update_dwell(dt: float) -> void:
 				_waited = 0.0
 		Dwell.WAITING:
 			_waited += dt
-			if _waited >= train_type.min_dwell_seconds and _departure_due() and not _doors_held(dt):
+			if _waited >= train_type.min_dwell_seconds and _departure_due() and not _doors_held(dt) \
+					and not _cargo_held(dt):
 				_next_dwell_phase(Dwell.CLOSING)
 				for car in cars:
 					if car.has_doors():
@@ -479,6 +486,31 @@ func _doors_held(dt: float) -> bool:
 		return false
 	_hold_time += dt
 	return _hold_time < MAX_DOOR_HOLD
+
+
+## Der Güterbahnhof lädt: Der Zug wartet mit der Abfahrt, bis [method release_departure]
+## gerufen wird (Sicherheitsgrenze [constant MAX_CARGO_HOLD]).
+func hold_departure(key: String) -> void:
+	_cargo_holds[key] = true
+
+
+func release_departure(key: String) -> void:
+	_cargo_holds.erase(key)
+
+
+func is_departure_held() -> bool:
+	return not _cargo_holds.is_empty()
+
+
+## Höchstens so lange (Simulationssekunden, ≈ 3 Spielstunden) wartet ein Zug auf Ladearbeiten.
+const MAX_CARGO_HOLD := 360.0
+
+
+func _cargo_held(dt: float) -> bool:
+	if _cargo_holds.is_empty():
+		return false
+	_cargo_hold_time += dt
+	return _cargo_hold_time < MAX_CARGO_HOLD
 
 
 func _departure_due() -> bool:

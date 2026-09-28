@@ -60,6 +60,20 @@ static func get_sound(sound_name: String) -> AudioStreamWAV:
 			stream = _murmur()
 		"bird_0", "bird_1", "bird_2", "bird_3":
 			stream = _bird(int(sound_name.right(1)))
+		"crane_motor":
+			stream = _crane_motor()
+		"clank":
+			stream = _clank()
+		"gravel":
+			stream = _gravel()
+		"hammer":
+			stream = _hammer()
+		"saw":
+			stream = _saw()
+		"page":
+			stream = _page()
+		"done_chime":
+			stream = _done_chime()
 		_:
 			push_warning("SoundLibrary: Unbekannter Klang '%s'." % sound_name)
 			stream = _to_wav(PackedFloat32Array([0.0]))
@@ -456,6 +470,123 @@ static func _horn() -> AudioStreamWAV:
 		smooth += 0.35 * (value - smooth)
 		samples[i] = smooth * envelope
 	_normalize(samples, 0.5)
+	return _to_wav(samples)
+
+
+# --- Güterbahnhof und Baustelle ---------------------------------------------------
+
+## Kranmotor: tiefes, weiches Brummen mit leisem Getriebesingen. Schleife (3 s).
+static func _crane_motor() -> AudioStreamWAV:
+	var rng := _rng(211)
+	var length := int(MIX_RATE * 3.0)
+	var fade := int(MIX_RATE * 0.3)
+	var raw := PackedFloat32Array()
+	raw.resize(length + fade)
+	var low := 0.0
+	for i in raw.size():
+		var t := float(i) / MIX_RATE
+		var white := rng.randf_range(-1.0, 1.0)
+		low += 0.04 * (white - low)
+		var hum := sin(TAU * 55.0 * t) * 0.5 + sin(TAU * 110.0 * t) * 0.25 + sin(TAU * 165.0 * t) * 0.1
+		var whine := sin(TAU * 620.0 * t + sin(TAU * 1.3 * t) * 2.0) * 0.05
+		raw[i] = (hum + whine) * (0.85 + 0.15 * sin(TAU * 4.0 * t)) + low * 0.9
+	var samples := _crossfade_loop(raw, length, fade)
+	_normalize(samples, 0.3)
+	return _to_wav(samples, true)
+
+
+## Metallisches Klacken (Traverse setzt auf, Greifer schließt): kurz, gedämpft.
+static func _clank() -> AudioStreamWAV:
+	var rng := _rng(223)
+	var samples := _silence(0.45)
+	for i in samples.size():
+		var t := float(i) / MIX_RATE
+		var ring := sin(TAU * 410.0 * t) * 0.5 + sin(TAU * 1130.0 * t) * 0.25 + sin(TAU * 1720.0 * t) * 0.12
+		var knock := rng.randf_range(-1.0, 1.0) * exp(-t * 90.0)
+		samples[i] = ring * exp(-t * 11.0) + knock * 0.6
+	_normalize(samples, 0.32)
+	return _to_wav(samples)
+
+
+## Schotter rieselt aus dem Greifer: prasselndes Rauschen, das ausläuft.
+static func _gravel() -> AudioStreamWAV:
+	var rng := _rng(227)
+	var duration := 1.6
+	var samples := _silence(duration)
+	var band := 0.0
+	for i in samples.size():
+		var t := float(i) / MIX_RATE
+		var white := rng.randf_range(-1.0, 1.0)
+		band += 0.45 * (white - band)
+		var grains := 1.0 if rng.randf() < 0.08 else 0.25
+		var envelope := smoothstep(0.0, 0.05, t) * (1.0 - smoothstep(0.3, duration, t))
+		samples[i] = (white - band * 0.6) * grains * envelope
+	_normalize(samples, 0.3)
+	return _to_wav(samples)
+
+
+## Drei gedämpfte Hammerschläge auf Holz (Baustelle).
+static func _hammer() -> AudioStreamWAV:
+	var rng := _rng(229)
+	var samples := _silence(1.4)
+	for hit in 3:
+		var start := int((0.05 + hit * 0.42) * MIX_RATE)
+		var pitch := 1.0 + rng.randf_range(-0.06, 0.06)
+		for j in int(0.25 * MIX_RATE):
+			var i := start + j
+			if i >= samples.size():
+				break
+			var t := float(j) / MIX_RATE
+			var knock := sin(TAU * 240.0 * pitch * t) * exp(-t * 30.0) + sin(TAU * 610.0 * pitch * t) * 0.4 * exp(-t * 55.0)
+			samples[i] += knock + rng.randf_range(-1.0, 1.0) * exp(-t * 150.0) * 0.5
+	_normalize(samples, 0.28)
+	return _to_wav(samples)
+
+
+## Handsäge: rhythmisches, gefiltertes Rauschen (vier Züge).
+static func _saw() -> AudioStreamWAV:
+	var rng := _rng(233)
+	var duration := 1.8
+	var samples := _silence(duration)
+	var band := 0.0
+	for i in samples.size():
+		var t := float(i) / MIX_RATE
+		var white := rng.randf_range(-1.0, 1.0)
+		band += 0.3 * (white - band)
+		var stroke := absf(sin(TAU * 1.1 * t))
+		var teeth := 0.6 + 0.4 * sin(TAU * (90.0 + 50.0 * stroke) * t)
+		samples[i] = (white - band) * stroke * teeth * (1.0 - smoothstep(duration - 0.2, duration, t))
+	_normalize(samples, 0.16)
+	return _to_wav(samples)
+
+
+## Seite umblättern (Notizbuch): kurzes, weiches Papierrascheln.
+static func _page() -> AudioStreamWAV:
+	var rng := _rng(239)
+	var duration := 0.38
+	var samples := _silence(duration)
+	var band := 0.0
+	for i in samples.size():
+		var t := float(i) / MIX_RATE
+		var white := rng.randf_range(-1.0, 1.0)
+		band += 0.18 * (white - band)
+		var envelope := sin(PI * clampf(t / duration, 0.0, 1.0)) * (0.7 + 0.3 * sin(TAU * 23.0 * t))
+		samples[i] = (white - band) * envelope * 0.6 + band * envelope
+	_normalize(samples, 0.2)
+	return _to_wav(samples)
+
+
+## Haus fertig: zwei helle, warme Glöckchen (Quinte), sanft ausklingend.
+static func _done_chime() -> AudioStreamWAV:
+	var samples := _silence(1.8)
+	for note in 2:
+		var start := int(note * 0.22 * MIX_RATE)
+		var frequency: float = [784.0, 1174.66][note]
+		for j in samples.size() - start:
+			var t := float(j) / MIX_RATE
+			var bell := sin(TAU * frequency * t) + 0.35 * sin(TAU * frequency * 2.76 * t) * exp(-t * 4.0)
+			samples[start + j] += bell * exp(-t * 2.6) * smoothstep(0.0, 0.01, t)
+	_normalize(samples, 0.35)
 	return _to_wav(samples)
 
 

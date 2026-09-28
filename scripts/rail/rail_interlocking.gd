@@ -306,6 +306,20 @@ func clear_train_occupancy(train_id: int) -> void:
 		evaluate()
 
 
+## Ein Zug verschwindet (Zieltunnel, Laden eines Spielstands): alle Fahrwege,
+## die er angefordert hat, werden frei – sonst blieben ihre Weichen gesperrt.
+func release_routes_of(owner_id: int) -> void:
+	if owner_id < 0:
+		return
+	var released := false
+	for signal_id: int in _routes.keys():
+		if _routes[signal_id].owner_id == owner_id:
+			_release(signal_id)
+			released = true
+	if released:
+		evaluate()
+
+
 ## Welcher Zug belegt das Gleis (-1 = keiner)?
 func get_train_on_segment(segment_id: int) -> int:
 	for train_id: int in _train_occupancy:
@@ -351,6 +365,8 @@ func evaluate() -> void:
 		elif _any_block_occupied(route.blocks):
 			route.entered = true
 			_release_cleared_blocks(route)
+			if _is_parked_at_destination(route):
+				_release(signal_id)
 		elif route.entered:
 			_release(signal_id)  # Fahrweg wurde befahren und wieder geräumt
 
@@ -391,6 +407,27 @@ func _reserve(route: RailRoute) -> void:
 	_routes[route.signal_id] = route
 	for block_id in route.blocks:
 		_reserved_blocks[block_id] = route.signal_id
+
+
+## Zielgleis-Auflösung: Steht der Zug, der den Fahrweg angefordert hat, vollständig
+## im letzten Abschnitt seines Fahrwegs (am Bahnsteig, beim Entladen im
+## Güterbahnhof), ist der Fahrweg erfüllt und wird aufgelöst – sonst bliebe das
+## Einfahrsignal gesperrt, solange der Zug dort steht. Der Abschnitt selbst bleibt
+## durch die Belegung geschützt (kein anderer Fahrweg kann hinein).
+func _is_parked_at_destination(route: RailRoute) -> bool:
+	if route.owner_id < 0 or route.segments.is_empty() or route.blocks.size() != 1:
+		return false
+	var last := network.get_segment(route.segments[-1])
+	if last == null or route.blocks[0] != last.block_id:
+		return false
+	var occupied: Array = _train_occupancy.get(route.owner_id, [])
+	if occupied.is_empty():
+		return false
+	for segment_id: int in occupied:
+		var segment := network.get_segment(segment_id)
+		if segment == null or segment.block_id != last.block_id:
+			return false
+	return true
 
 
 ## Teilauflösung: Blöcke, die der Zug befahren und wieder geräumt hat, werden

@@ -7,10 +7,12 @@
 ##   [member destination] fahren. Kommt bis [member until] keiner, geht der
 ##   Bewohner wieder heim. Zurück kommt er mit dem ersten Zug aus
 ##   [member destination], der nach [member return_after] in Wintervale hält.
+## - STROLL: von [member start] bis [member until] ein Spaziergang zum
+##   Lieblingsplatz im Dorf (Bank am Dorfplatz, Brunnen …), danach heim.
 class_name NpcRoutine
 extends Resource
 
-enum Activity { STATION_VISIT, TRAVEL }
+enum Activity { STATION_VISIT, TRAVEL, STROLL }
 
 @export var activity := Activity.STATION_VISIT
 ## Uhrzeit "HH:MM", zu der der Bewohner losgeht.
@@ -37,11 +39,13 @@ func get_return_hours() -> float:
 
 ## Gilt diese Routine zur Uhrzeit [param hours] noch (Losgehen bis Ende bzw. Rückkehr)?
 func covers(hours: float) -> bool:
-	var end := get_until_hours() if activity == Activity.STATION_VISIT else get_return_hours() + 4.0
+	var end := get_return_hours() + 4.0 if activity == Activity.TRAVEL else get_until_hours()
 	return hours >= get_start_hours() and hours < end
 
 
 func describe() -> String:
 	if activity == Activity.TRAVEL:
 		return "%s fährt nach %s, zurück ab %s" % [start, destination, return_after]
+	if activity == Activity.STROLL:
+		return "%s–%s Spaziergang im Dorf" % [start, until]
 	return "%s–%s am Bahnhof" % [start, until]

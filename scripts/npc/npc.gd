@@ -28,6 +28,7 @@ enum State {
 	ALIGHTING,         ## wartet im Zug aufs Aussteigen bzw. steigt aus
 	GOING_HOME,        ## auf dem Heimweg
 	LEAVING,           ## Reisender geht ins Dorf und verschwindet
+	STROLLING,         ## Spaziergang im Dorf (Lieblingsplatz)
 }
 
 ## Wie weit vor sich die Figur auf die Spielfigur Rücksicht nimmt.
@@ -63,6 +64,8 @@ var _queue_ready := false
 var _queue_door := Vector3.ZERO
 var _visitor := false
 var _favourite_pose := CharacterModel.Pose.STAND
+## Gepäck vor dem Zuzug (-1 = zieht gerade nicht ein).
+var _arrival_carry := -1
 
 var _path := PackedVector3Array()
 var _path_index := 0
@@ -223,6 +226,10 @@ func resume(hours: float) -> void:
 		_enter_state_home()
 		return
 	_routine = routine
+	if routine.activity == NpcRoutine.Activity.STROLL:
+		# Spaziergang: vom Haus aus neu beginnen (nächster Gedanke)
+		_enter_state_home()
+		return
 	if routine.activity == NpcRoutine.Activity.STATION_VISIT or hours < routine.get_until_hours():
 		# Steht schon am Bahnhof – direkt an einem Platz beginnen.
 		state = State.AT_STATION
@@ -266,6 +273,8 @@ func _think() -> void:
 				_idle_gestures(true)
 		State.AWAY:
 			_think_away(now)
+		State.STROLLING:
+			_think_strolling(now)
 
 
 func _think_at_station(now: float) -> void:
@@ -369,11 +378,90 @@ func _leave_home(routine: NpcRoutine) -> void:
 	var home := director.get_home(profile.home_name)
 	_place_at(home.get_inside_point() if home else director.get_exit_point())
 	_set_present(true, true)
-	state = State.AT_STATION
+	var strolling := routine.activity == NpcRoutine.Activity.STROLL
+	state = State.STROLLING if strolling else State.AT_STATION
+	var next := _begin_stroll if strolling else _next_behaviour
 	if home:
-		_walk_path([home.get_inside_point(), home.get_front_point()], _next_behaviour)
+		_walk_path([home.get_inside_point(), home.get_front_point()], next)
 	else:
-		_next_behaviour()
+		next.call()
+
+
+# --- Spaziergang und Zuzug ---------------------------------------------------------------
+
+## Spaziergang: zu einer Bank am Lieblingsplatz (oder einfach dorthin) und eine
+## Weile bleiben. Das Ende bestimmt [method _think_strolling].
+func _begin_stroll() -> void:
+	if state != State.STROLLING:
+		return
+	var via := profile.favourite_via if profile else Vector3.INF
+	var spot := director.claim_stroll_spot(self, via)
+	if spot:
+		_spot = spot
+		walk_to(spot.get_approach_point(), _take_spot.bind(spot, false), 0.9)
+		return
+	var target := via if via != Vector3.INF else global_position + Vector3(_rng.randf_range(-6, 6), 0, _rng.randf_range(-6, 6))
+	walk_to(target, func() -> void:
+		_behaviour = "stroll_stand"
+		model.set_pose(_favourite_pose), 0.9)
+
+
+func _think_strolling(now: float) -> void:
+	if _routine == null or now >= _routine.get_until_hours() or _is_done(_routine):
+		if _routine:
+			_mark_done(_routine)
+		go_home()
+		return
+	if not _moving:
+		_idle_gestures(false)
+
+
+## Neu zugezogen: kommt mit dem nächsten Zug aus [param origin] an (mit Koffer),
+## steigt aus und geht zum ersten Mal in sein neues Zuhause.
+func arrive_by_train(origin: String) -> void:
+	_stop_everything()
+	var arrival := NpcRoutine.new()
+	arrival.activity = NpcRoutine.Activity.TRAVEL
+	arrival.destination = origin
+	arrival.start = TimetableEntry.format_time(WorldClock.time_of_day)
+	arrival.return_after = TimetableEntry.format_time(WorldClock.time_of_day)
+	_travel_routine = arrival
+	_arrival_carry = model.carry
+	model.carry = CharacterModel.Carry.SUITCASE
+	state = State.AWAY
+	_set_present(false)
+
+
+## Ist der Bewohner gerade auf dem Weg in sein neues Zuhause (noch im Zug oder mit Koffer)?
+func is_moving_in() -> bool:
+	return _arrival_carry >= 0
+
+
+## Wohin er gerade mit dem Zug unterwegs ist ("" = nicht unterwegs).
+func get_away_destination() -> String:
+	return _travel_routine.destination if state == State.AWAY and _travel_routine else ""
+
+
+## Kurzer Satz, was der Bewohner gerade tut (Notizbuch).
+func get_status_text() -> String:
+	match state:
+		State.AT_HOME:
+			return "zu Hause"
+		State.AT_STATION:
+			return "am Bahnhof" if _routine == null or _routine.activity != NpcRoutine.Activity.TRAVEL else "wartet auf den Zug"
+		State.BOARDING:
+			return "steigt in den Zug"
+		State.AWAY:
+			if is_moving_in():
+				return "im Zug aus %s – zieht ein" % get_away_destination()
+			return "unterwegs in %s" % get_away_destination()
+		State.ALIGHTING:
+			return "steigt aus dem Zug"
+		State.GOING_HOME:
+			return "mit Koffer auf dem Weg ins neue Zuhause" if is_moving_in() else "auf dem Heimweg"
+		State.STROLLING:
+			return "beim Spaziergang im Dorf"
+	return "unterwegs"
 
 
 ## Nach Hause gehen (benannte Bewohner) bzw. ins Dorf (Reisende).
@@ -735,8 +823,30 @@ func _weighted_choice(weights: Dictionary) -> String:
 
 ## Geht über das Wegenetz zu [param target]; danach wird [param on_arrive] gerufen.
 func walk_to(target: Vector3, on_arrive := Callable(), pace := 1.0) -> void:
-	_walk_path(director.walk_graph.find_path(global_position, target) if director.walk_graph \
-		else PackedVector3Array([global_position, target]), on_arrive, pace)
+	if director.walk_graph == null:
+		_walk_path(PackedVector3Array([global_position, target]), on_arrive, pace)
+		return
+	var path := director.walk_graph.find_path(global_position, target)
+	# Lieblingsweg: auf längeren Wegen (Haus ↔ Bahnhof) gern über den Lieblingsplatz,
+	# solange der Umweg nicht zu groß ist
+	var via := profile.favourite_via if profile else Vector3.INF
+	if via != Vector3.INF and global_position.distance_to(target) > 22.0 \
+			and via.distance_to(global_position) > 4.0 and via.distance_to(target) > 4.0:
+		var first := director.walk_graph.find_path(global_position, via)
+		var second := director.walk_graph.find_path(via, target)
+		var combined := first.duplicate()
+		for i in range(1, second.size()):
+			combined.append(second[i])
+		if _path_length(combined) < _path_length(path) * 1.5:
+			path = combined
+	_walk_path(path, on_arrive, pace)
+
+
+static func _path_length(points: PackedVector3Array) -> float:
+	var total := 0.0
+	for i in points.size() - 1:
+		total += points[i].distance_to(points[i + 1])
+	return total
 
 
 func _walk_path(points: Array, on_arrive: Callable, pace := 1.0) -> void:
@@ -963,6 +1073,10 @@ func _enter_state_home() -> void:
 	_stop_everything()
 	state = State.AT_HOME
 	_set_present(false)
+	if _arrival_carry >= 0:
+		# Angekommen im neuen Zuhause: Koffer abgestellt
+		model.carry = _arrival_carry as CharacterModel.Carry
+		_arrival_carry = -1
 
 
 func _set_present(present: bool, fade_in := false) -> void:

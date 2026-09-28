@@ -63,15 +63,15 @@ func _ready() -> void:
 
 func _test_layout() -> void:
 	print("--- Layout")
-	check(network.get_segment_count() == 12, "starter railway built (%d segments)" % network.get_segment_count())
-	check(network.get_switches().size() == 2, "two switches")
+	check(network.get_segment_count() == 17, "starter railway with freight track built (%d segments)" % network.get_segment_count())
+	check(network.get_switches().size() == 4, "four switches (station + freight yard)")
 	var signals := network.get_signals()
-	check(signals.size() == 6, "six signals")
+	check(signals.size() == 8, "eight signals")
 	var all_route := true
 	for rail_signal in signals:
 		all_route = all_route and rail_signal.mode == RailSignal.Mode.ROUTE
 	check(all_route, "station signals wait for trains (ROUTE mode)")
-	check(network.get_block_ids().size() == 6, "six blocks (%d)" % network.get_block_ids().size())
+	check(network.get_block_ids().size() == 7, "seven blocks (%d)" % network.get_block_ids().size())
 	var tunnels := 0
 	var steepest := 0.0
 	var tightest := INF
@@ -89,6 +89,7 @@ func _test_layout() -> void:
 		if portal:
 			_check_portal_mountain(portal)
 	check(dispatcher.get_platform_stops("Wintervale").size() == 2, "two platform tracks")
+	check(dispatcher.get_platform_stops("Güterbahnhof").size() == 1, "one freight loading track")
 	var nature: PropScatter = main.get_node("World/Nature")
 	check(nature.get_cleared_count() > 0, "trees cleared along the line (%d)" % nature.get_cleared_count())
 
@@ -212,26 +213,36 @@ func _test_scheduled_run() -> void:
 	_check_safety()
 
 
+## Etappe 8: Güterzüge fahren nicht mehr durch, sondern halten am Güterbahnhof
+## (Gleis 3), werden vom Kran entladen und fahren dann weiter.
 func _test_freight_passes() -> void:
 	print("--- Freight")
 	dispatcher.enabled = false
+	var yard: FreightYard = main.get_node("World/FreightYard")
 	var index := _entry_index("GZ 803")
 	WorldClock.set_time(14.1)
+	var glass := Economy.get_stock("glass")
 	var train := dispatcher.spawn_train(index)
 	check(train != null, "freight train spawned")
-	check(train.cars.size() == 4, "freight consist: loco + timber + container + hopper")
+	check(train.cars.size() == 4, "freight consist: loco + container + container + timber")
+	var serviced := []
+	yard.train_serviced.connect(func(number: String, _goods: Dictionary) -> void: serviced.append(number))
 	dispatcher.enabled = true
 	WorldClock.time_scale = 10.0
 	var frames := 0
-	while is_instance_valid(train) and train.state != Train.State.DONE and frames < 20000:
+	var platform := 0
+	while is_instance_valid(train) and train.state != Train.State.DONE and frames < 40000:
 		await get_tree().physics_frame
 		frames += 1
 		_monitor()
 		if is_instance_valid(train) and train.state == Train.State.DWELLING:
 			dwelled["GZ 803"] = true
+			platform = train.platform_number
 	WorldClock.time_scale = 1.0
-	check(retired.has("GZ 803"), "freight train passed through and left")
-	check(not dwelled.has("GZ 803"), "freight train did not stop at the platform")
+	check(dwelled.has("GZ 803") and platform == 3, "freight train stopped at the freight yard (track 3)")
+	check(serviced.has("GZ 803"), "the crane unloaded it before departure")
+	check(Economy.get_stock("glass") > glass, "glass arrived in the warehouse (%d → %d)" % [glass, Economy.get_stock("glass")])
+	check(retired.has("GZ 803"), "freight train left through the tunnel afterwards")
 	_check_safety()
 
 
@@ -239,6 +250,8 @@ func _test_freight_passes() -> void:
 func _test_platform_choice() -> void:
 	print("--- Automatic platform choice")
 	dispatcher.enabled = false
+	# Züge aus dem vorigen Test (der Güterzug hält jetzt länger) räumen
+	dispatcher.clear_trains()
 	var track_1: int = starter.built["track_1"]
 	interlocking.set_segment_occupied(track_1, true)
 	var index := _entry_index("RE 209")
@@ -267,6 +280,8 @@ func _test_platform_choice() -> void:
 func _test_red_signal() -> void:
 	print("--- Red signal")
 	dispatcher.enabled = false
+	# Züge aus dem vorigen Test (der Güterzug hält jetzt länger) räumen
+	dispatcher.clear_trains()
 	var entry_signal := network.get_signal_for(_signal_node("north"), _signal_segment("north"))
 	network.set_signal_mode(entry_signal.id, RailSignal.Mode.HALT)
 	WorldClock.set_time(20.0)
@@ -330,7 +345,7 @@ func _test_save_and_camera() -> void:
 	check(SaveManager.load_game("traintest"), "load")
 	await get_tree().physics_frame
 	check(dispatcher.get_trains().is_empty(), "running trains are cleared on load (respawn by timetable)")
-	check(network.get_segment_count() == 12 and network.get_switches().size() == 2, "railway restored after load")
+	check(network.get_segment_count() == 17 and network.get_switches().size() == 4, "railway restored after load")
 	var served := dispatcher.save_state()["served"] as Dictionary
 	check(served.has(str(_entry_index("RB 315"))), "timetable progress restored")
 	SaveManager.delete_save("traintest")

@@ -8,6 +8,14 @@
 ##
 ## Beide Bahnsteiggleise haben Ausfahrsignale in beide Richtungen, so können
 ## sich Züge im Bahnhof kreuzen. Alle Signale stehen auf "Zuglenkung".
+##
+## Östlich von Gleis 1 liegt das Ladegleis des Güterbahnhofs (Gleis 3). Es
+## zweigt nördlich und südlich des Bahnhofs mit eigenen Weichen vom Hauptgleis
+## ab und hat ebenfalls Ausfahrsignale in beide Richtungen:
+##
+##   … Weiche ═ Weiche ─ Gleis 1 ─ Weiche ═ Weiche …
+##                ╲                    ╱
+##                 ─── Gleis 3 (Güter) ─
 class_name StarterRailway
 extends Node
 
@@ -16,6 +24,16 @@ extends Node
 ## x-Lage der Bahnsteiggleise (Gleis 1 = durchgehendes Hauptgleis).
 @export var main_x := 3.8
 @export var side_x := -3.8
+@export_group("Güterbahnhof")
+@export var with_freight_track := true
+## x-Lage des Ladegleises und seine Enden (z).
+@export var freight_x := 11.4
+@export var freight_north_z := -38.0
+@export var freight_south_z := 14.0
+## Lage der beiden Weichen auf dem Hauptgleis.
+@export var freight_switch_north_z := -60.0
+@export var freight_switch_south_z := 37.0
+@export_group("")
 ## Bahnsteiggleise reichen von north_z bis south_z.
 @export var platform_north_z := -33.0
 @export var platform_south_z := 15.0
@@ -48,9 +66,14 @@ func build() -> void:
 	var p2n := int(track_2["start_node"])
 	var p2s := int(track_2["end_node"])
 
-	# Norden: Weiche, Einfahrsignal, Tunnel
-	var north_1 := _chain(p1n, Vector3(main_x, 0, switch_north_z))
-	var switch_n := int(north_1["end_node"])
+	# Norden: (Güterweiche,) Weiche, Einfahrsignal, Tunnel
+	var north_1 := _chain(p1n, Vector3(main_x, 0, freight_switch_north_z if with_freight_track else switch_north_z))
+	var freight_switch_n := -1
+	var north_last := north_1
+	if with_freight_track:
+		freight_switch_n = int(north_1["end_node"])
+		north_last = _chain(freight_switch_n, Vector3(main_x, 0, switch_north_z))
+	var switch_n := int(north_last["end_node"])
 	var north_2 := _chain(switch_n, Vector3(main_x, 0, switch_north_z - 8.0))
 	var signal_n := int(north_2["end_node"])
 	var north_3 := _chain(signal_n, Vector3(main_x, 0, portal_north_z))
@@ -58,8 +81,13 @@ func build() -> void:
 	_chain(mouth_n, Vector3(main_x, 0, portal_north_z - tunnel_length), true)
 
 	# Süden
-	var south_1 := _chain(p1s, Vector3(main_x, 0, switch_south_z))
-	var switch_s := int(south_1["end_node"])
+	var south_1 := _chain(p1s, Vector3(main_x, 0, freight_switch_south_z if with_freight_track else switch_south_z))
+	var freight_switch_s := -1
+	var south_last := south_1
+	if with_freight_track:
+		freight_switch_s = int(south_1["end_node"])
+		south_last = _chain(freight_switch_s, Vector3(main_x, 0, switch_south_z))
+	var switch_s := int(south_last["end_node"])
 	var south_2 := _chain(switch_s, Vector3(main_x, 0, switch_south_z + 8.0))
 	var signal_s := int(south_2["end_node"])
 	var south_3 := _chain(signal_s, Vector3(main_x, 0, portal_south_z))
@@ -80,6 +108,20 @@ func build() -> void:
 
 	built = {"track_1": int(track_1["id"]), "track_2": int(track_2["id"]), "switch_north": switch_n,
 		"switch_south": switch_s, "link_north": int(link_n["id"]), "link_south": int(link_s["id"])}
+
+	# Güterbahnhof: ebenes Ladegleis, S-Kurven zu den Güterweichen, Ausfahrsignale
+	if with_freight_track:
+		var track_3 := _segment(Vector3(freight_x, station_height, freight_north_z), -1, Vector3.ZERO,
+			Vector3(freight_x, station_height, freight_south_z), -1, Vector3.ZERO, false, true)
+		var p3n := int(track_3["start_node"])
+		var p3s := int(track_3["end_node"])
+		var freight_link_n := _segment(Vector3.ZERO, freight_switch_n, Vector3.BACK, Vector3.ZERO, p3n, Vector3.BACK)
+		var freight_link_s := _segment(Vector3.ZERO, p3s, Vector3.BACK, Vector3.ZERO, freight_switch_s, Vector3.BACK)
+		_signal(p3n, int(freight_link_n["id"]))
+		_signal(p3s, int(freight_link_s["id"]))
+		built["track_3"] = int(track_3["id"])
+		built["freight_switch_north"] = freight_switch_n
+		built["freight_switch_south"] = freight_switch_s
 
 
 ## Gleis vom offenen Ende [param node_id] geradeaus bis [param target].

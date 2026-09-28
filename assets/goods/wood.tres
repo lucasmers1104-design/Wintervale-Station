@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GoodsType" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/economy/goods_type.gd" id="1_goods"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/goods_wood.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_goods")
+id = "wood"
+display_name = "Holz"
+icon = ExtResource("2_icon")
+origin = "Sägewerk Nordtal"
+origin_portal = "Nordtal"
+max_stock = 150
+start_stock = 70
+unit_price = 2
+color = Color(0.62, 0.42, 0.24, 1)
+sort_order = 0
+description = "Bretter und Balken für Wände, Dachstühle und Zäune. Kommt als Stammbündel auf Rungenwagen."

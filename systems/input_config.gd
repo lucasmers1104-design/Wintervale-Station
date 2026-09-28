@@ -29,6 +29,7 @@ const KEY_BINDINGS := {
 	&"toggle_fullscreen": [KEY_F11],
 	&"release_mouse": [KEY_ESCAPE],
 	&"build_mode": [KEY_B],
+	&"toggle_notebook": [KEY_N],
 	&"build_tool_rail": [KEY_1],
 	&"build_tool_switch": [KEY_2],
 	&"build_tool_signal": [KEY_3],
@@ -137,6 +138,7 @@ const LEGENDS := {
 		{"actions": [&"build_mode"], "text": "Bauen beenden"},
 	],
 	&"global": [
+		{"actions": [&"toggle_notebook"], "text": "Notizbuch"},
 		{"actions": [&"time_speed"], "text": "Zeitraffer"},
 		{"actions": [&"quick_save"], "text": "Speichern"},
 		{"actions": [&"quick_load"], "text": "Laden"},

@@ -30,6 +30,11 @@ var _wheel_angle := 0.0
 var _door_amount := 0.0
 var _steps: Array[Dictionary] = []
 var _step_amount := 0.0
+## Ladeplätze (Güterwagen): {"slot": Vector3, "piece", "goods", "amount", "state": "full" | "empty" | "none",
+## "node": MeshInstance3D, "portions": int (Schüttgut)}
+var _cargo: Array[Dictionary] = []
+var _cargo_material: Material
+var _exhaust: GPUParticles3D
 
 
 ## Baut das Fahrzeug. [param materials]: {"paint", "glass", "lamp_white", "lamp_red", "snow"}.
@@ -54,6 +59,11 @@ func build(p_kind: String, train_type: TrainType, is_first: bool, is_last: bool,
 		add_child(leaf)
 		_doors.append({"node": leaf, "closed": door["position"], "open_offset": door["open_offset"], "side": door["side"]})
 	_build_steps(materials["paint"])
+	_cargo_material = materials.get("cargo", materials["paint"])
+	_build_cargo(variant)
+	if kind == "loco_freight":
+		_exhaust = _make_exhaust(materials.get("steam", materials["snow"]))
+		add_child(_exhaust)
 
 	var bogie_mesh := TrainMeshes.create_bogie(parts["wheel_base"])
 	var wheel_mesh := TrainMeshes.create_wheelset()
@@ -312,6 +322,181 @@ func _make_snow_spray(material: Material) -> GPUParticles3D:
 	particles.local_coords = false
 	particles.emitting = false
 	particles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return particles
+
+
+# --- Ladung (Güterwagen) ------------------------------------------------------------
+
+## Ladeplätze nach [constant TrainMeshes.CARGO] anlegen – der Wagen kommt voll beladen an.
+func _build_cargo(variant: int) -> void:
+	var spec: Dictionary = TrainMeshes.CARGO.get(kind, {})
+	if spec.is_empty():
+		return
+	var slots: Array = spec["slots"]
+	for i in slots.size():
+		var entry := {"slot": slots[i], "piece": spec["piece"], "goods": spec["goods"], "amount": spec["amount"],
+			"state": "none", "node": null, "portions": int(spec.get("bulk", 0))}
+		_cargo.append(entry)
+		var node := MeshInstance3D.new()
+		node.mesh = TrainMeshes.create_cargo(spec["piece"], variant * 3 + i)
+		attach_cargo(i, node, spec["piece"], spec["goods"], int(spec["amount"]), "full")
+
+
+func has_cargo_slots() -> bool:
+	return not _cargo.is_empty()
+
+
+## Alle Ladeplätze (nur lesen – ändern über die Methoden unten).
+func get_cargo() -> Array[Dictionary]:
+	return _cargo
+
+
+## Schüttgut (Trichterwagen): wird portionsweise mit dem Greifer entladen.
+func is_bulk() -> bool:
+	return not _cargo.is_empty() and int(TrainMeshes.CARGO.get(kind, {}).get("bulk", 0)) > 0
+
+
+## Welches Leergut passt auf die freien Plätze ("" = keins).
+func get_empty_piece() -> String:
+	return String(TrainMeshes.CARGO.get(kind, {}).get("empty", ""))
+
+
+## Lage eines Ladeplatzes in der Welt (Mitte der Unterkante, Ausrichtung des Wagens).
+func get_slot_transform(index: int) -> Transform3D:
+	return global_transform * Transform3D(Basis.IDENTITY, _cargo[index]["slot"])
+
+
+## Stück vom Wagen nehmen (für den Kran). Rückgabe: der Node (ohne Eltern) oder null.
+func detach_cargo(index: int) -> Node3D:
+	var entry := _cargo[index]
+	var node: Node3D = entry["node"]
+	if node == null:
+		return null
+	var world := node.global_transform
+	remove_child(node)
+	node.transform = world
+	entry["node"] = null
+	entry["state"] = "none"
+	return node
+
+
+## Stück auf einen Ladeplatz setzen ([param state] "full" oder "empty").
+func attach_cargo(index: int, node: Node3D, piece: String, goods: String, amount: int, state: String) -> void:
+	var entry := _cargo[index]
+	if entry["node"]:
+		(entry["node"] as Node3D).queue_free()
+	if node.get_parent():
+		node.get_parent().remove_child(node)
+	add_child(node)
+	node.transform = Transform3D(Basis.IDENTITY, entry["slot"])
+	if node is GeometryInstance3D and _cargo_material:
+		(node as GeometryInstance3D).material_override = _cargo_material
+	entry["node"] = node
+	entry["piece"] = piece
+	entry["goods"] = goods
+	entry["amount"] = amount
+	entry["state"] = state
+	if int(entry["portions"]) > 0:
+		_update_bulk(index, false)
+
+
+## Oberkante der Schüttgut-Ladung (Welt) – hier greift der Kran zu.
+func get_bulk_top(index: int) -> Vector3:
+	var entry := _cargo[index]
+	var total := int(TrainMeshes.CARGO[kind].get("bulk", 1))
+	var depth := TrainMeshes.BULK_DEPTH * (1.0 - float(entry["portions"]) / total)
+	return global_transform * Vector3(0.0, 3.3 - depth, 0.0)
+
+
+## Eine Portion Schüttgut herausnehmen: die Oberfläche sinkt sanft. Rückgabe: noch übrige Portionen.
+func take_bulk_portion(index: int) -> int:
+	var entry := _cargo[index]
+	if int(entry["portions"]) <= 0:
+		return 0
+	entry["portions"] = int(entry["portions"]) - 1
+	_update_bulk(index, true)
+	if int(entry["portions"]) == 0:
+		entry["state"] = "none"
+	return int(entry["portions"])
+
+
+func _update_bulk(index: int, animated: bool) -> void:
+	var entry := _cargo[index]
+	var node: Node3D = entry["node"]
+	if node == null:
+		return
+	var total := int(TrainMeshes.CARGO[kind].get("bulk", 1))
+	var fraction := float(entry["portions"]) / total
+	var target := Vector3(0.0, -TrainMeshes.BULK_DEPTH * (1.0 - fraction), 0.0)
+	if animated and is_inside_tree():
+		var tween := node.create_tween()
+		tween.tween_property(node, "position", target, 0.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		if fraction <= 0.0:
+			tween.tween_callback(node.hide)
+	else:
+		node.position = target
+		node.visible = fraction > 0.0
+
+
+## Wie viele Stücke dieses Materials noch voll geladen sind.
+func count_full(goods_id := "") -> int:
+	var count := 0
+	for entry in _cargo:
+		if entry["state"] == "full" and (goods_id == "" or entry["goods"] == goods_id):
+			count += 1
+	return count
+
+
+## Kleine Abgaswolken der Güterlok: im Stand ein ruhiges Wölkchen, beim Anfahren mehr.
+func set_exhaust(speed: float, accelerating: bool) -> void:
+	if _exhaust == null:
+		return
+	_exhaust.emitting = true
+	_exhaust.amount_ratio = 1.0 if accelerating and speed < 6.0 else (0.45 if speed < 0.2 else 0.3)
+
+
+func _make_exhaust(material: Material) -> GPUParticles3D:
+	var process := ParticleProcessMaterial.new()
+	process.direction = Vector3(0.0, 1.0, 0.15)
+	process.spread = 12.0
+	process.initial_velocity_min = 0.9
+	process.initial_velocity_max = 1.4
+	process.gravity = Vector3(0.0, 0.25, 0.0)
+	process.damping_min = 0.4
+	process.damping_max = 0.8
+	process.scale_min = 0.8
+	process.scale_max = 1.3
+	var grow := Curve.new()
+	grow.add_point(Vector2(0.0, 0.35))
+	grow.add_point(Vector2(0.4, 0.9))
+	grow.add_point(Vector2(1.0, 1.6))
+	var scale_curve := CurveTexture.new()
+	scale_curve.curve = grow
+	process.scale_curve = scale_curve
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1.0, 1.0, 1.0, 0.0))
+	fade.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
+	fade.add_point(0.12, Color(0.96, 0.96, 0.95, 0.55))
+	fade.add_point(0.6, Color(0.92, 0.92, 0.93, 0.3))
+	var ramp := GradientTexture1D.new()
+	ramp.gradient = fade
+	process.color_ramp = ramp
+	var puff := SphereMesh.new()
+	puff.radius = 0.28
+	puff.height = 0.5
+	puff.radial_segments = 8
+	puff.rings = 4
+	puff.material = material
+	var particles := GPUParticles3D.new()
+	particles.name = "Exhaust"
+	particles.amount = 14
+	particles.lifetime = 2.6
+	particles.process_material = process
+	particles.draw_pass_1 = puff
+	particles.local_coords = false
+	particles.position = Vector3(0.0, 3.15, -2.2)
+	particles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	particles.visibility_aabb = AABB(Vector3(-4, -1, -4), Vector3(8, 9, 8))
 	return particles
 
 

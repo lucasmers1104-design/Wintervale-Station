@@ -123,10 +123,20 @@ func _test_build_house() -> void:
 	var before_npcs := director.get_npcs().size()
 	var before := village.get_houses().size()
 	check(tool.is_valid(), "free spot is valid (%s)" % tool.get_status())
+	var money := Economy.money
+	var wood := Economy.get_stock("wood")
 	check(tool.click_at(spot), "house placed by click")
 	await frames(3)
 	check(village.get_houses().size() == before + 1, "house exists")
 	var house: VillageHouse = village.get_houses()[-1]
+	# Etappe 8: erst Baustelle, dann Einzug
+	check(not house.is_finished() and house.get_site() != null, "a construction site appears (%s)" % house.get_stage_text())
+	check(village.get_residents(house).is_empty(), "nobody moves in before the house is finished")
+	check(Economy.money == money - 450 and Economy.get_reserved("wood") >= 45, "money paid, wood reserved for the site")
+	village.advance_project(house, 1.0)
+	await frames(3)
+	check(house.is_finished() and house.get_site() == null, "construction finished")
+	check(Economy.get_stock("wood") == wood - 45, "the wood was used up on the site")
 	check(village.get_residents(house).size() >= 1 and director.get_npcs().size() > before_npcs,
 		"a family moves in (%d)" % village.get_residents(house).size())
 	check(director.get_home(house.home_name) == house, "residents know their new home (%s)" % house.home_name)
@@ -137,9 +147,13 @@ func _test_build_house() -> void:
 	build.undo()
 	await frames(3)
 	check(village.get_houses().size() == before and director.get_npcs().size() == before_npcs, "undo removes house and family")
+	check(Economy.money == money and Economy.get_stock("wood") == wood, "undo refunds money and wood exactly")
 	build.redo()
 	await frames(3)
-	check(village.get_houses().size() == before + 1 and director.get_npcs().size() > before_npcs, "redo builds it again")
+	check(village.get_houses().size() == before + 1 and Economy.money == money - 450, "redo builds (and pays) again")
+	village.advance_project(village.get_houses()[-1], 1.0)
+	await frames(3)
+	check(director.get_npcs().size() > before_npcs, "and the family moves in again")
 
 
 func _test_rules() -> void:

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Stahl: zwei gestapelte Doppel-T-Träger, schräg gesehen -->
+  <g stroke="#3b2a20" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M6 42 L40 36 L58 42 L24 48 Z" fill="#8fa3b3"/>
+    <path d="M6 42 L24 48 L24 52 L6 46 Z" fill="#62768a"/>
+    <path d="M24 48 L58 42 L58 46 L24 52 Z" fill="#74889b"/>
+    <path d="M13 44.5 L13 36 L31 30 L31 38 Z" fill="#6c8193"/>
+    <path d="M6 30 L40 24 L58 30 L24 36 Z" fill="#9fb2c1"/>
+    <path d="M6 30 L24 36 L24 40 L6 34 Z" fill="#62768a"/>
+    <path d="M24 36 L58 30 L58 34 L24 40 Z" fill="#7a8ea1"/>
+    <path d="M6 18 L40 12 L58 18 L24 24 Z" fill="#b3c3cf"/>
+    <path d="M13 32.5 L13 23 L31 19 L31 27 Z" fill="#6c8193"/>
+  </g>
+  <path d="M14 17.5 L40 13 L50 16.5" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+  <path d="M18 19.5 C24 15 42 12 49 17 C44 19 38 17.6 35 19.4 C30 18 24 21 18 19.5 Z"
+        fill="#f4f7fb" stroke="#3b2a20" stroke-width="1.8" stroke-linejoin="round"/>
+</svg>

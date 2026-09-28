@@ -5,6 +5,9 @@
 [ext_resource type="Resource" path="res://assets/trains/regional_express.tres" id="3_re"]
 [ext_resource type="Resource" path="res://assets/trains/regional_bahn.tres" id="4_rb"]
 [ext_resource type="Resource" path="res://assets/trains/freight.tres" id="5_gz"]
+[ext_resource type="Resource" path="res://assets/trains/freight_timber.tres" id="6_gz_timber"]
+[ext_resource type="Resource" path="res://assets/trains/freight_building.tres" id="7_gz_building"]
+[ext_resource type="Resource" path="res://assets/trains/freight_bulk.tres" id="8_gz_bulk"]
 
 [sub_resource type="Resource" id="Entry_1"]
 script = ExtResource("2_entry")
@@ -36,14 +39,14 @@ stops = true
 script = ExtResource("2_entry")
 train_number = "GZ 801"
 train_name = "Nordtal → Südtal"
-train_type = ExtResource("5_gz")
+train_type = ExtResource("6_gz_timber")
 origin = "Nordtal"
 destination = "Südtal"
-station = "Wintervale"
-platform = 1
+station = "Güterbahnhof"
+platform = 3
 arrival = "07:05"
-departure = "07:05"
-stops = false
+departure = "08:20"
+stops = true
 
 [sub_resource type="Resource" id="Entry_4"]
 script = ExtResource("2_entry")
@@ -101,14 +104,14 @@ stops = true
 script = ExtResource("2_entry")
 train_number = "GZ 802"
 train_name = "Südtal → Nordtal"
-train_type = ExtResource("5_gz")
+train_type = ExtResource("7_gz_building")
 origin = "Südtal"
 destination = "Nordtal"
-station = "Wintervale"
-platform = 2
+station = "Güterbahnhof"
+platform = 3
 arrival = "10:30"
-departure = "10:30"
-stops = false
+departure = "13:00"
+stops = true
 
 [sub_resource type="Resource" id="Entry_9"]
 script = ExtResource("2_entry")
@@ -169,11 +172,11 @@ train_name = "Nordtal → Südtal"
 train_type = ExtResource("5_gz")
 origin = "Nordtal"
 destination = "Südtal"
-station = "Wintervale"
-platform = 1
+station = "Güterbahnhof"
+platform = 3
 arrival = "14:25"
-departure = "14:25"
-stops = false
+departure = "16:00"
+stops = true
 
 [sub_resource type="Resource" id="Entry_14"]
 script = ExtResource("2_entry")
@@ -244,14 +247,14 @@ stops = true
 script = ExtResource("2_entry")
 train_number = "GZ 804"
 train_name = "Südtal → Nordtal"
-train_type = ExtResource("5_gz")
+train_type = ExtResource("8_gz_bulk")
 origin = "Südtal"
 destination = "Nordtal"
-station = "Wintervale"
-platform = 2
+station = "Güterbahnhof"
+platform = 3
 arrival = "18:20"
-departure = "18:20"
-stops = false
+departure = "20:45"
+stops = true
 
 [sub_resource type="Resource" id="Entry_20"]
 script = ExtResource("2_entry")

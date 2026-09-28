@@ -17,6 +17,18 @@ extends Resource
 ## Gepäck, das der Bewohner dabeihat (Koffer, Rucksack, Einkaufstasche).
 @export var carry := CharacterModel.Carry.NONE
 
+@export_group("Alltag")
+## Tagesrhythmus in Worten (z.B. "Frühaufsteherin, pendelt nach Südtal") – fürs Notizbuch.
+@export var rhythm := ""
+## Rolle im Haushalt (z.B. "pendelt", "arbeitet daheim", "Kind").
+@export var role := ""
+## Lieblingsweg: Über diesen Punkt geht der Bewohner gern zum Bahnhof und heim
+## (Vector3.INF = kürzester Weg). [member favourite_way] beschreibt ihn in Worten.
+@export var favourite_via := Vector3.INF
+@export var favourite_way := ""
+## Woher die Familie zugezogen ist (Tunnelportal, mit dessen Zug sie ankam).
+@export var came_from := ""
+
 @export_group("Vorlieben am Bahnsteig")
 ## Wie gern sitzt, steht, spaziert der Bewohner, schaut auf Uhr oder Tafel? (Gewichte)
 @export_range(0.0, 1.0, 0.05) var likes_sitting := 0.5
