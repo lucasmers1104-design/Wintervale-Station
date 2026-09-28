@@ -693,7 +693,24 @@ func is_path_blocked(npc: Npc, direction: Vector3, space: float) -> bool:
 		var to_player := RailGeometry.flat(player.global_position - npc.global_position)
 		if to_player.length() < space and to_player.normalized().dot(direction) > 0.55:
 			return true
+	# Stehende Bewohner werden nicht durchlaufen, sondern umgangen (nur wer steht –
+	# zwei Gehende blockieren sich so nie gegenseitig)
+	var reach := minf(space * 0.75, npc.get_distance_to_waypoint())
+	for other in _npcs:
+		if _blocks(npc, other, direction, reach):
+			return true
+	for other in _travellers:
+		if is_instance_valid(other) and _blocks(npc, other, direction, reach):
+			return true
 	return false
+
+
+func _blocks(npc: Npc, other: Npc, direction: Vector3, reach: float) -> bool:
+	if other == npc or not other.is_present() or other.is_moving() or other.is_seated() or other.is_busy():
+		return false
+	var to_other := RailGeometry.flat(other.global_position - npc.global_position)
+	var distance := to_other.length()
+	return distance > 0.05 and distance < reach and to_other.dot(direction) / distance > 0.8
 
 
 ## Namensschild über dem Kopf: nur zu Fuß und nur in der Nähe.

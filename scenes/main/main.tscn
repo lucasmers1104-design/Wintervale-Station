@@ -46,6 +46,9 @@
 [ext_resource type="Script" path="res://scripts/building/village_place_tool.gd" id="46_village_tool"]
 [ext_resource type="Script" path="res://scripts/world/bird_flock.gd" id="47_birds"]
 [ext_resource type="Script" path="res://scripts/world/ambient_motes.gd" id="48_motes"]
+[ext_resource type="Material" path="res://assets/materials/foliage.tres" id="49_foliage"]
+[ext_resource type="Material" path="res://assets/materials/snow_terrain.tres" id="50_snow"]
+[ext_resource type="Script" path="res://scripts/audio/station_acoustics.gd" id="51_acoustics"]
 [ext_resource type="Script" path="res://scripts/npc/npc_director.gd" id="44_director"]
 [ext_resource type="Script" path="res://scripts/audio/ambient_soundscape.gd" id="45_ambient"]
 
@@ -75,6 +78,8 @@ fog_enabled = true
 fog_light_color = Color(0.95, 0.88, 0.8, 1)
 fog_density = 0.0035
 fog_sky_affect = 0.3
+fog_height = 3.0
+fog_height_density = 0.035
 adjustment_enabled = true
 adjustment_saturation = 1.06
 
@@ -101,7 +106,7 @@ world_environment = NodePath("../WorldEnvironment")
 light_color = Color(1, 0.88, 0.7, 1)
 light_angular_distance = 0.8
 shadow_enabled = true
-directional_shadow_max_distance = 120.0
+directional_shadow_max_distance = 95.0
 
 [node name="Moon" type="DirectionalLight3D" parent="DayNightCycle"]
 light_color = Color(0.8, 0.82, 0.9, 1)
@@ -113,13 +118,14 @@ directional_shadow_max_distance = 80.0
 
 [node name="Terrain" type="StaticBody3D" parent="World"]
 script = ExtResource("4_terrain")
-terrain_material = ExtResource("5_nature")
+terrain_material = ExtResource("50_snow")
 ice_material = ExtResource("6_ice")
 
 [node name="Nature" type="Node3D" parent="World" node_paths=PackedStringArray("terrain")]
 script = ExtResource("7_scatter")
 terrain = NodePath("../Terrain")
 prop_material = ExtResource("5_nature")
+tree_material = ExtResource("49_foliage")
 
 [node name="Railway" type="Node3D" parent="World"]
 
@@ -424,6 +430,10 @@ position = Vector3(-12.5, 0, 10.3)
 
 [node name="LanternCrossing" parent="World/TestArea" instance=ExtResource("9_lantern")]
 position = Vector3(-7.6, 0, 15.4)
+
+[node name="StationAcoustics" type="Area3D" parent="World/TestArea"]
+position = Vector3(0, 0.55, -9)
+script = ExtResource("51_acoustics")
 
 [node name="Village" type="Node3D" parent="World" node_paths=PackedStringArray("terrain", "walk_graph", "npc_director", "nature", "rail_network")]
 script = ExtResource("43_village")

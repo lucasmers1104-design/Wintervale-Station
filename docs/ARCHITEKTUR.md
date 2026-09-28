@@ -220,3 +220,11 @@ Ausführlich in [DORF.md](DORF.md). Kurz:
   - Die Platzhalter-Häuser (`NpcHome`) der fünf Familien sind durch echte Häuser ersetzt; `NpcHome` bleibt als Basisklasse.
 - **Spielsymbol** neu (`assets/ui/icon.png`, aus der Vorlage des Creative Directors zugeschnitten, runde Ecken).
 - `tests/village_test.*`: 87 Prüfungen; `railway_test` prüft zusätzlich die Dorf-Tasten in der Legende (94).
+
+## Etappe 7: Visual Polish, Bug Hunt & Winter Atmosphere
+
+Ausführlich in [POLISH.md](POLISH.md) (8 in Etappe 7 behobene Fehler plus 6 aus Etappe 6, alle Verbesserungen, Performance-Messung).
+Neu: `StationAcoustics` (Bahnhofshall), `snow_terrain.gdshader` (Schneeglitzern), `train_window.gdshader`.
+Geändert (erweitert, nicht neu geschrieben): Gleis-, Baum-, Bahnsteig-, Fenster- und Figurenmodelle,
+Laternen, Klänge, Ausweichen der Bewohner, Kamera-Kollision, Lichter mit Ausblenden in der Ferne.
+`TrainDispatcher.glass_material` akzeptiert jetzt auch Shader-Materialien (`get_window_glow()`).

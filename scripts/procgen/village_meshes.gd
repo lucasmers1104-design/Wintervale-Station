@@ -43,7 +43,7 @@ static func tree_pine_tall(st: SurfaceTool, rng: RandomNumberGenerator) -> void:
 		var needle := NEEDLES.lerp(NEEDLES_DARK, rng.randf() * 0.6)
 		var offset := rng.randf() * TAU
 		LowPolyBuilder.add_cone(st, Vector3(0, y, 0), radius, h, 8, needle, offset)
-		LowPolyBuilder.add_cone(st, Vector3(0, y + h * 0.5, 0), radius * 0.58, h * 0.5, 8, SNOW, offset, false)
+		_snow_band(st, y, radius, h, 0.2, 0.47, 8, offset)
 		y += h * 0.46
 		radius *= 0.8
 
@@ -57,8 +57,8 @@ static func tree_fir_full(st: SurfaceTool, rng: RandomNumberGenerator) -> void:
 		var h := radius * 1.05
 		var offset := rng.randf() * TAU
 		LowPolyBuilder.add_cone(st, Vector3(0, y, 0), radius, h, 10, NEEDLES.lerp(NEEDLES_LIGHT, rng.randf() * 0.35), offset)
-		# Schnee in Bändern auf jeder Stufe
-		LowPolyBuilder.add_cone(st, Vector3(0, y + h * 0.42, 0), radius * 0.66, h * 0.4, 10, SNOW, offset, false)
+		# Schnee in Bändern auf dem sichtbaren Außenring jeder Stufe
+		_snow_band(st, y, radius, h, 0.22, 0.5, 10, offset)
 		y += h * 0.52
 		radius *= 0.74
 
@@ -527,6 +527,17 @@ static func hedge(st: SurfaceTool, length: float, rng: RandomNumberGenerator) ->
 
 
 # --- Hilfen -----------------------------------------------------------------------------
+
+## Schneeband auf einer Kegelstufe: liegt als Kegelstumpf knapp über der Nadeloberfläche
+## zwischen den Anteilen [param from] und [param to] der Stufenhöhe – also auf dem
+## Außenring, der unter der nächsten Stufe hervorschaut. Die Unterkante bleibt grün.
+static func _snow_band(st: SurfaceTool, y: float, radius: float, height: float, from: float, to: float,
+		segments: int, offset: float) -> void:
+	var lift := 0.035
+	var bottom := radius * (1.0 - from) + lift
+	var top := radius * (1.0 - to) + lift
+	LowPolyBuilder.add_cylinder(st, Vector3(0, y + height * from + lift, 0), bottom, top, height * (to - from), segments, SNOW, offset)
+
 
 ## Vierkant mit eigener Vertexfarbe (inkl. Alpha als Datenkanal).
 static func _colored_box(st: SurfaceTool, center: Vector3, size: Vector3, color: Color) -> void:

@@ -1,6 +1,7 @@
 ## Spielt Schrittgeräusche passend zum Untergrund.
 ##
-## Im Schnee knirscht es weich, auf Bahnsteig, Holz und Stein klopft es leise.
+## Im Schnee knirscht es weich, auf Bahnsteig und Wegen klopft es leise, auf dem
+## Bohlenübergang klingt es hohl nach Holz.
 ## Verbinden mit [signal CharacterModel.footstep]. Drei Varianten je Boden und
 ## leicht schwankende Tonhöhe verhindern, dass es mechanisch klingt.
 class_name FootstepPlayer
@@ -34,7 +35,7 @@ func play_step() -> void:
 	SoundLibrary.play(self)
 
 
-## "snow" oder "stone" – je nachdem, worauf die Figur gerade steht.
+## "snow", "stone" oder "wood" – je nachdem, worauf die Figur gerade steht.
 func get_surface() -> String:
 	var space := get_world_3d().direct_space_state
 	var origin := global_position + Vector3.UP * 0.4
@@ -43,6 +44,8 @@ func get_surface() -> String:
 	if hit.is_empty():
 		return "snow"
 	var collider: Object = hit["collider"]
+	if collider is StationProp and (collider as StationProp).kind == StationProp.Kind.CROSSING:
+		return "wood"
 	if collider is RailwayPlatform or collider is StationProp:
 		return "stone"
 	# Gebaute Wege und der Dorfplatz sind geräumt – dort klingt es nach Stein
@@ -59,3 +62,13 @@ func get_last_surface() -> String:
 func _exit_tree() -> void:
 	stop()
 	stream = null
+
+
+## Einen anderen Klang dieser Figur abspielen (z.B. Knarren der Bank).
+func play_named(sound_name: String, volume_offset := 0.0) -> void:
+	if not is_inside_tree():
+		return
+	stream = SoundLibrary.get_sound(sound_name)
+	pitch_scale = _rng.randf_range(0.92, 1.08)
+	volume_db = base_volume_db + volume_offset
+	SoundLibrary.play(self)

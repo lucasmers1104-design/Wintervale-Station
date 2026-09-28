@@ -1,0 +1,12 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://assets/materials/snow_terrain.gdshader" id="1_snow"]
+
+[resource]
+resource_name = "SnowTerrain"
+shader = ExtResource("1_snow")
+shader_parameter/roughness = 0.9
+shader_parameter/sparkle_density = 14.0
+shader_parameter/sparkle_amount = 0.035
+shader_parameter/sparkle_strength = 2.4
+shader_parameter/sparkle_fade_distance = 38.0

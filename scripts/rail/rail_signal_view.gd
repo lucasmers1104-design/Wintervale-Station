@@ -38,6 +38,9 @@ func build(rail_signal: RailSignal, xform: Transform3D, material: Material) -> v
 	_add_lamp(RailMeshes.SIGNAL_RED_Y, _red)
 
 	_glow = OmniLight3D.new()
+	_glow.distance_fade_enabled = true
+	_glow.distance_fade_begin = 60.0
+	_glow.distance_fade_length = 15.0
 	_glow.position = Vector3(0.0, (RailMeshes.SIGNAL_GREEN_Y + RailMeshes.SIGNAL_RED_Y) * 0.5, -0.5)
 	_glow.omni_range = 3.5
 	_glow.light_energy = 0.6

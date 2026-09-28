@@ -29,6 +29,7 @@ var _start := Vector3.INF
 var _point := Vector3.INF
 var _valid := false
 var _ghost_key := ""
+var _check_key := ""
 var _ghost: Node3D
 var _marker: MeshInstance3D
 
@@ -133,6 +134,12 @@ func preview_at(point: Vector3) -> void:
 		return
 	var item_id := get_item()
 	point = _snap(point)
+	# Nur neu prüfen, wenn sich etwas geändert hat (die Prüfung kostet Physik- und Wegetests)
+	var check_key := "%s|%d|%s|%s|%.3f|%d" % [item_id, _variant, point.snapped(Vector3.ONE * 0.05), _start,
+		_current_angle(point), village.get_object_count()]
+	if check_key == _check_key and _ghost:
+		return
+	_check_key = check_key
 	_point = point
 	var reason := ""
 	if VillageCatalog.is_line(item_id):
@@ -272,6 +279,7 @@ func _set_ghost_material(material: Material) -> void:
 
 
 func _clear_ghost() -> void:
+	_check_key = ""
 	if _ghost:
 		_ghost.queue_free()
 		_ghost = null

@@ -9,12 +9,14 @@ extends Node3D
 
 @export var terrain: LowPolyTerrain
 @export var prop_material: Material
+## Material für die Bäume (wiegen sich leicht im Wind). Leer = prop_material.
+@export var tree_material: Material
 @export var scatter_seed := 7
 
 @export_group("Anzahl")
 @export_range(0, 2000) var tree_count := 320
 @export_range(0, 1000) var rock_count := 110
-@export_range(1, 8) var tree_variants := 4
+@export_range(1, 8) var tree_variants := 3
 @export_range(1, 8) var rock_variants := 3
 
 @export_group("Platzierung")
@@ -72,8 +74,18 @@ func scatter() -> void:
 
 func _scatter_trees(rng: RandomNumberGenerator, forest_noise: FastNoiseLite, colliders: StaticBody3D) -> void:
 	var meshes: Array[Mesh] = []
+	# Dieselben Nadelbaum-Modelle wie im Dorf (hohe Fichte, Tanne, Schneefichte)
 	for i in tree_variants:
-		meshes.append(NatureMeshes.create_pine(rng))
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		match i % 3:
+			0:
+				VillageMeshes.tree_pine_tall(st, rng)
+			1:
+				VillageMeshes.tree_fir_full(st, rng)
+			_:
+				VillageMeshes.tree_spruce_snowy(st, rng)
+		meshes.append(st.commit())
 	var transforms := _empty_lists(meshes.size())
 	var limit := terrain.get_half_extent() * coverage
 
@@ -93,7 +105,7 @@ func _scatter_trees(rng: RandomNumberGenerator, forest_noise: FastNoiseLite, col
 		if y > terrain.mountain_height * tree_line:
 			continue
 
-		var s := rng.randf_range(0.75, 1.35)
+		var s := rng.randf_range(0.7, 1.15)
 		var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.9, 1.15), s))
 		var variant := rng.randi() % meshes.size()
 		transforms[variant].append(Transform3D(basis, Vector3(x, y - 0.15, z)))
@@ -154,7 +166,7 @@ func _create_multimeshes(prefix: String, meshes: Array[Mesh], transforms: Array[
 		var instance := MultiMeshInstance3D.new()
 		instance.name = "%s%d" % [prefix, i]
 		instance.multimesh = multimesh
-		instance.material_override = prop_material
+		instance.material_override = tree_material if prefix == "Trees" and tree_material else prop_material
 		add_child(instance)
 		_multimeshes[String(instance.name)] = multimesh
 

@@ -3,7 +3,7 @@
 Ein gemütliches Low-Poly Eisenbahn- und Dorfbau-Spiel im Winter.
 Engine: **Godot 4.7** (GDScript, Renderer Forward+).
 
-Aktueller Stand: **Etappe 6 – Cozy Village & Building System**: Hinter dem Bahnhof liegt ein kleines Dorf mit Dorfplatz; im Build-Mode baut man Häuser (8 Formen), Wege, Natur, Beleuchtung und Dekoration. Jedes neue Haus bekommt eine Familie, die morgens über die Wege zum Bahnhof geht und mit dem Zug fährt.
+Aktueller Stand: **Etappe 7 – Visual Polish & Winter Atmosphere**: überarbeitete Gleise, Bäume, Bahnsteig, Fenster und Figuren, Schneeglitzern, weichere Nachtbeleuchtung, Bahnhofshall und 8 behobene Fehler. Dazu aus Etappe 6: Hinter dem Bahnhof liegt ein kleines Dorf mit Dorfplatz; im Build-Mode baut man Häuser (8 Formen), Wege, Natur, Beleuchtung und Dekoration. Jedes neue Haus bekommt eine Familie, die morgens über die Wege zum Bahnhof geht und mit dem Zug fährt.
 Das Spiel startet in der Vogelperspektive über dem Bahnhof. Unten rechts zeigt eine Legende immer die passenden Tasten.
 
 ## Starten
@@ -76,4 +76,5 @@ Exit-Code 0 = alle Prüfungen bestanden.
 - [docs/ZUEGE.md](docs/ZUEGE.md) – Züge, Fahrplan, Bahnhofsbetrieb, neue Züge erstellen
 - [docs/NPCS.md](docs/NPCS.md) – Figuren, Bewohner, Tagesablauf, neue Bewohner erstellen
 - [docs/DORF.md](docs/DORF.md) – Dorf, Häuser, Wege, Bauen, Bewohner neuer Häuser
+- [docs/POLISH.md](docs/POLISH.md) – Etappe 7: behobene Fehler, Verbesserungen, Performance
 - [CLAUDE.md](CLAUDE.md) – Projektregeln & Vision

@@ -6,37 +6,21 @@
 class_name NatureMeshes
 extends RefCounted
 
-const TRUNK_COLOR := Color(0.38, 0.25, 0.17)
-const NEEDLE_COLOR := Color(0.15, 0.33, 0.27)
-const NEEDLE_COLOR_DARK := Color(0.10, 0.24, 0.21)
 const SNOW_COLOR := Color(0.90, 0.93, 0.97)
 const ROCK_COLOR := Color(0.48, 0.46, 0.46)
 const ROCK_COLOR_DARK := Color(0.38, 0.36, 0.37)
 
 
-## Tanne aus gestapelten Kegeln, jede Stufe mit einer Schneehaube.
-## Ursprung = Stammfuß. Höhe ca. 4–5 m.
+## Tanne – seit Etappe 7 dieselben Modelle wie im Dorf (hohe Fichte oder Tanne),
+## damit alle Nadelbäume einheitlich aussehen. Ursprung = Stammfuß.
 static func create_pine(rng: RandomNumberGenerator) -> ArrayMesh:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-
-	LowPolyBuilder.add_cylinder(st, Vector3(0.0, -0.3, 0.0), 0.2, 0.13, 1.6, 6, TRUNK_COLOR)
-
-	var needle := NEEDLE_COLOR.lerp(NEEDLE_COLOR_DARK, rng.randf())
-	var tiers := rng.randi_range(3, 4)
-	var radius := rng.randf_range(1.45, 1.8)
-	var y := 0.8
-	for i in tiers:
-		var tier_height := radius * 1.35
-		var offset := rng.randf() * TAU
-		LowPolyBuilder.add_cone(st, Vector3(0.0, y, 0.0), radius, tier_height, 7, needle, offset)
-		# Die Schneehaube ist ein flacherer Kegel über der oberen Hälfte der Stufe.
-		LowPolyBuilder.add_cone(st, Vector3(0.0, y + tier_height * 0.45, 0.0), radius * 0.64,
-			tier_height * 0.6, 7, SNOW_COLOR, offset, false)
-		y += tier_height * 0.5
-		radius *= 0.72
-
-	return st.commit()
+	var village_st := SurfaceTool.new()
+	village_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	if rng.randf() < 0.5:
+		VillageMeshes.tree_pine_tall(village_st, rng)
+	else:
+		VillageMeshes.tree_fir_full(village_st, rng)
+	return village_st.commit()
 
 
 ## Stein mit Schnee auf den oberen Flächen. Ursprung = Mittelpunkt, Radius ca. 1 m.

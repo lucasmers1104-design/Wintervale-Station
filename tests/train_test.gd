@@ -310,8 +310,7 @@ func _test_red_signal() -> void:
 	WorldClock.time_scale = 1.0
 	# Nachtbeleuchtung
 	await get_tree().create_timer(3.5).timeout
-	var glass: StandardMaterial3D = dispatcher.glass_material
-	check(glass.emission_energy_multiplier > 0.5, "windows glow warm at night")
+	check(dispatcher.get_window_glow() > 0.5, "windows glow warm at night (%.2f)" % dispatcher.get_window_glow())
 	_check_safety()
 
 

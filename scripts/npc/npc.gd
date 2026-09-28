@@ -99,6 +99,8 @@ func setup(p_director: NpcDirector, p_profile: NpcProfile, look: CharacterAppear
 	display_name = profile.display_name if profile else ""
 	walk_speed = profile.walk_speed if profile else _rng.randf_range(1.0, 1.35)
 	_lane_offset = [-0.22, 0.0, 0.22][seed_value % 3]
+	# Nicht alle Bewohner denken im selben Frame nach (gleichmäßige Last)
+	_think_timer = _rng.randf() * THINK_INTERVAL
 	name = display_name.replace(" ", "") if profile else "Reisender%d" % seed_value
 
 	collision_layer = GameDefs.LAYER_CHARACTERS
@@ -115,6 +117,7 @@ func setup(p_director: NpcDirector, p_profile: NpcProfile, look: CharacterAppear
 
 	model = CharacterModel.new()
 	model.appearance = look
+	model.view_distance = 120.0
 	model.carry = profile.carry if profile else carry
 	# Jeder geht ein bisschen anders: gemächlich, normal oder munter
 	model.gait_energy = clampf(walk_speed * 0.8 + _rng.randf_range(-0.12, 0.12), 0.6, 1.3)
@@ -164,6 +167,14 @@ func is_busy() -> bool:
 
 func is_moving() -> bool:
 	return _moving
+
+
+## Abstand zum nächsten Wegpunkt (Draufsicht) – wer näher am Ziel ist als ein
+## Hindernis, muss ihm nicht ausweichen.
+func get_distance_to_waypoint() -> float:
+	if not _moving or _path_index >= _path.size():
+		return 0.0
+	return Vector3(global_position.x, 0.0, global_position.z).distance_to(_path[_path_index])
 
 
 ## Ist der Bewohner schon mit diesem Zug gefahren (angekommen oder abgefahren)?
@@ -667,7 +678,9 @@ func _sit_down(spot: StationSpot, instant: bool) -> void:
 	_kill_tween()
 	_tween = create_tween()
 	_tween.tween_interval(0.45 / director.speed_factor())  # erst zur Bank umdrehen
-	_tween.tween_callback(func() -> void: model.set_pose(CharacterModel.Pose.SIT))
+	_tween.tween_callback(func() -> void:
+		model.set_pose(CharacterModel.Pose.SIT)
+		_footsteps.play_named("creak", 2.0))
 	_tween.tween_method(func(t: float) -> void:
 		var eased := ease(t, -1.8)
 		global_position = start.lerp(seat, eased) + Vector3.UP * sin(eased * PI) * 0.04,

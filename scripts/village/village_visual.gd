@@ -19,6 +19,8 @@ static func attach(parent: Node3D, item_id: String, variant: int, length: float,
 		preview := false, preview_material: Material = null) -> Dictionary:
 	var data := VillageCatalog.build_meshes(item_id, variant, length)
 	var result := {"meshes": [], "lights": [], "windows": null, "string_glow": null, "smoke": [], "data": data}
+	# Kleine Deko wirft keinen Schatten (spart Draw-Calls im Schattenpass, sieht man ohnehin kaum)
+	var small := float(VillageCatalog.get_item(item_id).get("radius", 1.0)) < 0.6 and VillageCatalog.get_kind(item_id) == "point"
 	var body_material := VillageCatalog.body_material(item_id, material)
 	_add(parent, data["body"], preview_material if preview else body_material, result)
 	_add(parent, data["glow"], preview_material if preview else VillageCatalog.GLOW_MATERIAL, result)
@@ -36,6 +38,9 @@ static func attach(parent: Node3D, item_id: String, variant: int, length: float,
 			(bulbs as ShaderMaterial).set_shader_parameter(&"glow", 0.0)
 			result["string_glow"] = bulbs
 		_add(parent, data["bulbs"], bulbs, result)
+	if small:
+		for mesh: MeshInstance3D in result["meshes"]:
+			mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if preview:
 		return result
 	var light_info: Dictionary = VillageCatalog.get_item(item_id).get("light", {})
@@ -47,6 +52,10 @@ static func attach(parent: Node3D, item_id: String, variant: int, length: float,
 		light.omni_range = float(light_info.get("range", 4.5 if is_house else 5.0))
 		light.omni_attenuation = 1.4
 		light.shadow_enabled = false
+		# Weit entfernte Lichter blenden aus (Leistung) – aus der Vogelperspektive bleiben die Gläser sichtbar
+		light.distance_fade_enabled = true
+		light.distance_fade_begin = 60.0
+		light.distance_fade_length = 20.0
 		light.light_energy = 0.0
 		light.visible = false
 		light.set_meta(&"energy", float(light_info.get("energy", 0.7 if is_house else 1.0)))

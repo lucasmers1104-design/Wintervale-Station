@@ -6,7 +6,8 @@
 ##
 ## Verfügbar: rolling (Schleife), clack, brake, brake_squeal, door_open, door_close,
 ## door_unlock, stairs_out, stairs_in (Trittstufe), chime, horn, step_snow_0..2 und
-## step_stone_0..2 (Schritte), wind und station_murmur (Schleifen), bird_0..3 (Vogelrufe)
+## step_stone_0..2, step_wood_0..2 (Schritte), creak (Holzknarren), wind, station_murmur und
+## lamp_hum (Schleifen), bird_0..3 (Vogelrufe)
 class_name SoundLibrary
 extends RefCounted
 
@@ -22,7 +23,8 @@ static func get_sound(sound_name: String) -> AudioStreamWAV:
 	if sound_name.begins_with("step_"):
 		# step_snow_0 … step_snow_2, step_stone_0 … step_stone_2
 		var parts := sound_name.split("_")
-		stream = _step(parts[1] == "snow", int(parts[2]) if parts.size() > 2 else 0)
+		var variant := int(parts[2]) if parts.size() > 2 else 0
+		stream = _wood_step(variant) if parts[1] == "wood" else _step(parts[1] == "snow", variant)
 		_cache[sound_name] = stream
 		return stream
 	match sound_name:
@@ -48,6 +50,10 @@ static func get_sound(sound_name: String) -> AudioStreamWAV:
 			stream = _stairs(false)
 		"brake_squeal":
 			stream = _brake_squeal()
+		"creak":
+			stream = _creak()
+		"lamp_hum":
+			stream = _lamp_hum()
 		"wind":
 			stream = _wind()
 		"station_murmur":
@@ -94,7 +100,10 @@ static func _rolling() -> AudioStreamWAV:
 		mid += 0.09 * (white - mid)
 		mid_low += 0.03 * (white - mid_low)
 		var pulse := 0.85 + 0.15 * sin(TAU * 1.5 * t)
-		raw[i] = (low * 9.0 + (mid - mid_low) * 1.4) * pulse
+		# Drehgestelle: ein weiches, tiefes Wummern im Takt der Räder, dazu leises Schienensingen
+		var bogie := sin(TAU * 38.0 * t) * (0.5 + 0.5 * sin(TAU * 2.0 * t)) * 0.25
+		var hum := sin(TAU * 310.0 * t + sin(TAU * 0.5 * t) * 2.0) * 0.035
+		raw[i] = (low * 9.0 + (mid - mid_low) * 1.4) * pulse + bogie + hum
 	# Ende weich in den Anfang überblenden → keine Knackser an der Schleifenstelle
 	var samples := PackedFloat32Array()
 	samples.resize(length)
@@ -371,6 +380,64 @@ static func _crossfade_loop(raw: PackedFloat32Array, length: int, fade: int) -> 
 			var w := float(i) / fade
 			samples[i] = raw[i] * w + raw[length + i] * (1.0 - w)
 	return samples
+
+
+## Schritt auf Holz (Bohlenübergang): dumpfes Klopfen mit hohlem Nachklang.
+static func _wood_step(variant: int) -> AudioStreamWAV:
+	var rng := _rng(131 + variant * 17)
+	var samples := _silence(0.22)
+	var band := 0.0
+	var base := 190.0 + variant * 22.0
+	for i in samples.size():
+		var t := float(i) / MIX_RATE
+		var white := rng.randf_range(-1.0, 1.0)
+		band += 0.3 * (white - band)
+		var knock := sin(TAU * base * t) * exp(-t * 38.0) + 0.5 * sin(TAU * base * 2.3 * t) * exp(-t * 60.0)
+		var click := (white - band) * exp(-t * 120.0) * 0.4
+		samples[i] = knock * 0.7 + click
+	_normalize(samples, 0.27)
+	return _to_wav(samples)
+
+
+## Holzknarren (Bank beim Hinsetzen): langsam gleitender, rauer Ton.
+static func _creak() -> AudioStreamWAV:
+	var rng := _rng(137)
+	var duration := 0.55
+	var samples := _silence(duration)
+	var phase := 0.0
+	for i in samples.size():
+		var t := float(i) / MIX_RATE
+		var frequency := lerpf(210.0, 150.0, t / duration) + sin(TAU * 7.0 * t) * 12.0
+		phase += TAU * frequency / MIX_RATE
+		# Reibung: ruckelnde Pulse statt glattem Ton
+		var grain := 0.6 + 0.4 * absf(sin(TAU * 34.0 * t + rng.randf() * 0.4))
+		var envelope := smoothstep(0.0, 0.08, t) * (1.0 - smoothstep(duration - 0.2, duration, t))
+		samples[i] = (sin(phase) + 0.4 * sin(phase * 2.0) + 0.2 * sin(phase * 3.0)) * grain * envelope
+	_normalize(samples, 0.2)
+	return _to_wav(samples)
+
+
+## Laternen-Ambiente: ganz leises, warmes Summen mit gelegentlichem Knistern. Schleife (4 s).
+static func _lamp_hum() -> AudioStreamWAV:
+	var rng := _rng(149)
+	var length := int(MIX_RATE * 4.0)
+	var fade := int(MIX_RATE * 0.4)
+	var raw := PackedFloat32Array()
+	raw.resize(length + fade)
+	var low := 0.0
+	var crackle := 0.0
+	for i in raw.size():
+		var t := float(i) / MIX_RATE
+		var white := rng.randf_range(-1.0, 1.0)
+		low += 0.05 * (white - low)
+		if rng.randf() < 0.0004:
+			crackle = rng.randf_range(0.4, 1.0)
+		crackle *= 0.985
+		var hum := sin(TAU * 100.0 * t) * 0.3 + sin(TAU * 200.0 * t) * 0.1
+		raw[i] = hum * (0.8 + 0.2 * sin(TAU * 0.7 * t)) + low * 0.8 + white * crackle * 0.5
+	var samples := _crossfade_loop(raw, length, fade)
+	_normalize(samples, 0.3)
+	return _to_wav(samples, true)
 
 
 ## Sanftes Zweiklang-Horn (große Terz) mit weichem Ein- und Ausschwingen.

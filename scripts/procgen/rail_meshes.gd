@@ -12,11 +12,14 @@
 class_name RailMeshes
 extends RefCounted
 
-const GRAVEL := Color(0.46, 0.43, 0.40)
-const GRAVEL_DARK := Color(0.37, 0.35, 0.33)
-const SNOW := Color(0.88, 0.91, 0.95)
-const WOOD := Color(0.30, 0.21, 0.15)
-const STEEL_TOP := Color(0.80, 0.80, 0.82)
+const GRAVEL := Color(0.56, 0.52, 0.48)
+const GRAVEL_DARK := Color(0.45, 0.42, 0.39)
+const SNOW := Color(0.9, 0.93, 0.97)
+const SNOW_SHADE := Color(0.8, 0.84, 0.91)
+const WOOD := Color(0.43, 0.29, 0.19)
+const WOOD_TOP := Color(0.52, 0.37, 0.25)
+const WOOD_END := Color(0.62, 0.47, 0.32)
+const STEEL_TOP := Color(0.86, 0.86, 0.88)
 const STEEL_SIDE := Color(0.33, 0.32, 0.31)
 const RUST := Color(0.42, 0.28, 0.21)
 const IRON_DARK := Color(0.18, 0.18, 0.20)
@@ -30,12 +33,13 @@ const SIGNAL_BLACK := Color(0.07, 0.07, 0.08)
 ## Querschnitt Schotterbett (x, y) – links nach rechts. Der Rand reicht in
 ## den Boden, damit kleine Geländeunebenheiten nie Lücken zeigen.
 const BALLAST_PROFILE: Array[Vector2] = [
-	Vector2(-2.3, -0.6), Vector2(-2.05, 0.02), Vector2(-1.5, RailConfig.BALLAST_TOP),
-	Vector2(1.5, RailConfig.BALLAST_TOP), Vector2(2.05, 0.02), Vector2(2.3, -0.6),
+	Vector2(-2.3, -0.6), Vector2(-2.1, 0.0), Vector2(-1.8, 0.2), Vector2(-1.45, RailConfig.BALLAST_TOP),
+	Vector2(1.45, RailConfig.BALLAST_TOP), Vector2(1.8, 0.2), Vector2(2.1, 0.0), Vector2(2.3, -0.6),
 ]
-## Farben / Schneeanteil je Profilkante (Rand, Böschung, Krone, Böschung, Rand).
-const BALLAST_COLORS: Array[Color] = [SNOW, GRAVEL_DARK, GRAVEL, GRAVEL_DARK, SNOW]
-const BALLAST_SNOW: Array[float] = [0.0, 0.15, 0.3, 0.15, 0.0]
+## Farben / Schneeanteil je Profilkante (Rand, Schneewehe, Böschung, Krone, Böschung, Schneewehe, Rand).
+## Die Krone bleibt fast frei (Züge wirbeln den Schnee weg), an den Flanken liegt er weich an.
+const BALLAST_COLORS: Array[Color] = [SNOW, SNOW_SHADE, GRAVEL_DARK, GRAVEL, GRAVEL_DARK, SNOW_SHADE, SNOW]
+const BALLAST_SNOW: Array[float] = [0.0, 0.0, 0.35, 0.06, 0.35, 0.0, 0.0]
 
 ## Vereinfachtes Schienenprofil (Fuß, Steg, Kopf) – konvex, 15 cm hoch.
 const RAIL_PROFILE: Array[Vector2] = [
@@ -85,7 +89,7 @@ static func create_ghost(curve: Curve3D) -> ArrayMesh:
 	var frames := RailGeometry.sample_frames(curve, 1.0)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var crown: Array[Vector2] = [BALLAST_PROFILE[1], BALLAST_PROFILE[2], BALLAST_PROFILE[3], BALLAST_PROFILE[4]]
+	var crown: Array[Vector2] = [BALLAST_PROFILE[2], BALLAST_PROFILE[3], BALLAST_PROFILE[4], BALLAST_PROFILE[5]]
 	var white: Array[Color] = [Color.WHITE, Color.WHITE, Color.WHITE]
 	_extrude(st, frames, crown, Vector2(0.0, 0.03), white, [0.0, 0.0, 0.0], rng)
 	for side in [-RailConfig.RAIL_OFFSET, RailConfig.RAIL_OFFSET]:
@@ -263,14 +267,26 @@ static func _add_sleepers(st: SurfaceTool, curve: Curve3D, length: float, rng: R
 	for i in count:
 		var frame := RailGeometry.frame_at(curve, spacing * (i + 0.5))
 		var center := frame.origin + frame.basis.y * y
-		LowPolyBuilder.add_oriented_box(st, Transform3D(frame.basis, center), RailConfig.SLEEPER_SIZE, _vary(WOOD, rng, 0.04))
-		# Etwas Schnee auf manchen Schwellen
-		if rng.randf() < 0.35:
-			var snow_length := rng.randf_range(0.5, 1.4)
-			var snow_center := center + frame.basis.y * (RailConfig.SLEEPER_HEIGHT * 0.5 + 0.015) \
-				+ frame.basis.x * rng.randf_range(-0.6, 0.6)
-			LowPolyBuilder.add_oriented_box(st, Transform3D(frame.basis, snow_center),
-				Vector3(snow_length, 0.03, 0.22), SNOW)
+		var size := RailConfig.SLEEPER_SIZE
+		var xform := Transform3D(frame.basis.rotated(frame.basis.y.normalized(), rng.randf_range(-0.025, 0.025)), center)
+		# Schwelle: Körper, hellere, leicht schmalere Oberseite (weiche Kante), helles Hirnholz an den Enden
+		LowPolyBuilder.add_oriented_box(st, xform, size - Vector3(0.0, 0.03, 0.0), _vary(WOOD, rng, 0.035))
+		LowPolyBuilder.add_oriented_box(st, xform.translated_local(Vector3(0.0, size.y * 0.5 - 0.02, 0.0)),
+			Vector3(size.x - 0.06, 0.04, size.z - 0.05), _vary(WOOD_TOP, rng, 0.035))
+		for end: float in [-1.0, 1.0]:
+			LowPolyBuilder.add_oriented_box(st, xform.translated_local(Vector3(end * (size.x * 0.5 + 0.004), -0.01, 0.0)),
+				Vector3(0.01, size.y - 0.05, size.z - 0.05), WOOD_END.lerp(WOOD, rng.randf() * 0.3))
+		# Schnee sammelt sich an den Schwellenenden (außerhalb der Schienen), selten auch in der Mitte
+		for end: float in [-1.0, 1.0]:
+			if rng.randf() < 0.7:
+				var snow_length := rng.randf_range(0.25, 0.42)
+				var snow_center := Vector3(end * (size.x * 0.5 - snow_length * 0.5 - 0.02), size.y * 0.5 + 0.012,
+					rng.randf_range(-0.02, 0.02))
+				LowPolyBuilder.add_oriented_box(st, xform.translated_local(snow_center),
+					Vector3(snow_length, 0.028, size.z - 0.03), SNOW.lerp(SNOW_SHADE, rng.randf() * 0.4))
+		if rng.randf() < 0.18:
+			LowPolyBuilder.add_oriented_box(st, xform.translated_local(Vector3(rng.randf_range(-0.3, 0.3), size.y * 0.5 + 0.012, 0.0)),
+				Vector3(rng.randf_range(0.2, 0.5), 0.02, size.z - 0.06), SNOW)
 
 
 ## Laschen (Schienenverbinder) mit je zwei Schrauben an beiden Gleisenden.

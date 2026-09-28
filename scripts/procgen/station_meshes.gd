@@ -6,13 +6,13 @@
 class_name StationMeshes
 extends RefCounted
 
-const PAVING := Color(0.60, 0.58, 0.56)
-const PAVING_DARK := Color(0.52, 0.50, 0.49)
-const EDGE_STONE := Color(0.76, 0.75, 0.73)
-const WALL := Color(0.47, 0.45, 0.44)
+const PAVING := Color(0.68, 0.63, 0.57)
+const PAVING_DARK := Color(0.6, 0.56, 0.51)
+const EDGE_STONE := Color(0.8, 0.77, 0.72)
+const WALL := Color(0.55, 0.5, 0.46)
 const SAFETY_LINE := Color(0.93, 0.90, 0.80)
 const SNOW := Color(0.88, 0.91, 0.95)
-const WOOD := Color(0.50, 0.33, 0.20)
+const WOOD := Color(0.56, 0.37, 0.23)
 const IRON := Color(0.18, 0.18, 0.20)
 const SIGN_GREEN := Color(0.14, 0.27, 0.22)
 
@@ -38,19 +38,26 @@ static func create_platform(length: float, width: float, height: float, rng: Ran
 			LowPolyBuilder.add_quad_facing(st, Vector3(x, WALL_BOTTOM, za), Vector3(x, height, za),
 				Vector3(x, height, zb), Vector3(x, WALL_BOTTOM, zb), _vary(WALL, rng), Vector3(side, 0, 0))
 
-	# Pflaster in 1-m-Kacheln, manche verschneit
+	# Sandsteinpflaster im Läuferverband (jede zweite Reihe um eine halbe Platte versetzt),
+	# geräumt – nur vereinzelt liegen Schneereste
 	var inner := half_w - EDGE_WIDTH
-	var columns := maxi(1, roundi(inner * 2.0))
-	var rows := maxi(1, roundi(z1 - z0))
-	for c in columns:
-		for r in rows:
-			var xa := lerpf(-inner, inner, float(c) / columns)
-			var xb := lerpf(-inner, inner, float(c + 1) / columns)
-			var za := lerpf(z0, z1, float(r) / rows)
-			var zb := lerpf(z0, z1, float(r + 1) / rows)
-			var color := SNOW if rng.randf() < 0.22 else (PAVING if rng.randf() < 0.6 else PAVING_DARK)
+	var slab := 0.8
+	var columns := maxi(1, roundi(inner * 2.0 / slab))
+	var rows := maxi(1, roundi((z1 - z0) / 0.55))
+	for r in rows:
+		var za := lerpf(z0, z1, float(r) / rows)
+		var zb := lerpf(z0, z1, float(r + 1) / rows)
+		var shift := 0.5 if r % 2 == 1 else 0.0
+		for c in range(0, columns + 1):
+			var xa := clampf(lerpf(-inner, inner, (c - shift) / columns), -inner, inner)
+			var xb := clampf(lerpf(-inner, inner, (c + 1 - shift) / columns), -inner, inner)
+			if xb - xa < 0.01:
+				continue
+			var color := PAVING if rng.randf() < 0.55 else PAVING_DARK
+			if rng.randf() < 0.07:
+				color = SNOW
 			LowPolyBuilder.add_quad_facing(st, Vector3(xa, height, za), Vector3(xb, height, za),
-				Vector3(xb, height, zb), Vector3(xa, height, zb), _vary(color, rng), Vector3.UP)
+				Vector3(xb, height, zb), Vector3(xa, height, zb), _vary(color, rng, 0.02), Vector3.UP)
 
 	# Bahnsteigkanten (leicht überstehend) und weiße Sicherheitslinie
 	for side: float in [-1.0, 1.0]:

@@ -24,7 +24,7 @@ const MAX_LATE_HOURS := 0.5
 @export var enabled := true
 @export_group("Materialien")
 @export var paint_material: Material
-@export var glass_material: StandardMaterial3D
+@export var glass_material: Material
 ## Leuchtstärke der Fenster bei Nacht (warmes Licht von innen).
 @export var window_glow := 1.2
 ## Auch tagsüber brennt drinnen ein wenig Licht – die Fenster wirken warm statt grau.
@@ -387,7 +387,8 @@ func _on_darkness_changed(dark: bool) -> void:
 		if _glow_tween and _glow_tween.is_valid():
 			_glow_tween.kill()
 		_glow_tween = create_tween()
-		_glow_tween.tween_property(glass_material, "emission_energy_multiplier", window_glow if dark else day_window_glow, 3.0)
+		var property := "shader_parameter/glow" if glass_material is ShaderMaterial else "emission_energy_multiplier"
+		_glow_tween.tween_property(glass_material, property, window_glow if dark else day_window_glow, 3.0)
 
 
 func _lamp_material(color: Color, energy: float) -> StandardMaterial3D:
@@ -432,3 +433,12 @@ func load_state(data: Dictionary) -> void:
 	for key: Variant in served:
 		_served_day[int(key)] = int(served[key])
 	_travel_hours.clear()
+
+
+## Aktuelle Helligkeit des Innenlichts in den Zugfenstern.
+func get_window_glow() -> float:
+	if glass_material is ShaderMaterial:
+		return float((glass_material as ShaderMaterial).get_shader_parameter(&"glow"))
+	if glass_material is StandardMaterial3D:
+		return (glass_material as StandardMaterial3D).emission_energy_multiplier
+	return 0.0

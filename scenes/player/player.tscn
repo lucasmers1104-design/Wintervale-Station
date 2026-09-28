@@ -31,6 +31,7 @@ position = Vector3(0, 1.16, 0)
 [node name="CameraPitch" type="Node3D" parent="CameraYaw"]
 
 [node name="SpringArm3D" type="SpringArm3D" parent="CameraYaw/CameraPitch"]
+collision_mask = 5
 shape = SubResource("SphereShape3D_arm")
 spring_length = 4.0
 margin = 0.2

@@ -33,6 +33,8 @@ const EYE_HEIGHT := 1.16
 ## Hüfthöhe einer Erwachsenen-Figur (Sitzhöhe = Sitzfläche minus diese Höhe).
 const HIP_HEIGHT := 0.24
 const HEAD_Y := 1.13
+## Augenhöhe im Kopf (etwas unter der Mitte – das wirkt kindlich und freundlich).
+const EYE_Y := 0.004
 ## Überblendgeschwindigkeit der Haltungen (1/s). Hinsetzen/Aufstehen ist langsamer.
 const POSE_BLEND := 3.0
 const SIT_BLEND := 1.7
@@ -57,6 +59,8 @@ const DETAIL_RANGE := 45.0
 			rebuild()
 ## Temperament des Gangs: 0,7 = gemütlich schlendernd, 1,0 = normal, 1,2 = lebhaft.
 @export_range(0.5, 1.4, 0.05) var gait_energy := 1.0
+## Ab dieser Entfernung wird die ganze Figur nicht mehr gezeichnet (0 = immer sichtbar).
+var view_distance := 0.0
 
 var pose := Pose.STAND
 
@@ -123,7 +127,7 @@ func rebuild() -> void:
 	var look := appearance if appearance else CharacterAppearance.new()
 	var winter := outfit == CharacterAppearance.Outfit.WINTER
 	_height = look.height_scale
-	var skin := _material(look.skin_color, 0.65, 0.25)
+	var skin := _material(look.skin_color, 0.5, 0.32)  # leicht glänzend wie Vinyl-Spielzeug
 	var pants := _material(look.pants_color, 0.9)
 	var shoes := _material(look.shoe_color, 0.55)
 
@@ -136,6 +140,9 @@ func rebuild() -> void:
 	for hip in [_hip_left, _hip_right]:
 		_part(hip, _capsule(0.078, 0.26), pants, Vector3(0.0, -0.1, 0.0))
 		_part(hip, _sphere(0.088, 16, 8), shoes, Vector3(0.0, -0.195, -0.035), Vector3(0.95, 0.58, 1.35))
+		# Dunkle Sohle
+		_detail(_part(hip, _sphere(0.09, 14, 6), _material(look.shoe_color.darkened(0.45), 0.8), Vector3(0.0, -0.215, -0.035),
+			Vector3(0.98, 0.3, 1.38)))
 
 	# Rundlicher Rumpf: Hosenboden und Oberteil
 	_torso = _pivot(_body, "Torso", Vector3.ZERO)
@@ -146,6 +153,11 @@ func rebuild() -> void:
 	_build_head(look, winter, skin)
 	_build_carry(look)
 	set_shadows_only(_shadows_only)
+	if view_distance > 0.0:
+		for mesh in _meshes:
+			if not mesh in _details:
+				mesh.visibility_range_end = view_distance
+				mesh.visibility_range_end_margin = 10.0
 
 
 ## Fortbewegung für diesen Frame. [param speed] m/s, [param sprint] 0..1,
@@ -506,6 +518,10 @@ func _build_arms(look: CharacterAppearance, winter: bool, skin: Material) -> voi
 			_part(shoulder, _capsule(0.056, 0.28, 12, 4), skin, Vector3(0.0, -0.17, 0.0))
 		# Einfache runde Hände (im Winter Fäustlinge)
 		_part(shoulder, _sphere(0.072 if hand != skin else 0.064, 14, 7), hand, Vector3(0.0, -0.32, -0.005))
+		if hand != skin:
+			# Gestricktes Bündchen am Fäustling
+			_detail(_part(shoulder, _torus(0.05, 0.078, 14), _material(look.hat_color.lightened(0.1), 1.0),
+				Vector3(0.0, -0.265, 0.0), Vector3(1.0, 1.4, 1.0)))
 
 
 func _build_head(look: CharacterAppearance, winter: bool, skin: Material) -> void:
@@ -518,14 +534,18 @@ func _build_head(look: CharacterAppearance, winter: bool, skin: Material) -> voi
 
 	# Gesicht: nur Knopfaugen, Näschen und rosige Wangen
 	var eyes := _material(Color(0.08, 0.065, 0.06), 0.3)
-	for x: float in [-0.1, 0.1]:
-		var eye := _part(_head, _sphere(0.031, 12, 6), eyes, Vector3(x, 0.025, -0.268), Vector3(0.9, 1.15, 0.55))
+	# Kindchenschema: Augen etwas tiefer und weiter auseinander, mit kleinem Glanzpunkt
+	var catchlight := _material(Color(1.0, 0.98, 0.94), 0.2)
+	for x: float in [-0.105, 0.105]:
+		var eye := _part(_head, _sphere(0.031, 12, 6), eyes, Vector3(x, EYE_Y, -0.27), Vector3(0.9, 1.15, 0.55))
 		_eyes.append(eye)
 		_detail(eye)
-	_detail(_part(_head, _sphere(0.046, 12, 6), _material(look.skin_color.darkened(0.07), 0.65), Vector3(0.0, -0.045, -0.283)))
-	var blush := _material(look.skin_color.lerp(Color(0.95, 0.45, 0.42), 0.32), 0.8)
-	for x: float in [-0.165, 0.165]:
-		_detail(_part(_head, _sphere(0.05, 10, 5), blush, Vector3(x, -0.065, -0.235), Vector3(1.0, 0.6, 0.4)))
+		# Glanzpunkt als Kind des Auges – blinzelt mit
+		_detail(_part(eye, _sphere(0.012, 6, 3), catchlight, Vector3(0.011, 0.012, -0.031)))
+	_detail(_part(_head, _sphere(0.042, 12, 6), _material(look.skin_color.darkened(0.07), 0.55, 0.3), Vector3(0.0, -0.058, -0.283)))
+	var blush := _material(look.skin_color.lerp(Color(0.96, 0.45, 0.42), 0.36), 0.8)
+	for x: float in [-0.17, 0.17]:
+		_detail(_part(_head, _sphere(0.052, 10, 5), blush, Vector3(x, -0.078, -0.232), Vector3(1.0, 0.6, 0.4)))
 
 	if look.beard:
 		var beard := _material(look.hair_color, 0.95)
@@ -544,12 +564,12 @@ func _build_head(look: CharacterAppearance, winter: bool, skin: Material) -> voi
 
 	if look.glasses:
 		var frame := _material(look.glasses_color, 0.35)
-		for x: float in [-0.1, 0.1]:
-			var lens := _detail(_part(_head, _torus(0.047, 0.061, 18), frame, Vector3(x, 0.025, -0.282)))
+		for x: float in [-0.105, 0.105]:
+			var lens := _detail(_part(_head, _torus(0.047, 0.061, 18), frame, Vector3(x, EYE_Y, -0.284)))
 			lens.rotation.x = PI * 0.5
 		var bridge := BoxMesh.new()
 		bridge.size = Vector3(0.075, 0.014, 0.014)
-		_part(_head, bridge, frame, Vector3(0.0, 0.035, -0.293))
+		_part(_head, bridge, frame, Vector3(0.0, EYE_Y + 0.01, -0.295))
 
 
 func _build_hair(look: CharacterAppearance, under_hat: bool) -> void:

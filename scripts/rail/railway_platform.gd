@@ -42,7 +42,7 @@ func _set_lamps(on: bool) -> void:
 	for light in _lamp_lights:
 		light.light_energy = lamp_energy if on else 0.0
 	if _lamp_glow:
-		_lamp_glow.emission_energy_multiplier = 3.0 if on else 0.3
+		_lamp_glow.emission_energy_multiplier = 2.0 if on else 0.3
 
 
 func rebuild() -> void:
@@ -95,6 +95,9 @@ func rebuild() -> void:
 			light.omni_range = 6.5
 			light.light_energy = 0.0
 			light.shadow_enabled = false
+			light.distance_fade_enabled = true
+			light.distance_fade_begin = 70.0
+			light.distance_fade_length = 20.0
 			_add_generated(light)
 			_lamp_lights.append(light)
 
