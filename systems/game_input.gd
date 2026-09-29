@@ -7,7 +7,7 @@
 extends Node
 
 const BINDINGS_PATH := "user://keybindings.cfg"
-var storage_path := BINDINGS_PATH
+var storage_path := QaSandbox.redirect(BINDINGS_PATH)
 
 
 func _enter_tree() -> void:

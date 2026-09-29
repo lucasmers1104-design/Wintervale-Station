@@ -11,6 +11,8 @@
 extends Node
 
 const SAVE_DIR := "user://saves/"
+## Tatsächlicher Ordner – in Tests (siehe QaSandbox) umgeleitet.
+var save_dir := QaSandbox.redirect(SAVE_DIR)
 const DEFAULT_SLOT := "quicksave"
 ## Wird erhöht, sobald sich das Format ändert (siehe _migrate()).
 const SAVE_VERSION := 2
@@ -21,7 +23,7 @@ var playtime_seconds := 0.0
 
 
 func _ready() -> void:
-	var dir := DirAccess.open(SAVE_DIR)
+	var dir := DirAccess.open(save_dir)
 	if dir == null:
 		return
 	for filename in dir.get_files():
@@ -29,7 +31,7 @@ func _ready() -> void:
 			continue
 		var slot := filename.trim_suffix(".json.bak")
 		if _valid_slot(slot) and not FileAccess.file_exists(get_save_path(slot)):
-			DirAccess.rename_absolute(SAVE_DIR + filename, get_save_path(slot))
+			DirAccess.rename_absolute(save_dir + filename, get_save_path(slot))
 
 
 func _process(delta: float) -> void:
@@ -54,7 +56,7 @@ func save_game(slot: String = DEFAULT_SLOT) -> bool:
 		"objects": objects,
 	}
 
-	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+	DirAccess.make_dir_recursive_absolute(save_dir)
 	var path := get_save_path(slot)
 	var temp_path := path + ".tmp"
 	var file := FileAccess.open(temp_path, FileAccess.WRITE)
@@ -82,7 +84,7 @@ func save_game(slot: String = DEFAULT_SLOT) -> bool:
 		var capture := get_viewport().get_texture().get_image()
 		if capture:
 			capture.resize(480, 270, Image.INTERPOLATE_LANCZOS)
-			capture.save_png(SAVE_DIR + slot + ".png")
+			capture.save_png(save_dir + slot + ".png")
 
 	active_slot = slot
 	Events.game_saved.emit(slot)
@@ -124,7 +126,7 @@ func delete_save(slot: String = DEFAULT_SLOT) -> void:
 		var backup := get_save_path(slot) + ".bak"
 		if FileAccess.file_exists(backup):
 			DirAccess.remove_absolute(backup)
-		var thumbnail := SAVE_DIR + slot + ".png"
+		var thumbnail := save_dir + slot + ".png"
 		if FileAccess.file_exists(thumbnail):
 			DirAccess.remove_absolute(thumbnail)
 		if active_slot == slot:
@@ -132,7 +134,7 @@ func delete_save(slot: String = DEFAULT_SLOT) -> void:
 
 
 func get_save_path(slot: String) -> String:
-	return SAVE_DIR + slot + ".json" if _valid_slot(slot) else ""
+	return save_dir + slot + ".json" if _valid_slot(slot) else ""
 
 
 func read_save_data(slot: String) -> Dictionary:
@@ -160,7 +162,7 @@ func read_save_data(slot: String) -> Dictionary:
 
 func list_saves(include_invalid := false) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	var dir := DirAccess.open(SAVE_DIR)
+	var dir := DirAccess.open(save_dir)
 	if dir == null:
 		return result
 	for filename in dir.get_files():

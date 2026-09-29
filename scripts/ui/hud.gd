@@ -21,12 +21,66 @@ var _day_value: Label
 var _time_value: Label
 var _bar_speed_label: Label
 var _status_bar: Control
+var _clock_hands: HudClockHands
 var _money_tween: Tween
 var _shown_money := -1
 
 const COIN_ICON := preload("res://assets/ui/icons/coin.svg")
 const NOTEBOOK_ICON := preload("res://assets/ui/icons/notebook.svg")
-const STATUS_BAR_ART := preload("res://assets/ui/hud_status_bar.png")
+## Freigegebene Leiste ohne die gemalten Uhrzeiger (tools/generate_hud_clock_face.gd);
+## das Original liegt unverändert daneben (hud_status_bar.png).
+const STATUS_BAR_ART := preload("res://assets/ui/hud_status_bar_clean.png")
+## Mitte des Zifferblatts in Leistenkoordinaten (Vorlage 1167|196.8 minus Ausschnitt 130|83).
+const CLOCK_CENTER := Vector2(1037.0, 113.8)
+
+
+## Die zwei Zeiger der kleinen Uhr – sie zeigen immer die Spielzeit der Digitalanzeige.
+class HudClockHands extends Control:
+	const INK := Color("2b1a12")
+	const SHADOW := Color(0.12, 0.05, 0.02, 0.28)
+	const BRASS := Color("c99a4e")
+	## Umriss in Zeiger-Koordinaten: x quer, y von der Mitte zur Spitze (Bildpixel der Vorlage).
+	const MINUTE_SHAPE := [Vector2(-1.5, -5.0), Vector2(1.5, -5.0), Vector2(1.2, 25.5),
+		Vector2(2.7, 28.5), Vector2(0.0, 34.5), Vector2(-2.7, 28.5), Vector2(-1.2, 25.5)]
+	const HOUR_SHAPE := [Vector2(-2.3, -5.0), Vector2(2.3, -5.0), Vector2(2.0, 14.5),
+		Vector2(4.1, 17.5), Vector2(0.0, 23.5), Vector2(-4.1, 17.5), Vector2(-2.0, 14.5)]
+
+	var hour_degrees := 0.0
+	var minute_degrees := 0.0
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _process(_delta: float) -> void:
+		set_time(WorldClock.time_of_day)
+
+	## [param hours] = Spielzeit in Stunden (16.0 → Stundenzeiger auf 4, Minutenzeiger auf 12).
+	func set_time(hours: float) -> void:
+		var minute := fposmod(hours, 1.0) * 360.0
+		var hour := fposmod(hours, 12.0) / 12.0 * 360.0
+		if absf(minute - minute_degrees) < 0.05 and absf(hour - hour_degrees) < 0.05:
+			return
+		minute_degrees = minute
+		hour_degrees = hour
+		queue_redraw()
+
+	func _draw() -> void:
+		for layer: Color in [SHADOW, INK]:
+			var offset := Vector2(0.9, 1.2) if layer == SHADOW else Vector2.ZERO
+			_draw_hand(HOUR_SHAPE, hour_degrees, layer, offset)
+			_draw_hand(MINUTE_SHAPE, minute_degrees, layer, offset)
+		draw_circle(Vector2.ZERO, 4.3, INK, true, -1.0, true)
+		draw_circle(Vector2.ZERO, 1.6, BRASS, true, -1.0, true)
+
+	func _draw_hand(shape: Array, degrees: float, color: Color, offset: Vector2) -> void:
+		var along := Vector2(sin(deg_to_rad(degrees)), -cos(deg_to_rad(degrees)))
+		var across := Vector2(-along.y, along.x)
+		var points := PackedVector2Array()
+		for p: Vector2 in shape:
+			points.append(offset + across * p.x + along * p.y)
+		draw_colored_polygon(points, color)
+		points.append(points[0])
+		draw_polyline(points, color, 0.8, true)
 
 @onready var _clock_label: Label = %ClockLabel
 @onready var _speed_label: Label = %SpeedLabel
@@ -232,21 +286,47 @@ func _build_money_display() -> void:
 	_time_value = _status_value("TimeValue", Vector2(1100, 58), Vector2(235, 105), 68)
 	_bar_speed_label = _status_value("SpeedValue", Vector2(1217, 155), Vector2(112, 32), 20)
 	_bar_speed_label.visible = false
-	var book := Button.new()
-	book.name = "NotebookButton"
-	book.icon = NOTEBOOK_ICON
-	book.expand_icon = true
-	book.flat = true
-	book.focus_mode = Control.FOCUS_NONE
-	book.position = Vector2(1413, 82)
-	book.size = Vector2(43, 43)
-	book.tooltip_text = "Notizbuch (Taste %s)" % InputConfig.get_action_label(&"toggle_notebook")
-	book.pressed.connect(Events.notebook_requested.emit.bind(""))
-	_status_bar.add_child(book)
+	_clock_hands = HudClockHands.new()
+	_clock_hands.name = "ClockHands"
+	_clock_hands.position = CLOCK_CENTER
+	_status_bar.add_child(_clock_hands)
+	_clock_hands.set_time(WorldClock.time_of_day)
+	_status_bar.add_child(_build_notebook_button())
 	_layout_status_bar()
 	get_viewport().size_changed.connect(_layout_status_bar)
 	Economy.money_changed.connect(_on_money_changed)
 	_on_money_changed(Economy.money)
+
+
+## Rundes Holz-Medaillon mit Messingrand, das unter dem rechten Leistenende hängt.
+func _build_notebook_button() -> Button:
+	var book := Button.new()
+	book.name = "NotebookButton"
+	book.icon = NOTEBOOK_ICON
+	book.expand_icon = true
+	book.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	book.focus_mode = Control.FOCUS_NONE
+	book.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	book.tooltip_text = "Notizbuch (Taste %s)" % InputConfig.get_action_label(&"toggle_notebook")
+	for state in ["normal", "hover", "pressed", "hover_pressed"]:
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("6a4027") if state == "normal" else Color("7b4c2e")
+		style.border_color = Color("e2b36a") if state.begins_with("hover") else Color("c28a45")
+		style.set_border_width_all(5)
+		style.set_corner_radius_all(40)
+		style.set_content_margin_all(15)
+		style.shadow_color = Color(0.1, 0.04, 0.02, 0.45)
+		style.shadow_size = 6
+		style.shadow_offset = Vector2(0, 3)
+		book.add_theme_stylebox_override(state, style)
+	book.position = Vector2(1318, 188)
+	book.size = Vector2(80, 80)
+	book.pressed.connect(Events.notebook_requested.emit.bind(""))
+	return book
+
+
+func get_clock_hands() -> HudClockHands:
+	return _clock_hands
 
 
 func _status_value(node_name: String, at: Vector2, dimensions: Vector2, font_size: int) -> Label:

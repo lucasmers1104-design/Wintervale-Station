@@ -22,7 +22,7 @@ const AUDIO_BUSES := {
 var legend_expanded := true
 var fullscreen := false
 var values: Dictionary = DEFAULTS.duplicate(true)
-var storage_path := PATH
+var storage_path := QaSandbox.redirect(PATH)
 var _audio_scan_delay := 0.0
 
 

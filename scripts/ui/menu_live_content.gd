@@ -275,7 +275,7 @@ func _save_card(entry: Dictionary) -> Control:
 	thumbnail.custom_minimum_size = Vector2(206, 116)
 	thumbnail.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	thumbnail.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	var image_path := SaveManager.SAVE_DIR + String(entry["slot"]) + ".png"
+	var image_path := SaveManager.save_dir + String(entry["slot"]) + ".png"
 	if FileAccess.file_exists(image_path):
 		var image := Image.new()
 		if image.load(image_path) == OK:
