@@ -6,6 +6,7 @@ const DESIGN_SIZE := Vector2(1672.0, 941.0)
 const BACKGROUND := preload("res://assets/ui/main_menu/station_background.png")
 const LOGO := preload("res://assets/ui/main_menu/wood_logo.png")
 const PARCHMENT := preload("res://assets/ui/main_menu/parchment_panel.png")
+const GALLERY_SCENE := preload("res://scenes/ui/menu_gallery.tscn")
 const SELECTION := preload("res://assets/ui/main_menu/selection_frame.svg")
 const ICONS := [
 	preload("res://assets/ui/main_menu/icons/continue_train.svg"),
@@ -25,6 +26,7 @@ var _buttons: Array[Button] = []
 var _notice: PanelContainer
 var _notice_text: Label
 var _snow: MenuSnow
+var _gallery: Node
 
 
 class MenuSnow extends Control:
@@ -148,6 +150,9 @@ func _build() -> void:
 	_canvas.add_child(version)
 
 	_build_notice()
+	_gallery = GALLERY_SCENE.instantiate()
+	_canvas.add_child(_gallery)
+	_gallery.connect("closed", Callable(self, "_on_gallery_closed"))
 
 
 func _add_image(texture: Texture2D, pos: Vector2, dimensions: Vector2, label: String) -> void:
@@ -312,18 +317,19 @@ func _activate(index: int) -> void:
 		1:
 			_start_game(false)
 		2:
-			if SaveManager.has_save():
-				_start_game(true)
-			else:
-				_show_notice("No save files found. The current game supports a quicksave slot.")
+			_gallery.call("show_page", "load_save")
 		3:
-			_show_notice("Settings screen is not implemented in this project yet. Press F11 in the game for fullscreen.")
+			_gallery.call("show_page", "settings_graphics")
 		4:
-			_show_notice("Achievements screen is not implemented in this project yet.")
+			_gallery.call("show_page", "achievements")
 		5:
-			_show_notice("Credits screen is not implemented in this project yet.")
+			_gallery.call("show_page", "credits")
 		6:
 			get_tree().quit()
+
+
+func _on_gallery_closed() -> void:
+	_buttons[0].grab_focus()
 
 
 func _start_game(load_save: bool) -> void:
