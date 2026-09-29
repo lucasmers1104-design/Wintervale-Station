@@ -74,7 +74,7 @@ const UNDER := Color(0.16, 0.16, 0.18)
 const FRAME := Color(0.2, 0.2, 0.22)
 const METAL := Color(0.38, 0.38, 0.4)
 const RUBBER := Color(0.1, 0.1, 0.11)
-const SNOW := Color(0.9, 0.93, 0.97)
+const SNOW := Color(0.9, 0.93, 0.97, 0.5)
 const PANE := Color(0.1, 0.13, 0.18)
 const WOOD_DECK := Color(0.45, 0.32, 0.21)
 const BARK := Color(0.33, 0.23, 0.16)
@@ -597,7 +597,7 @@ static func _cargo_stone_pile(st: SurfaceTool, rng: RandomNumberGenerator) -> vo
 			var x0 := -1.3 + j * (2.6 / 3.0)
 			var x1 := x0 + 2.6 / 3.0
 			var top := 3.25 + (0.18 if j == 1 else 0.0) + rng.randf_range(-0.05, 0.05)
-			var color := SNOW if rng.randf() < 0.35 else GRAVEL.lerp(Color(0.32, 0.3, 0.28), rng.randf())
+			var color := Color(SNOW, 0.75) if rng.randf() < 0.35 else GRAVEL.lerp(Color(0.32, 0.3, 0.28), rng.randf())
 			LowPolyBuilder.add_quad_facing(st, Vector3(x0, top, z0), Vector3(x1, top, z0), Vector3(x1, top, z1),
 				Vector3(x0, top, z1), color, Vector3.UP)
 	for i in 6:
@@ -625,7 +625,7 @@ static func _cargo_stone_heap(st: SurfaceTool, rng: RandomNumberGenerator) -> vo
 			var p1 := Vector3(cos(a1) * lower_r, lower_y, sin(a1) * lower_r)
 			var p2 := Vector3(cos(a1) * upper_r, upper_y, sin(a1) * upper_r)
 			var p3 := Vector3(cos(a0) * upper_r, upper_y, sin(a0) * upper_r)
-			var color := SNOW if r == rings.size() - 2 and rng.randf() < 0.7 else GRAVEL.lerp(Color(0.62, 0.58, 0.53), rng.randf())
+			var color := Color(SNOW, 0.75) if r == rings.size() - 2 and rng.randf() < 0.7 else GRAVEL.lerp(Color(0.62, 0.58, 0.53), rng.randf())
 			var outward := Vector3(cos((a0 + a1) * 0.5), 0.6, sin((a0 + a1) * 0.5))
 			LowPolyBuilder.add_triangle_facing(st, p0, p1, p2, color, outward)
 			if upper_r > 0.0:

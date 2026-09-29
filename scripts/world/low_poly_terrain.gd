@@ -367,7 +367,7 @@ func _write_triangle(vertices: PackedVector3Array, normals: PackedVector3Array, 
 		c = swap
 		normal = -normal
 	var influence := (_weights[ia] + _weights[ib] + _weights[ic]) / 3.0
-	var color := _terrain_color((a + b + c) / 3.0, normal, influence, rng)
+	var color := _terrain_color((a + b + c) / 3.0, maxf(a.y, maxf(b.y, c.y)), normal, influence, rng)
 	vertices[cursor] = a
 	vertices[cursor + 1] = b
 	vertices[cursor + 2] = c
@@ -377,10 +377,12 @@ func _write_triangle(vertices: PackedVector3Array, normals: PackedVector3Array, 
 	return cursor + 3
 
 
-func _terrain_color(center: Vector3, normal: Vector3, influence: float, rng: RandomNumberGenerator) -> Color:
+## [param top]: höchste Ecke der Fläche – Seegrund ist nur, was ganz unter Wasser liegt
+## (sonst ragen gefärbte Grund-Dreiecke als Zacken über die Uferlinie).
+func _terrain_color(center: Vector3, top: float, normal: Vector3, influence: float, rng: RandomNumberGenerator) -> Color:
 	var slope := 1.0 - normal.y
 	var color: Color
-	if center.y < ice_level + 0.1 and is_in_lake(center.x, center.z):
+	if top < ice_level + 0.05 and is_in_lake(center.x, center.z):
 		color = COLOR_LAKE_BED
 	elif influence > 0.85:
 		# Festgetretener Schnee neben den Gleisen
@@ -394,27 +396,41 @@ func _terrain_color(center: Vector3, normal: Vector3, influence: float, rng: Ran
 	else:
 		var shade := clampf(_detail_noise.get_noise_2d(center.x * 1.5, center.z * 1.5) * 0.5 + 0.5, 0.0, 1.0)
 		color = COLOR_SNOW_SHADE.lerp(COLOR_SNOW, shade)
-	# Leichte Variation pro Fläche betont die Facetten.
+	# Leichte Variation pro Fläche betont die Facetten. Der Alpha-Kanal sagt dem
+	# Gelände-Shader, was die Fläche ist (siehe snow_terrain.gdshader):
+	# 0.5 = Schnee (taut zu Wiese), 0.75 = Boden neben Gleisen / Seeufer (wird Erde).
 	var variation := rng.randf_range(-0.025, 0.025)
-	return Color(color.r + variation, color.g + variation, color.b + variation)
+	var marker := 1.0
+	if color == COLOR_TRACKSIDE or color == COLOR_LAKE_BED:
+		marker = 0.75
+	elif color != COLOR_ROCK and color != COLOR_ROCK_DARK and color != COLOR_EARTH:
+		marker = 0.5
+	return Color(color.r + variation, color.g + variation, color.b + variation, marker)
 
 
 func _build_ice() -> void:
 	var center := Vector3(lake_center.x, ice_level, lake_center.y)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var segments := 20
+	# Die Fläche reicht etwas unter das Ufer: Die Uferlinie ergibt sich dort, wo das
+	# Gelände die Wasserhöhe schneidet (natürlich statt eines gezackten Vielecks).
+	var segments := 40
+	var reach := lake_radius * 1.12
 	for i in segments:
-		var p0 := center + Vector3(cos(TAU * i / segments), 0.0, sin(TAU * i / segments)) * lake_radius
-		var p1 := center + Vector3(cos(TAU * (i + 1) / segments), 0.0, sin(TAU * (i + 1) / segments)) * lake_radius
+		var p0 := center + Vector3(cos(TAU * i / segments), 0.0, sin(TAU * i / segments)) * reach
+		var p1 := center + Vector3(cos(TAU * (i + 1) / segments), 0.0, sin(TAU * (i + 1) / segments)) * reach
 		LowPolyBuilder.add_triangle_facing(st, center, p0, p1, Color.WHITE, Vector3.UP)
 
 	var ice := MeshInstance3D.new()
 	ice.name = "Ice"
 	ice.mesh = st.commit()
 	ice.material_override = ice_material
+	if ice_material is ShaderMaterial:
+		(ice_material as ShaderMaterial).set_shader_parameter(&"lake_center", lake_center)
+		(ice_material as ShaderMaterial).set_shader_parameter(&"lake_radius", lake_radius)
 	ice.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_add_generated(ice)
+	_build_ice_patches()
 
 	var shape := CylinderShape3D.new()
 	shape.radius = lake_radius * 0.95
@@ -430,3 +446,38 @@ func _build_ice() -> void:
 func _add_generated(node: Node) -> void:
 	node.set_meta(&"generated", true)
 	add_child(node)
+
+
+## Kleine gefrorene Pfützen rund um den See (tauen im Frühling mit der Schneedecke).
+func _build_ice_patches() -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = terrain_seed + 77
+	var ice := Color(0.72, 0.84, 0.95, 0.5)
+	for i in 11:
+		var angle := rng.randf() * TAU
+		var distance := lake_radius * rng.randf_range(1.12, 1.55)
+		var center := Vector2(lake_center.x, lake_center.y) + Vector2(cos(angle), sin(angle)) * distance
+		var rx := rng.randf_range(0.6, 1.8)
+		var rz := rx * rng.randf_range(0.5, 0.9)
+		var turn := rng.randf() * TAU
+		var y := get_height(center.x, center.y) + 0.03
+		var segments := 9
+		var points: Array[Vector3] = []
+		for s in segments:
+			var a := TAU * s / segments
+			var r := 1.0 + rng.randf_range(-0.18, 0.12)
+			var local := Vector2(cos(a) * rx * r, sin(a) * rz * r).rotated(turn)
+			var px := center.x + local.x
+			var pz := center.y + local.y
+			points.append(Vector3(px, maxf(y, get_height(px, pz) + 0.03), pz))
+		var middle := Vector3(center.x, y, center.y)
+		for s in segments:
+			LowPolyBuilder.add_triangle_facing(st, middle, points[s], points[(s + 1) % segments], ice, Vector3.UP)
+	var patches := MeshInstance3D.new()
+	patches.name = "IcePatches"
+	patches.mesh = st.commit()
+	patches.material_override = preload("res://assets/materials/nature_vertex_color.tres")
+	patches.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_add_generated(patches)

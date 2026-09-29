@@ -11,8 +11,8 @@
 class_name FreightMeshes
 extends RefCounted
 
-const SNOW := Color(0.92, 0.94, 0.98)
-const SNOW_SHADE := Color(0.83, 0.87, 0.94)
+const SNOW := Color(0.92, 0.94, 0.98, 0.5)
+const SNOW_SHADE := Color(0.83, 0.87, 0.94, 0.5)
 const BOARD := Color(0.56, 0.2, 0.15)
 const BOARD_DARK := Color(0.43, 0.15, 0.12)
 const HALL := Color(0.37, 0.45, 0.39)

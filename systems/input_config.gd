@@ -30,6 +30,8 @@ const KEY_BINDINGS := {
 	&"release_mouse": [KEY_ESCAPE],
 	&"build_mode": [KEY_B],
 	&"toggle_notebook": [KEY_N],
+	&"next_season": [KEY_J],
+	&"next_weather": [KEY_K],
 	&"build_tool_rail": [KEY_1],
 	&"build_tool_switch": [KEY_2],
 	&"build_tool_signal": [KEY_3],
@@ -140,6 +142,8 @@ const LEGENDS := {
 	&"global": [
 		{"actions": [&"toggle_notebook"], "text": "Notizbuch"},
 		{"actions": [&"time_speed"], "text": "Zeitraffer"},
+		{"actions": [&"next_season"], "text": "Nächste Jahreszeit"},
+		{"actions": [&"next_weather"], "text": "Wetter wechseln"},
 		{"actions": [&"quick_save"], "text": "Speichern"},
 		{"actions": [&"quick_load"], "text": "Laden"},
 		{"actions": [&"toggle_help"], "text": "Legende"},

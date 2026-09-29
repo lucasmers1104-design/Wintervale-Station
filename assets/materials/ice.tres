@@ -1,7 +1,12 @@
-[gd_resource type="StandardMaterial3D" format=3]
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://assets/materials/ice_lake.gdshader" id="1_lake"]
 
 [resource]
 resource_name = "Ice"
-albedo_color = Color(0.66, 0.8, 0.9, 1)
-roughness = 0.12
-metallic_specular = 0.8
+shader = ExtResource("1_lake")
+shader_parameter/ice_color = Color(0.66, 0.8, 0.9, 1)
+shader_parameter/water_deep = Color(0.08, 0.2, 0.26, 1)
+shader_parameter/water_shallow = Color(0.2, 0.36, 0.36, 1)
+shader_parameter/lake_center = Vector2(52, -38)
+shader_parameter/lake_radius = 16.0

@@ -11,7 +11,7 @@ const WOOD := Color(0.62, 0.40, 0.24)
 const WOOD_DARK := Color(0.44, 0.28, 0.17)
 const IRON := Color(0.16, 0.17, 0.19)
 const GREEN_METAL := Color(0.22, 0.34, 0.28)
-const SNOW := Color(0.9, 0.93, 0.97)
+const SNOW := Color(0.9, 0.93, 0.97, 0.5)
 const NEEDLES := Color(0.16, 0.34, 0.26)
 const NEEDLES_LIGHT := Color(0.24, 0.44, 0.3)
 const BERRY := Color(0.78, 0.12, 0.12)
@@ -258,7 +258,7 @@ static func add_snow_bank(st: SurfaceTool, rng: RandomNumberGenerator, length :=
 		var x := lerpf(-length * 0.5 + 0.25, length * 0.5 - 0.25, (i + 0.5) / blobs) + rng.randf_range(-0.1, 0.1)
 		var edge := 1.0 - absf(x) / (length * 0.5) * 0.6
 		var radius := rng.randf_range(0.28, 0.4) * edge
-		var shade := SNOW.lerp(Color(0.8, 0.85, 0.93), rng.randf() * 0.5)
+		var shade := SNOW.lerp(Color(0.8, 0.85, 0.93, 0.5), rng.randf() * 0.5)
 		LowPolyBuilder.add_rock(st, rng, Vector3(x, radius * 0.25, rng.randf_range(-0.08, 0.08)), radius, shade.darkened(0.03), shade)
 
 
@@ -295,4 +295,4 @@ static func crossing_ramp(side: float) -> Transform3D:
 
 static func _vary(color: Color, rng: RandomNumberGenerator, amount := 0.025) -> Color:
 	var v := rng.randf_range(-amount, amount)
-	return Color(color.r + v, color.g + v, color.b + v)
+	return Color(color.r + v, color.g + v, color.b + v, color.a)

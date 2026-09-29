@@ -1,0 +1,11 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://assets/materials/path.gdshader" id="1_path"]
+
+[resource]
+resource_name = "PathRoad"
+shader = ExtResource("1_path")
+shader_parameter/style = 2
+shader_parameter/base_color = Color(0.54, 0.5, 0.46, 1)
+shader_parameter/dark_color = Color(0.38, 0.35, 0.33, 1)
+shader_parameter/light_color = Color(0.72, 0.68, 0.62, 1)

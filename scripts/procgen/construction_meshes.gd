@@ -15,7 +15,7 @@ const RED := Color(0.78, 0.2, 0.16)
 const WHITE := Color(0.94, 0.92, 0.88)
 const YELLOW := Color(0.95, 0.72, 0.2)
 const CONCRETE := Color(0.66, 0.65, 0.62)
-const SNOW := Color(0.92, 0.94, 0.98)
+const SNOW := Color(0.92, 0.94, 0.98, 0.5)
 const GLASS := Color(0.62, 0.8, 0.88)
 ## Höhe einer Gerüstetage.
 const SCAFFOLD_LEVEL := 1.9

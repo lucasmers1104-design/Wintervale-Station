@@ -6,11 +6,12 @@ render_mode cull_disabled;
 uniform float strength = 0.16;
 uniform float speed = 2.4;
 uniform float roughness : hint_range(0.0, 1.0) = 0.85;
+global uniform float wind_strength;
 
 void vertex() {
 	vec3 origin = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 	float along = UV.x;
-	float gust = 0.7 + 0.3 * sin(TIME * 0.37 + origin.x * 0.1);
+	float gust = (0.7 + 0.3 * sin(TIME * 0.37 + origin.x * 0.1)) * (0.35 + wind_strength * 1.5);
 	float phase = TIME * speed - along * 5.0 + origin.z * 0.3;
 	VERTEX.z += sin(phase) * along * strength * gust;
 	VERTEX.y += sin(phase * 0.5 + 1.0) * along * strength * 0.25 * gust;

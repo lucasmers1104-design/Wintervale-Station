@@ -29,6 +29,11 @@ func play_step() -> void:
 	if not is_inside_tree():
 		return
 	_last_surface = get_surface()
+	# Im Schnee bleiben Fußabdrücke zurück
+	if _last_surface == "snow":
+		var prints := get_tree().get_first_node_in_group(Footprints.GROUP) as Footprints
+		if prints:
+			prints.add_step(self, global_position)
 	stream = SoundLibrary.get_sound("step_%s_%d" % [_last_surface, _rng.randi_range(0, 2)])
 	pitch_scale = _rng.randf_range(0.9, 1.1)
 	volume_db = base_volume_db + _rng.randf_range(-1.5, 1.0)
@@ -42,7 +47,7 @@ func get_surface() -> String:
 	var query := PhysicsRayQueryParameters3D.create(origin, origin + Vector3.DOWN * 1.0, GROUND_MASK)
 	var hit := space.intersect_ray(query)
 	if hit.is_empty():
-		return "snow"
+		return _soft_ground()
 	var collider: Object = hit["collider"]
 	if collider is StationProp and (collider as StationProp).kind == StationProp.Kind.CROSSING:
 		return "wood"
@@ -52,7 +57,7 @@ func get_surface() -> String:
 	var village := get_tree().get_first_node_in_group(VillageManager.GROUP) as VillageManager
 	if village and village.is_on_path(global_position):
 		return "stone"
-	return "snow"
+	return _soft_ground()
 
 
 func get_last_surface() -> String:
@@ -72,3 +77,8 @@ func play_named(sound_name: String, volume_offset := 0.0) -> void:
 	pitch_scale = _rng.randf_range(0.92, 1.08)
 	volume_db = base_volume_db + volume_offset
 	SoundLibrary.play(self)
+
+
+## Weicher Boden: im Winter Schnee, sonst Wiese.
+func _soft_ground() -> String:
+	return "snow" if Seasons.get_snow_cover() >= 0.4 else "grass"

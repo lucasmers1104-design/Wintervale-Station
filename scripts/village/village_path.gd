@@ -41,7 +41,11 @@ func _ready() -> void:
 func rebuild() -> void:
 	var height := func(x: float, z: float) -> float: return terrain.get_height(x, z) if terrain else 0.0
 	_mesh.mesh = PathMeshes.build(item_id, start_point, end_point, height)
-	_mesh.material_override = preload("res://assets/materials/nature_vertex_color.tres")
+	# Oberfläche 0: Wege-Shader (Kies, Pflaster, Straße), Oberfläche 1: Randsteine und Schneewall
+	if _mesh.mesh.get_surface_count() > 0:
+		_mesh.set_surface_override_material(0, PathMeshes.material(item_id))
+	if _mesh.mesh.get_surface_count() > 1:
+		_mesh.set_surface_override_material(1, preload("res://assets/materials/nature_vertex_color.tres"))
 
 
 func get_data() -> Dictionary:

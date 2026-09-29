@@ -21,10 +21,38 @@ uniform float moon_disc_size : hint_range(0.005, 0.2) = 0.03;
 uniform float star_intensity : hint_range(0.0, 1.0) = 0.0;
 uniform float star_density : hint_range(0.0, 0.05) = 0.012;
 
+// Wolken: Bedeckung (0 = klar, 1 = geschlossene Decke), Verschiebung durch den Wind,
+// Farbe der beleuchteten Wolkenseite.
+uniform float cloud_cover : hint_range(0.0, 1.0) = 0.3;
+uniform float cloud_drift = 0.0;
+uniform vec3 cloud_light : source_color = vec3(0.95, 0.93, 0.9);
+
 float hash13(vec3 p) {
 	p = fract(p * 0.1031);
 	p += dot(p, p.zyx + 31.32);
 	return fract((p.x + p.y) * p.z);
+}
+
+float cloud_noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	float a = hash13(vec3(i, 1.0));
+	float b = hash13(vec3(i + vec2(1.0, 0.0), 1.0));
+	float c = hash13(vec3(i + vec2(0.0, 1.0), 1.0));
+	float d = hash13(vec3(i + vec2(1.0, 1.0), 1.0));
+	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+float cloud_fbm(vec2 p) {
+	float value = 0.0;
+	float amp = 0.55;
+	for (int i = 0; i < 4; i++) {
+		value += cloud_noise(p) * amp;
+		p = p * 2.03 + vec2(1.7, 9.2);
+		amp *= 0.5;
+	}
+	return value;
 }
 
 // Sterne: ein 3D-Zellraster auf der Himmelskugel, wenige Zellen bekommen einen Stern.
@@ -72,9 +100,22 @@ void sky() {
 	col = mix(col, moon_color * 1.4, moon_disc * moon_above);
 	col += moon_color * pow(max(dot(dir, moon_dir), 0.0), 200.0) * 0.25 * moon_above;
 
+	// Wolken: weiche Schichtwolken, von der Sonne her aufgehellt, zum Horizont dichter
+	float density = 0.0;
+	if (h > 0.0 && cloud_cover > 0.01) {
+		vec2 uv = dir.xz / (h + 0.18) * 0.9 + vec2(cloud_drift, cloud_drift * 0.35);
+		float n = cloud_fbm(uv);
+		float threshold = mix(0.72, 0.28, cloud_cover);
+		density = smoothstep(threshold, threshold + 0.22, n) * smoothstep(0.0, 0.14, h);
+		density = max(density, smoothstep(0.55, 1.0, cloud_cover) * 0.85);
+		float lit = 0.55 + 0.45 * pow(max(dot(dir, sun_dir), 0.0), 3.0) * sun_above;
+		vec3 shade = mix(cloud_light * 0.62, cloud_light, clamp(n * 1.3 - 0.2, 0.0, 1.0));
+		col = mix(col, shade * lit + sun_color * 0.08 * sun_above, density * 0.92);
+	}
+
 	// Sterne (nicht in der Reflexions-Cubemap, dort wären sie nur Rauschen)
 	if (!AT_CUBEMAP_PASS && star_intensity > 0.0 && h > 0.0) {
-		col += vec3(stars(dir)) * star_intensity * smoothstep(0.0, 0.25, h);
+		col += vec3(stars(dir)) * star_intensity * smoothstep(0.0, 0.25, h) * (1.0 - density);
 	}
 
 	COLOR = col;

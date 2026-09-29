@@ -55,6 +55,9 @@
 [ext_resource type="Material" path="res://assets/materials/flag.tres" id="53_flag"]
 [ext_resource type="Script" path="res://scripts/economy/town_finances.gd" id="54_finances"]
 [ext_resource type="PackedScene" path="res://scenes/ui/notebook.tscn" id="55_notebook"]
+[ext_resource type="Script" path="res://scripts/world/weather_system.gd" id="56_weather"]
+[ext_resource type="Script" path="res://scripts/world/rainfall.gd" id="57_rain"]
+[ext_resource type="Script" path="res://scripts/world/footprints.gd" id="58_prints"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("2_sky")
@@ -100,22 +103,25 @@ player_spawn = Vector3(-11, 0, 12)
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_main")
 
-[node name="DayNightCycle" type="Node3D" parent="." node_paths=PackedStringArray("sun", "moon", "world_environment")]
+[node name="DayNightCycle" type="Node3D" parent="." node_paths=PackedStringArray("sun", "moon", "world_environment", "weather")]
 script = ExtResource("3_cycle")
 sun = NodePath("Sun")
 moon = NodePath("Moon")
 world_environment = NodePath("../WorldEnvironment")
+weather = NodePath("../Weather")
 
 [node name="Sun" type="DirectionalLight3D" parent="DayNightCycle"]
 light_color = Color(1, 0.88, 0.7, 1)
 light_angular_distance = 0.8
 shadow_enabled = true
+directional_shadow_blend_splits = true
 directional_shadow_max_distance = 95.0
 
 [node name="Moon" type="DirectionalLight3D" parent="DayNightCycle"]
 light_color = Color(0.8, 0.82, 0.9, 1)
 light_energy = 0.0
 shadow_enabled = true
+directional_shadow_blend_splits = true
 directional_shadow_max_distance = 80.0
 
 [node name="World" type="Node3D" parent="."]
@@ -199,6 +205,9 @@ script = ExtResource("36_stop")
 station_name = "Güterbahnhof"
 platform_number = 3
 platform_direction = Vector3(1, 0, 0)
+
+[node name="Footprints" type="MultiMeshInstance3D" parent="World"]
+script = ExtResource("58_prints")
 
 [node name="FreightYard" type="Node3D" parent="World" node_paths=PackedStringArray("terrain", "network", "dispatcher")]
 script = ExtResource("52_freight")
@@ -642,6 +651,14 @@ script = ExtResource("41_spot")
 kind = 4
 partner = NodePath("../ChatC1")
 
+[node name="Weather" type="Node" parent="." node_paths=PackedStringArray("snowfall", "rainfall")]
+script = ExtResource("56_weather")
+snowfall = NodePath("../Snowfall")
+rainfall = NodePath("../Rainfall")
+
+[node name="Rainfall" type="GPUParticles3D" parent="."]
+script = ExtResource("57_rain")
+
 [node name="Snowfall" type="GPUParticles3D" parent="."]
 script = ExtResource("39_snow")
 
@@ -748,10 +765,11 @@ walk_graph = NodePath("../World/WalkGraph")
 terrain = NodePath("../World/Terrain")
 player = NodePath("../Player")
 
-[node name="AmbientSoundscape" type="Node3D" parent="." node_paths=PackedStringArray("npc_director", "snowfall")]
+[node name="AmbientSoundscape" type="Node3D" parent="." node_paths=PackedStringArray("npc_director", "snowfall", "weather")]
 script = ExtResource("45_ambient")
 npc_director = NodePath("../NpcDirector")
 snowfall = NodePath("../Snowfall")
+weather = NodePath("../Weather")
 
 [node name="BirdFlock" type="Node3D" parent="."]
 script = ExtResource("47_birds")

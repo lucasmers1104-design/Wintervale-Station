@@ -1,7 +1,10 @@
-[gd_resource type="StandardMaterial3D" format=3]
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://assets/materials/world_vertex.gdshader" id="1_world"]
 
 [resource]
 resource_name = "Cargo"
-vertex_color_use_as_albedo = true
-roughness = 0.78
-metallic_specular = 0.4
+shader = ExtResource("1_world")
+shader_parameter/roughness = 0.78
+shader_parameter/specular = 0.4
+shader_parameter/receives_wetness = true

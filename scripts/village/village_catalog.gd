@@ -70,8 +70,8 @@ const ITEMS := {
 	"bike_rack": {"category": &"decor", "label": "Fahrradständer", "kind": "point", "radius": 1.0, "solid": true},
 	"mailbox": {"category": &"decor", "label": "Briefkasten", "kind": "point", "radius": 0.35, "solid": true},
 	"planter": {"category": &"decor", "label": "Pflanzkübel", "kind": "point", "radius": 0.5, "solid": true},
-	"snowman": {"category": &"decor", "label": "Schneemann", "kind": "point", "radius": 0.55, "solid": true},
-	"sled": {"category": &"decor", "label": "Schlitten", "kind": "point", "radius": 0.6},
+	"snowman": {"category": &"decor", "label": "Schneemann", "kind": "point", "radius": 0.55, "solid": true, "winter_only": true},
+	"sled": {"category": &"decor", "label": "Schlitten", "kind": "point", "radius": 0.6, "winter_only": true},
 }
 
 ## Baukosten: Geld ("money") und Material (Schlüssel wie in assets/goods/).
@@ -198,7 +198,7 @@ static func build_meshes(item_id: String, variant := 0, length := 0.0) -> Dictio
 	if _cache.has(key):
 		return _cache[key]
 	var result := {"body": null, "glow": null, "cable": null, "bulbs": null, "glass": null, "lights": [],
-		"chimneys": [], "seats": [], "signs": [], "door": Vector3.ZERO, "height": 2.0}
+		"chimneys": [], "seats": [], "signs": [], "door": Vector3.ZERO, "height": 2.0, "swing": null}
 	var item := get_item(item_id)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(item_id) + variant * 977
@@ -245,7 +245,11 @@ static func build_meshes(item_id: String, variant := 0, length := 0.0) -> Dictio
 			result["lights"] = [VillageMeshes.garden_lamp(st, glow)]
 			has_glow = true
 		"street_lamp":
-			result["lights"] = [VillageMeshes.street_lamp(st, glow)]
+			# Der hängende Lampenkopf ist ein eigenes Teil: er schwingt leicht im Wind
+			var head := _new_st()
+			var head_glow := _new_st()
+			result["lights"] = [VillageMeshes.street_lamp(st, glow, head, head_glow)]
+			result["swing"] = {"body": head.commit(), "glow": head_glow.commit(), "pivot": VillageMeshes.street_lamp_pivot()}
 			has_glow = true
 		"string_lights":
 			var cable := _new_st()

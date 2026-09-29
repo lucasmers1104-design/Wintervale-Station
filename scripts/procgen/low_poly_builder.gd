@@ -155,7 +155,17 @@ static func _add_rock_triangle(st: SurfaceTool, center: Vector3, a: Vector3, b: 
 	var normal := face_normal(a, b, c)
 	if normal.dot(outward) < 0.0:
 		normal = -normal
-	add_triangle_facing(st, a, b, c, top_color if normal.y > 0.55 else color, outward)
+	if normal.y <= 0.55:
+		add_triangle_facing(st, a, b, c, color, outward)
+	elif top_color.a < 0.6 and color.a >= 0.6:
+		# Schneekappe als Auflage knapp über dem Stein: taut sie im Frühling weg,
+		# kommt der Fels darunter zum Vorschein (statt eines Lochs)
+		add_triangle_facing(st, a, b, c, color, outward)
+		# 2 cm: genug Abstand, damit die Kappe auch aus der Ferne nicht mit dem Fels flimmert
+		var lift := normal * 0.02
+		add_triangle_facing(st, a + lift, b + lift, c + lift, top_color, outward)
+	else:
+		add_triangle_facing(st, a, b, c, top_color, outward)
 
 
 static func _ring_point(center: Vector3, radius: float, angle: float) -> Vector3:

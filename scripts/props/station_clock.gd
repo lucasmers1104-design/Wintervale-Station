@@ -73,7 +73,7 @@ func _build() -> void:
 			_add_box(mark, Vector3(0.01, 0.05 if i % 3 == 0 else 0.03, 0.02), hand_material)
 		_hour_hands.append(_add_hand(side, radius * 0.5, 0.035, hand_material))
 		_minute_hands.append(_add_hand(side, radius * 0.78, 0.022, hand_material))
-	_add_box(Vector3(0.0, face_height + radius + 0.07, 0.0), Vector3(0.14, 0.04, radius * 1.6), _material(Color(0.9, 0.93, 0.97), 1.0))
+	_add_box(Vector3(0.0, face_height + radius + 0.07, 0.0), Vector3(0.14, 0.04, radius * 1.6), preload("res://assets/materials/snow.tres"))  # Schneekappe (taut im Frühling)
 
 
 func _add_hand(side: float, hand_length: float, width: float, material: Material) -> Node3D:

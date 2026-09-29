@@ -14,8 +14,11 @@ extends RefCounted
 
 const GRAVEL := Color(0.56, 0.52, 0.48)
 const GRAVEL_DARK := Color(0.45, 0.42, 0.39)
-const SNOW := Color(0.9, 0.93, 0.97)
-const SNOW_SHADE := Color(0.8, 0.84, 0.91)
+const SNOW := Color(0.9, 0.93, 0.97, 0.5)
+const SNOW_SHADE := Color(0.8, 0.84, 0.91, 0.5)
+## Schnee als Teil des Schotterbetts (wird in den warmen Jahreszeiten zu Schotter statt zu verschwinden).
+const SNOW_GROUND := Color(0.9, 0.93, 0.97, 0.75)
+const SNOW_SHADE_GROUND := Color(0.8, 0.84, 0.91, 0.75)
 const WOOD := Color(0.43, 0.29, 0.19)
 const WOOD_TOP := Color(0.52, 0.37, 0.25)
 const WOOD_END := Color(0.62, 0.47, 0.32)
@@ -38,7 +41,7 @@ const BALLAST_PROFILE: Array[Vector2] = [
 ]
 ## Farben / Schneeanteil je Profilkante (Rand, Schneewehe, Böschung, Krone, Böschung, Schneewehe, Rand).
 ## Die Krone bleibt fast frei (Züge wirbeln den Schnee weg), an den Flanken liegt er weich an.
-const BALLAST_COLORS: Array[Color] = [SNOW, SNOW_SHADE, GRAVEL_DARK, GRAVEL, GRAVEL_DARK, SNOW_SHADE, SNOW]
+const BALLAST_COLORS: Array[Color] = [SNOW_GROUND, SNOW_SHADE_GROUND, GRAVEL_DARK, GRAVEL, GRAVEL_DARK, SNOW_SHADE_GROUND, SNOW_GROUND]
 const BALLAST_SNOW: Array[float] = [0.0, 0.0, 0.35, 0.06, 0.35, 0.0, 0.0]
 
 ## Vereinfachtes Schienenprofil (Fuß, Steg, Kopf) – konvex, 15 cm hoch.
@@ -241,7 +244,7 @@ static func _extrude(st: SurfaceTool, frames: Array[Transform3D], profile: Array
 			var d := _to_world(fb, profile[e] + offset)
 			var mid := (profile[e] + profile[e + 1]) * 0.5 - centroid
 			var outward := fa.basis.x * mid.x + fa.basis.y * mid.y
-			var color := SNOW if rng.randf() < float(snow[e]) else colors[e]
+			var color := SNOW_GROUND if rng.randf() < float(snow[e]) else colors[e]
 			LowPolyBuilder.add_quad_facing(st, a, b, c, d, _vary(color, rng), outward)
 
 
@@ -323,4 +326,4 @@ static func _to_world(frame: Transform3D, p: Vector2) -> Vector3:
 
 static func _vary(color: Color, rng: RandomNumberGenerator, amount := 0.03) -> Color:
 	var v := rng.randf_range(-amount, amount)
-	return Color(color.r + v, color.g + v, color.b + v)
+	return Color(color.r + v, color.g + v, color.b + v, color.a)

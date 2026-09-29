@@ -6,7 +6,7 @@
 class_name NatureMeshes
 extends RefCounted
 
-const SNOW_COLOR := Color(0.90, 0.93, 0.97)
+const SNOW_COLOR := Color(0.90, 0.93, 0.97, 0.5)
 const ROCK_COLOR := Color(0.48, 0.46, 0.46)
 const ROCK_COLOR_DARK := Color(0.38, 0.36, 0.37)
 

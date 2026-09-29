@@ -104,7 +104,7 @@ func _complete() -> void:
 		mesh.visible = true
 	_hidden_meshes.clear()
 	for smoke: GPUParticles3D in _parts.get("smoke", []):
-		smoke.emitting = true
+		_set_smoke(smoke, true)
 	if _site:
 		_site.finish()
 		_site = null
@@ -214,7 +214,7 @@ func _start_construction(house_data: Dictionary) -> void:
 			mesh.visible = false
 			_hidden_meshes.append(mesh)
 	for smoke: GPUParticles3D in _parts.get("smoke", []):
-		smoke.emitting = false
+		_set_smoke(smoke, false)
 	_site = ConstructionSite.new()
 	_site.set_meta(&"generated", true)
 	add_child(_site)
@@ -245,3 +245,11 @@ func _on_darkness_changed(dark: bool) -> void:
 		# Nicht alle Häuser gehen gleichzeitig an
 		_glow_tween.tween_interval(randf() * 2.0)
 		_glow_tween.tween_property(windows, "shader_parameter/glow", 1.0 if dark else 0.0, 3.0)
+
+
+## Rauch samt Funken an- oder ausschalten.
+static func _set_smoke(smoke: GPUParticles3D, on: bool) -> void:
+	smoke.emitting = on
+	for child in smoke.get_children():
+		if child is GPUParticles3D:
+			(child as GPUParticles3D).emitting = on

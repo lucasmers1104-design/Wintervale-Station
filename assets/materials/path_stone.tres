@@ -1,0 +1,11 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://assets/materials/path.gdshader" id="1_path"]
+
+[resource]
+resource_name = "PathStone"
+shader = ExtResource("1_path")
+shader_parameter/style = 1
+shader_parameter/base_color = Color(0.6, 0.56, 0.52, 1)
+shader_parameter/dark_color = Color(0.44, 0.41, 0.39, 1)
+shader_parameter/light_color = Color(0.74, 0.68, 0.6, 1)

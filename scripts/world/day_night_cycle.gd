@@ -10,9 +10,14 @@
 class_name DayNightCycle
 extends Node3D
 
+## Kleinste Drehung (Bogenmaß, ≈ 0,15°), ab der Sonne und Mond nachgeführt werden.
+const LIGHT_STEP := 0.0026
+
 @export var sun: DirectionalLight3D
 @export var moon: DirectionalLight3D
 @export var world_environment: WorldEnvironment
+## Wetter (Wolken dämpfen Sonne und Schatten, Nebel, Sterne). Optional.
+@export var weather: WeatherSystem
 
 ## Tageszeit, die im Editor als Vorschau gezeigt wird.
 @export_range(0.0, 24.0, 0.25) var editor_preview_hour := 15.5:
@@ -36,6 +41,9 @@ var _zenith_colors: Gradient
 var _horizon_colors: Gradient
 var _sun_colors: Gradient
 var _ambient_colors: Gradient
+var _base_fog := -1.0
+var _base_fog_height := 0.0
+var _cloud_drift := 0.0
 
 
 func _ready() -> void:
@@ -55,47 +63,95 @@ func apply_time(hour: float) -> void:
 	if _zenith_colors == null:
 		_build_gradients()
 
-	var t := fposmod(hour, 24.0) / 24.0
+	var in_game := not Engine.is_editor_hint()
+	# Die Farbverläufe sind für den Wintertag (7–17 Uhr) angelegt; im Sommer wird
+	# die Uhrzeit so umgerechnet, dass Morgen- und Abendfarben mit der Sonne wandern.
+	var t := _winter_hour(hour) / 24.0
 	var sun_angle := _celestial_angle(hour)
-	var sun_dir := _sky_direction(sun_angle, max_sun_elevation)
+	var elevation := float(Seasons.get_value("elevation")) if in_game else max_sun_elevation
+	var sun_dir := _sky_direction(sun_angle, elevation)
 	var moon_dir := _sky_direction(sun_angle + PI, max_moon_elevation)
 
 	var daylight := smoothstep(-0.05, 0.12, sun_dir.y)
 	var moonlight := smoothstep(-0.05, 0.15, moon_dir.y) * (1.0 - daylight)
+	# Wetter: Wolken dämpfen Sonne und Schatten, der Himmel wird grauer
+	var cloud := weather.get_value("cloud") if weather and in_game else 0.0
+	var sun_factor := weather.get_value("sun") if weather and in_game else 1.0
+	var light_tint: Color = Seasons.get_value("light_tint") if in_game else Color.WHITE
+	var sky_tint: Color = Seasons.get_value("sky_tint") if in_game else Color.WHITE
 
 	_orient_light(sun, sun_dir)
-	sun.light_color = _sun_colors.sample(t)
-	sun.light_energy = sun_energy * daylight
+	sun.light_color = _sun_colors.sample(t) * light_tint
+	sun.light_energy = sun_energy * daylight * sun_factor
+	sun.shadow_opacity = lerpf(1.0, 0.45, cloud)
 	sun.visible = daylight > 0.001
 
 	_orient_light(moon, moon_dir)
-	moon.light_energy = moon_energy * moonlight
+	moon.light_energy = moon_energy * moonlight * lerpf(1.0, 0.4, cloud)
 	moon.visible = moonlight > 0.001
 
-	var zenith := _zenith_colors.sample(t)
-	var horizon := _horizon_colors.sample(t)
+	var overcast := Color(0.62, 0.64, 0.68) * lerpf(0.25, 1.0, daylight)
+	var zenith := (_zenith_colors.sample(t) * sky_tint).lerp(overcast * 0.85, cloud * 0.7)
+	var horizon := (_horizon_colors.sample(t) * sky_tint).lerp(overcast, cloud * 0.6)
 	var env := world_environment.environment
-	env.ambient_light_color = _ambient_colors.sample(t)
-	env.ambient_light_energy = lerpf(night_ambient_energy, day_ambient_energy, daylight)
+	env.ambient_light_color = _ambient_colors.sample(t).lerp(overcast, cloud * 0.35)
+	env.ambient_light_energy = lerpf(night_ambient_energy, day_ambient_energy, daylight) * (1.0 + cloud * 0.18)
 	env.fog_light_color = horizon.lerp(zenith, 0.35)
+	if in_game:
+		if _base_fog < 0.0:
+			_base_fog = env.fog_density
+			_base_fog_height = env.fog_height_density
+		var weather_fog := weather.get_value("fog") if weather else 1.0
+		var fog := float(Seasons.get_value("fog")) * weather_fog
+		# Dichter Nebel ist kühl-grau, nicht vom warmen Horizont gefärbt
+		var mist := clampf((weather_fog - 1.5) / 3.0, 0.0, 1.0)
+		env.fog_light_color = env.fog_light_color.lerp(Color(0.74, 0.77, 0.8) * lerpf(0.22, 1.0, daylight), mist * 0.75)
+		env.fog_density = _base_fog * fog
+		env.fog_height_density = _base_fog_height * clampf(fog, 0.5, 2.5)
+		_cloud_drift += get_process_delta_time() * (0.004 + (weather.get_value("wind") if weather else 0.3) * 0.02)
 
 	var sky_material: ShaderMaterial = env.sky.sky_material as ShaderMaterial if env.sky else null
 	if sky_material:
+		var stars := weather.get_value("stars") if weather and in_game else 1.0
 		sky_material.set_shader_parameter(&"zenith_color", zenith)
 		sky_material.set_shader_parameter(&"horizon_color", horizon)
 		sky_material.set_shader_parameter(&"ground_color", horizon.darkened(0.55))
 		sky_material.set_shader_parameter(&"sun_direction", sun_dir)
-		sky_material.set_shader_parameter(&"sun_color", sun.light_color)
+		sky_material.set_shader_parameter(&"sun_color", sun.light_color * lerpf(1.0, 0.4, cloud))
 		sky_material.set_shader_parameter(&"moon_direction", moon_dir)
-		sky_material.set_shader_parameter(&"star_intensity", 1.0 - smoothstep(-0.2, 0.05, sun_dir.y))
+		sky_material.set_shader_parameter(&"star_intensity", (1.0 - smoothstep(-0.2, 0.05, sun_dir.y)) * clampf(stars, 0.0, 1.4))
+		sky_material.set_shader_parameter(&"cloud_cover", cloud)
+		sky_material.set_shader_parameter(&"cloud_drift", _cloud_drift)
+		sky_material.set_shader_parameter(&"cloud_light", _horizon_colors.sample(t).lerp(Color(0.86, 0.87, 0.9), 0.4) * lerpf(0.18, 1.0, daylight))
+
+
+## Uhrzeit → "Winter-Uhrzeit": Sonnenaufgang wird 7 Uhr, Sonnenuntergang 17 Uhr.
+func _winter_hour(hour: float) -> float:
+	var h := fposmod(hour, 24.0)
+	var rise := _sunrise()
+	var set_hour := _sunset()
+	var w_rise := GameDefs.SUNRISE_HOUR
+	var w_set := GameDefs.SUNSET_HOUR
+	if h >= rise and h <= set_hour:
+		return w_rise + (h - rise) / (set_hour - rise) * (w_set - w_rise)
+	var night := fposmod(h - set_hour, 24.0) / (24.0 - (set_hour - rise))
+	return fposmod(w_set + night * (24.0 - (w_set - w_rise)), 24.0)
+
+
+func _sunrise() -> float:
+	return GameDefs.SUNRISE_HOUR if Engine.is_editor_hint() else WorldClock.get_sunrise()
+
+
+func _sunset() -> float:
+	return GameDefs.SUNSET_HOUR if Engine.is_editor_hint() else WorldClock.get_sunset()
 
 
 ## Position auf der Himmelsbahn: 0..PI am Tag (Aufgang → Untergang),
 ## PI..TAU in der Nacht. Tag und Nacht dürfen unterschiedlich lang sein.
 func _celestial_angle(hour: float) -> float:
 	var h := fposmod(hour, 24.0)
-	var rise := GameDefs.SUNRISE_HOUR
-	var set_hour := GameDefs.SUNSET_HOUR
+	var rise := _sunrise()
+	var set_hour := _sunset()
 	var day_length := set_hour - rise
 	if h >= rise and h <= set_hour:
 		return (h - rise) / day_length * PI
@@ -110,8 +166,13 @@ func _sky_direction(angle: float, max_elevation_deg: float) -> Vector3:
 	return Vector3(cos(elevation) * sin(azimuth), sin(elevation), cos(elevation) * cos(azimuth))
 
 
+## Richtet ein Himmelslicht aus – in kleinen Schritten statt jedes Bild: Ein
+## ständig minimal wanderndes Licht lässt die Schattenkanten flimmern
+## ("Schattenkriechen"). Schritte unter [constant LIGHT_STEP] werden ausgelassen.
 func _orient_light(light: DirectionalLight3D, direction_to_light: Vector3) -> void:
-	light.basis = Basis.looking_at(-direction_to_light, Vector3.UP)
+	var current := light.basis.z
+	if Engine.is_editor_hint() or current.angle_to(direction_to_light) > LIGHT_STEP:
+		light.basis = Basis.looking_at(-direction_to_light, Vector3.UP)
 
 
 func _build_gradients() -> void:

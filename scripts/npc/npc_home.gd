@@ -11,7 +11,7 @@ extends Node3D
 const GROUP := &"npc_home"
 const WOOD := Color(0.52, 0.34, 0.2)
 const WOOD_DARK := Color(0.4, 0.26, 0.16)
-const SNOW := Color(0.9, 0.93, 0.97)
+const SNOW := Color(0.9, 0.93, 0.97, 0.5)
 const MAILBOX := Color(0.72, 0.22, 0.18)
 const IRON := Color(0.18, 0.18, 0.2)
 

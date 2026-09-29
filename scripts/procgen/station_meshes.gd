@@ -11,7 +11,7 @@ const PAVING_DARK := Color(0.6, 0.56, 0.51)
 const EDGE_STONE := Color(0.8, 0.77, 0.72)
 const WALL := Color(0.55, 0.5, 0.46)
 const SAFETY_LINE := Color(0.93, 0.90, 0.80)
-const SNOW := Color(0.88, 0.91, 0.95)
+const SNOW := Color(0.88, 0.91, 0.95, 0.5)
 const WOOD := Color(0.56, 0.37, 0.23)
 const IRON := Color(0.18, 0.18, 0.20)
 const SIGN_GREEN := Color(0.14, 0.27, 0.22)
@@ -55,7 +55,7 @@ static func create_platform(length: float, width: float, height: float, rng: Ran
 				continue
 			var color := PAVING if rng.randf() < 0.55 else PAVING_DARK
 			if rng.randf() < 0.07:
-				color = SNOW
+				color = Color(SNOW, 0.75)
 			LowPolyBuilder.add_quad_facing(st, Vector3(xa, height, za), Vector3(xb, height, za),
 				Vector3(xb, height, zb), Vector3(xa, height, zb), _vary(color, rng, 0.02), Vector3.UP)
 
@@ -163,4 +163,4 @@ static func add_canopy(st: SurfaceTool, center: Vector3, length: float, width: f
 
 static func _vary(color: Color, rng: RandomNumberGenerator, amount := 0.025) -> Color:
 	var v := rng.randf_range(-amount, amount)
-	return Color(color.r + v, color.g + v, color.b + v)
+	return Color(color.r + v, color.g + v, color.b + v, color.a)

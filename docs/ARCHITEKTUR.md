@@ -42,6 +42,8 @@ Main (main.gd)                    – Spawn, Zeitraffer, Schnellspeichern
 | `GameInput` | Trägt die Tasten aus `InputConfig` in die Input Map ein; Mausfang, Vollbild |
 | `WorldClock` | Tageszeit, Tage, Zeitraffer |
 | `SaveManager` | Speichert alle Nodes der Gruppe `saveable` als JSON nach `user://saves/` (Format-Version 2) |
+| `Economy` | Geld, Lager, Reservierungen, Kassenbuch (Etappe 8) |
+| `Seasons` | Jahreslauf: Frühling, Sommer, Herbst, Winter; setzt die Shader-Globals (Etappe 9) |
 
 Dazu: `InputConfig` (alle Tasten, Werkzeuge und Legenden an einer Stelle), `GameDefs` (Enums, Physik-Ebenen), `SaveUtils`.
 
@@ -244,3 +246,13 @@ Ausführlich in [WIRTSCHAFT.md](WIRTSCHAFT.md) (Architektur, Materialfluss, Kost
   - `VillageHouse`: Bauzustand; `NpcRoutine`: `STROLL`; `Npc`: Spaziergang, Ankunft mit dem Zug, Lieblingsweg.
   - HUD: Gemeindekasse neben der Uhr, Notizbuch-Knopf, Kostenzeile; `InputConfig`: Taste N.
 - `tests/economy_test.*`: neue Prüfungen für Etappe 8.
+
+## Etappe 9: Jahreszeiten, Wetter und gemütlicher Welt-Feinschliff
+
+Ausführlich in [JAHRESZEITEN.md](JAHRESZEITEN.md) (Jahreslauf, Wetter, Schnee-Merker, Wege-Materialien, Fehlerliste). Kurz:
+
+- **Neu:** Autoload `Seasons` (Taste J), Node `Weather` (`WeatherSystem`, Taste K), `Rainfall`, `World/Footprints`, `LampSway`; Shader `world_vertex`, `path`, `ice_lake`, `train_paint`, Include `world_snow.gdshaderinc`; Wege-Materialien `path_gravel/stone/road.tres`.
+- **Shader-Globals** (Projekt → Shader-Globals): `snow_cover`, `season_grass`, `season_bare`, `foliage_autumn`, `foliage_spring`, `wind_strength`, `wetness`. Alle Welt-Shader lesen sie; nur `Seasons` und `WeatherSystem` schreiben sie.
+- **Schnee-Merker im Alpha-Kanal der Vertexfarbe:** < 0.6 Schneeauflage (taut weg), < 0.9 Bodenschnee (wird Erde), sonst normale Farbe. Das Gelände nutzt denselben Kanal für Schnee/Erde/Fels.
+- **Erweiterungen bestehender Systeme (nichts neu geschrieben):** `DayNightCycle` (Tageslänge, Sonnenhöhe, Farbton, Wolken, Nebel je Jahreszeit und Wetter), `WorldClock` (Dämmerung nach Jahreszeit), `Snowfall` (Stärke/Wind vom Wetter), `AmbientSoundscape` (Wetter- und Jahreszeitenklänge), `PathMeshes` (neue Geometrie, gleiche Schnittstelle), `VillageObject`/`StationProp` (Wintersachen), `VillageVisual` (Funken, schwingende Laternen).
+- `tests/world_test.*`: neue Prüfungen für Etappe 9.

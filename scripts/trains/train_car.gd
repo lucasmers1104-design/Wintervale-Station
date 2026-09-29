@@ -233,10 +233,10 @@ func set_light_level(dark: bool) -> void:
 		_tail_glow.light_energy = 0.6 if dark else 0.15
 
 
-## Aufgewirbelter Schnee an der Lok – nur bei zügiger Fahrt.
+## Aufgewirbelter Schnee an der Lok – nur bei zügiger Fahrt und nur, wenn Schnee liegt.
 func set_snow_spray(speed: float) -> void:
 	if _snow:
-		_snow.emitting = speed > 4.0
+		_snow.emitting = speed > 4.0 and Seasons.get_snow_cover() > 0.3
 		_snow.amount_ratio = clampf((speed - 4.0) / 10.0, 0.1, 1.0)
 
 

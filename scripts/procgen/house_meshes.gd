@@ -31,8 +31,8 @@ const CAPACITY := {
 	"cottage": 1, "chalet": 2, "townhouse": 2, "farmhouse": 3, "tower": 2, "aframe": 1, "barn": 2, "villa": 3,
 }
 
-const SNOW := Color(0.92, 0.94, 0.98)
-const SNOW_SHADE := Color(0.82, 0.86, 0.93)
+const SNOW := Color(0.92, 0.94, 0.98, 0.5)
+const SNOW_SHADE := Color(0.82, 0.86, 0.93, 0.5)
 const TIMBER := Color(0.36, 0.24, 0.16)
 const TRIM := Color(0.93, 0.89, 0.8)
 const STONE := Color(0.55, 0.52, 0.5)
@@ -42,7 +42,7 @@ const DOOR_WOOD := Color(0.46, 0.28, 0.18)
 const BRASS := Color(0.85, 0.66, 0.3)
 const GREEN := Color(0.17, 0.35, 0.26)
 const BERRY := Color(0.78, 0.13, 0.12)
-const ICE := Color(0.82, 0.9, 0.98)
+const ICE := Color(0.82, 0.9, 0.98, 0.5)
 
 ## Farbpaletten: Wand, Dach, Fensterläden, Tür.
 const PALETTES := [
@@ -289,7 +289,7 @@ class _Builder:
 
 	func vary(color: Color, amount := 0.03) -> Color:
 		var v := rng.randf_range(-amount, amount)
-		return Color(color.r + v, color.g + v, color.b + v)
+		return Color(color.r + v, color.g + v, color.b + v, color.a)
 
 	# Wände und Sockel -------------------------------------------------------
 

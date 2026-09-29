@@ -8,8 +8,8 @@
 class_name VillageMeshes
 extends RefCounted
 
-const SNOW := Color(0.92, 0.94, 0.98)
-const SNOW_SHADE := Color(0.82, 0.86, 0.93)
+const SNOW := Color(0.92, 0.94, 0.98, 0.5)
+const SNOW_SHADE := Color(0.82, 0.86, 0.93, 0.5)
 const NEEDLES := Color(0.15, 0.33, 0.27)
 const NEEDLES_DARK := Color(0.1, 0.24, 0.21)
 const NEEDLES_LIGHT := Color(0.24, 0.43, 0.3)
@@ -166,6 +166,11 @@ static func bush_juniper(st: SurfaceTool, rng: RandomNumberGenerator) -> void:
 
 ## Eingeschneiter Busch: ein Schneehügel, aus dem Zweige ragen.
 static func bush_snowy(st: SurfaceTool, rng: RandomNumberGenerator) -> void:
+	# Unter dem Schnee ein Busch (kommt im Frühling zum Vorschein). Gleiche Zufallsform,
+	# nur kleiner – so schaut der Busch im Winter nirgends durch die Schneehaube.
+	var shape_state := rng.state
+	LowPolyBuilder.add_rock(st, rng, Vector3(0, 0.15, 0), 0.66, NEEDLES_DARK, NEEDLES_DARK.lightened(0.1), 4, 8)
+	rng.state = shape_state
 	LowPolyBuilder.add_rock(st, rng, Vector3(0, 0.15, 0), 0.75, SNOW_SHADE, SNOW, 4, 8)
 	for i in 10:
 		var angle := rng.randf() * TAU
@@ -255,7 +260,9 @@ static func garden_lamp(st: SurfaceTool, glow: SurfaceTool) -> Vector3:
 
 
 ## Straßenlaterne mit geschwungenem Arm und hängender Leuchte. Rückgabe: Lichtpunkt.
-static func street_lamp(st: SurfaceTool, glow: SurfaceTool) -> Vector3:
+## Mit [param head]/[param head_glow] landet der hängende Lampenkopf in eigenen
+## Meshes (er schwingt im Wind um [method street_lamp_pivot]).
+static func street_lamp(st: SurfaceTool, glow: SurfaceTool, head: SurfaceTool = null, head_glow: SurfaceTool = null) -> Vector3:
 	LowPolyBuilder.add_cylinder(st, Vector3.ZERO, 0.2, 0.16, 0.4, 8, IRON)
 	LowPolyBuilder.add_cylinder(st, Vector3(0, 0.4, 0), 0.08, 0.06, 3.3, 8, IRON)
 	LowPolyBuilder.add_cylinder(st, Vector3(0, 1.2, 0), 0.1, 0.1, 0.12, 8, IRON)
@@ -268,11 +275,13 @@ static func street_lamp(st: SurfaceTool, glow: SurfaceTool) -> Vector3:
 		previous = p
 	LowPolyBuilder.add_cone(st, Vector3(0, 3.72, 0), 0.1, 0.25, 6, IRON)
 	var lamp := Vector3(0, 3.25, -0.95)
-	LowPolyBuilder.add_cylinder_between(st, previous, lamp + Vector3(0, 0.3, 0), 0.02, 4, IRON)
-	LowPolyBuilder.add_cone(st, lamp + Vector3(0, 0.12, 0), 0.26, 0.2, 6, IRON)
-	LowPolyBuilder.add_cone(st, lamp + Vector3(0, 0.2, 0), 0.17, 0.1, 6, SNOW, 0.0, false)
-	LowPolyBuilder.add_cylinder(glow, lamp + Vector3(0, -0.2, 0), 0.1, 0.17, 0.32, 6, GLASS_WARM)
-	LowPolyBuilder.add_cylinder(st, lamp + Vector3(0, -0.24, 0), 0.08, 0.1, 0.05, 6, IRON)
+	var part := head if head else st
+	var part_glow := head_glow if head_glow else glow
+	LowPolyBuilder.add_cylinder_between(part, previous, lamp + Vector3(0, 0.3, 0), 0.02, 4, IRON)
+	LowPolyBuilder.add_cone(part, lamp + Vector3(0, 0.12, 0), 0.26, 0.2, 6, IRON)
+	LowPolyBuilder.add_cone(part, lamp + Vector3(0, 0.2, 0), 0.17, 0.1, 6, SNOW, 0.0, false)
+	LowPolyBuilder.add_cylinder(part_glow, lamp + Vector3(0, -0.2, 0), 0.1, 0.17, 0.32, 6, GLASS_WARM)
+	LowPolyBuilder.add_cylinder(part, lamp + Vector3(0, -0.24, 0), 0.08, 0.1, 0.05, 6, IRON)
 	return lamp + Vector3(0, -0.15, 0)
 
 
@@ -419,7 +428,7 @@ static func plaza(st: SurfaceTool, glow: SurfaceTool, rng: RandomNumberGenerator
 			if r == rings - 1:
 				color = Color(0.5, 0.46, 0.43)
 			if rng.randf() < 0.12:
-				color = SNOW_SHADE
+				color = Color(SNOW_SHADE, 0.75)
 			var p00 := Vector3(cos(a0) * r0, 0.06, sin(a0) * r0)
 			var p01 := Vector3(cos(a1) * r0, 0.06, sin(a1) * r0)
 			var p10 := Vector3(cos(a0) * r1, 0.06, sin(a0) * r1)
@@ -513,6 +522,18 @@ static func fence(st: SurfaceTool, length: float, rng: RandomNumberGenerator) ->
 		LowPolyBuilder.add_box(st, Vector3(x, h * 0.5, 0.1), Vector3(0.1, h, 0.03), WOOD.lerp(WOOD_DARK, rng.randf() * 0.3))
 		LowPolyBuilder.add_cone(st, Vector3(x, h, 0.1), 0.07, 0.08, 4, SNOW, PI * 0.25, false)
 		x += 0.22
+	# Am Zaun sammelt sich der Schnee: eine weiche Wehe auf der Windseite
+	var drift_x := 0.0
+	var previous_h := 0.1
+	while drift_x < length - 0.01:
+		var next_x := minf(drift_x + 0.5, length)
+		var next_h := 0.12 + rng.randf() * 0.12 if next_x < length - 0.01 else 0.06
+		LowPolyBuilder.add_quad_facing(st, Vector3(drift_x, previous_h, 0.14), Vector3(next_x, next_h, 0.14),
+			Vector3(next_x, -0.02, 0.62), Vector3(drift_x, -0.02, 0.62), SNOW, Vector3(0, 1, 0.4))
+		LowPolyBuilder.add_quad_facing(st, Vector3(drift_x, -0.02, -0.05), Vector3(next_x, -0.02, -0.05),
+			Vector3(next_x, next_h * 0.6, 0.14), Vector3(drift_x, previous_h * 0.6, 0.14), SNOW_SHADE, Vector3(0, 1, -0.4))
+		drift_x = next_x
+		previous_h = next_h
 
 
 ## Hecke von 0 bis [param length] entlang X: kastenförmig, weich, mit Schnee obenauf.
@@ -546,3 +567,8 @@ static func _colored_box(st: SurfaceTool, center: Vector3, size: Vector3, color:
 
 static func _colored_beam(st: SurfaceTool, a: Vector3, b: Vector3, thickness: float, color: Color) -> void:
 	LowPolyBuilder.add_beam(st, a, b, thickness, color)
+
+
+## Aufhängepunkt des schwingenden Lampenkopfs der Straßenlaterne (Ende des Arms).
+static func street_lamp_pivot() -> Vector3:
+	return Vector3(0, 3.6, -0.95)

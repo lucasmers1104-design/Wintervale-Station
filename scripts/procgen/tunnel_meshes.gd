@@ -14,8 +14,8 @@ const STONE := Color(0.60, 0.55, 0.49)
 const STONE_DARK := Color(0.48, 0.44, 0.40)
 const KEYSTONE := Color(0.70, 0.62, 0.52)
 const DARK := Color(0.03, 0.03, 0.035)
-const SNOW := Color(0.9, 0.93, 0.97)
-const SNOW_SHADE := Color(0.82, 0.86, 0.93)
+const SNOW := Color(0.9, 0.93, 0.97, 0.5)
+const SNOW_SHADE := Color(0.82, 0.86, 0.93, 0.5)
 const ROCK := Color(0.47, 0.44, 0.44)
 const ROCK_DARK := Color(0.36, 0.34, 0.36)
 
@@ -138,9 +138,9 @@ static func create_mound(tunnel_length: float, noise_seed: int) -> ArrayMesh:
 					normal = -normal
 				var color := ROCK_DARK
 				if normal.y > 0.86:
-					color = SNOW
+					color = Color(SNOW, 0.75)
 				elif normal.y > 0.74:
-					color = SNOW_SHADE
+					color = Color(SNOW_SHADE, 0.75)
 				elif normal.y > 0.5:
 					color = ROCK
 				color = color.lightened(jitter.randf_range(-0.025, 0.025))

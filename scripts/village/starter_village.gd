@@ -47,6 +47,9 @@ static func build(village: VillageManager) -> void:
 	_point(village, "street_lamp", Vector3(-50.5, 0, STREET_Z + 2.4), 0.0)
 	# Lichterkette nördlich des Dorfplatzes
 	_line(village, "string_lights", Vector3(-33.0, 0, -3.3), Vector3(-21.0, 0, -3.3))
+	# Lichterketten zwischen den Häusern (Etappe 9): Sommer–Kellner und Hofer–Winter
+	_line(village, "string_lights", Vector3(-44.5, 0, 8.2), Vector3(-40.8, 0, 8.2))
+	_line(village, "string_lights", Vector3(-32.8, 0, 17.4), Vector3(-26.5, 0, 17.4))
 	# Gärten: Zäune, Hecken, Beete, Gartenlampen
 	_line(village, "fence", Vector3(-18.6, 0, 5.8), Vector3(-16.1, 0, 5.8))
 	_line(village, "fence", Vector3(-13.9, 0, 5.8), Vector3(-11.6, 0, 5.8))

@@ -37,6 +37,21 @@ func _ready() -> void:
 		add_to_group(RAIL_ALIGNED_GROUP)
 	add_to_group(PropScatter.GROUP_CLEARING)
 	rebuild()
+	set_process(kind == Kind.SNOW_BANK and not Engine.is_editor_hint())
+
+
+## Schneebänke tauen mit den Jahreszeiten (das Mesh schmilzt im Shader, hier
+## verschwindet auch die Kollision – sonst liefe man im Sommer gegen Unsichtbares).
+var _melt_timer := 0.0
+
+
+func _process(delta: float) -> void:
+	_melt_timer -= delta
+	if _melt_timer <= 0.0:
+		_melt_timer = 1.0
+		var layer := GameDefs.LAYER_OBJECTS if Seasons.get_snow_cover() > 0.3 else 0
+		if collision_layer != layer:
+			collision_layer = layer
 
 
 ## Bohlenübergang: exakt auf die Höhe des Gleises darunter setzen.

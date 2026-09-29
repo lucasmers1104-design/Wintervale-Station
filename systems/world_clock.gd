@@ -133,5 +133,16 @@ func _emit_changes() -> void:
 
 
 func _compute_dark() -> bool:
-	return time_of_day < GameDefs.SUNRISE_HOUR + LIGHTS_MARGIN_HOURS \
-		or time_of_day > GameDefs.SUNSET_HOUR - LIGHTS_MARGIN_HOURS
+	return time_of_day < get_sunrise() + LIGHTS_MARGIN_HOURS \
+		or time_of_day > get_sunset() - LIGHTS_MARGIN_HOURS
+
+
+## Sonnenaufgang und -untergang (Stunden) – je nach Jahreszeit ("Seasons"), sonst Winter.
+func get_sunrise() -> float:
+	var seasons := get_node_or_null(^"/root/Seasons")
+	return float(seasons.call(&"get_sunrise")) if seasons else GameDefs.SUNRISE_HOUR
+
+
+func get_sunset() -> float:
+	var seasons := get_node_or_null(^"/root/Seasons")
+	return float(seasons.call(&"get_sunset")) if seasons else GameDefs.SUNSET_HOUR

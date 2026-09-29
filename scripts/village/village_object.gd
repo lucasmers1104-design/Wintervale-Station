@@ -46,6 +46,46 @@ func _ready() -> void:
 	_add_collision(length)
 	_add_signs()
 	_add_seats()
+	if bool(VillageCatalog.get_item(item_id).get("winter_only", false)):
+		set_process(true)
+		_update_winter(true)
+	else:
+		set_process(false)
+
+
+## Nur im Winter da (Schneemann, Schlitten): taut die Schneedecke, sinkt er
+## sanft zusammen und verschwindet samt Kollision; im nächsten Winter ist er wieder da.
+var _winter_visible := true
+var _winter_timer := 0.0
+
+
+func _process(delta: float) -> void:
+	_winter_timer -= delta
+	if _winter_timer <= 0.0:
+		_winter_timer = 1.0
+		_update_winter(false)
+
+
+func _update_winter(instant: bool) -> void:
+	var show := Seasons.get_snow_cover() > 0.45
+	if show == _winter_visible and not instant:
+		return
+	_winter_visible = show
+	collision_layer = GameDefs.LAYER_OBJECTS if show else 0
+	if instant or not is_inside_tree():
+		visible = show
+		scale = Vector3.ONE
+		return
+	visible = true
+	var tween := create_tween()
+	tween.tween_property(self, "scale", Vector3(1.0, 1.0, 1.0) if show else Vector3(1.0, 0.05, 1.0), 1.5) \
+		.from(Vector3(1.0, 0.05, 1.0) if show else Vector3.ONE).set_trans(Tween.TRANS_SINE)
+	if not show:
+		tween.tween_callback(hide)
+
+
+func is_winter_visible() -> bool:
+	return _winter_visible
 
 
 func get_data() -> Dictionary:

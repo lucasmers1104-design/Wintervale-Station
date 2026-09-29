@@ -56,6 +56,8 @@ Voraussetzung: Eine Grafikkarte mit aktuellem Vulkan-Treiber (Forward+).
 |---|---|
 | N | Notizbuch – auch über den Knopf neben der Uhr |
 | T | Zeitraffer (×1 → ×10 → ×60) |
+| J | Nächste Jahreszeit (blendet in ein paar Sekunden über) |
+| K | Wetter wechseln (sonnig, bewölkt, leichter/starker Schnee, klarer Winterabend, Regen, Nebel) |
 | F5 / F9 | Schnellspeichern / Schnellladen |
 | F1 | Tastenlegende ein-/ausklappen |
 | F11 | Vollbild |
@@ -69,6 +71,7 @@ godot --headless --path . --fixed-fps 60 res://tests/train_test.tscn
 godot --headless --path . --fixed-fps 60 res://tests/npc_test.tscn
 godot --headless --path . --fixed-fps 60 res://tests/village_test.tscn
 godot --headless --path . --fixed-fps 60 res://tests/economy_test.tscn
+godot --headless --path . --fixed-fps 60 res://tests/world_test.tscn
 ```
 
 Exit-Code 0 = alle Prüfungen bestanden.
@@ -81,4 +84,5 @@ Exit-Code 0 = alle Prüfungen bestanden.
 - [docs/DORF.md](docs/DORF.md) – Dorf, Häuser, Wege, Bauen, Bewohner neuer Häuser
 - [docs/POLISH.md](docs/POLISH.md) – Etappe 7: behobene Fehler, Verbesserungen, Performance
 - [docs/WIRTSCHAFT.md](docs/WIRTSCHAFT.md) – Etappe 8: Güterbahnhof, Materialien, Güterzüge, Bauprojekte, Bewohner, Notizbuch, Fehlerliste
+- [docs/JAHRESZEITEN.md](docs/JAHRESZEITEN.md) – Etappe 9: Jahreszeiten, Wetter, Wege-Materialien, Schnee, Fehlerliste
 - [CLAUDE.md](CLAUDE.md) – Projektregeln & Vision

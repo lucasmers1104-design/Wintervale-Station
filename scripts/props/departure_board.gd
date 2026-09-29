@@ -131,8 +131,6 @@ func _box(center: Vector3, size: Vector3, material: Material) -> void:
 	add_child(instance)
 
 
-func _snow_material() -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.9, 0.93, 0.97)
-	material.roughness = 1.0
-	return material
+## Schneekappe auf dem Dach der Anzeige (Schneeauflage: taut mit den Jahreszeiten).
+func _snow_material() -> Material:
+	return preload("res://assets/materials/snow.tres")

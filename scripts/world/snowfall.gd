@@ -20,7 +20,7 @@ var _noise := FastNoiseLite.new()
 func _ready() -> void:
 	_noise.seed = weather_seed
 	_noise.frequency = 1.0
-	amount = 1400
+	amount = 2200
 	lifetime = 9.0
 	preprocess = 9.0
 	local_coords = false
@@ -29,7 +29,8 @@ func _ready() -> void:
 
 	var process := ParticleProcessMaterial.new()
 	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	process.emission_box_extents = Vector3(32.0, 1.0, 32.0)
+	# Hoher Kasten: Flocken entstehen in allen Höhen, das Bild ist sofort gefüllt
+	process.emission_box_extents = Vector3(32.0, 12.0, 32.0)
 	process.direction = Vector3(0.2, -1.0, 0.1)
 	process.spread = 12.0
 	process.initial_velocity_min = 1.4
@@ -51,6 +52,9 @@ func _ready() -> void:
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	material.albedo_color = Color(1.0, 1.0, 1.0, 0.85)
+	# Kein Nebel auf den Flocken: sie fallen nah vor der Kamera und sollen
+	# auch bei dichtem Schneetreiben sichtbar bleiben (sonst verschwinden sie im Grau).
+	material.disable_fog = true
 	material.albedo_texture = _flake_texture()
 	flake.material = material
 	draw_pass_1 = flake
@@ -59,10 +63,40 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	var camera := get_viewport().get_camera_3d()
 	if camera:
-		global_position = camera.global_position + Vector3(0.0, 14.0, 0.0)
-	intensity = get_weather_intensity(WorldClock.day + WorldClock.time_of_day / 24.0)
-	amount_ratio = intensity * max_intensity
+		# Etwas vor der Kamera, damit die Flocken im Bild fallen. Aus der
+		# Vogelperspektive (hohe Kamera) werden sie größer, sonst sähe man sie nicht.
+		var forward := -camera.global_basis.z
+		global_position = camera.global_position + forward * 12.0 + Vector3(0.0, 6.0, 0.0)
+		# Hohe Kamera: größere, dafür weniger Flocken (große halbtransparente Flächen kosten Leistung)
+		_height_factor = clampf((camera.global_position.y - 4.0) / 16.0, 0.0, 1.0)
+		var size := 0.08 * lerpf(1.0, 3.0, _height_factor)
+		var flake := draw_pass_1 as QuadMesh
+		if flake and absf(flake.size.x - size) > size * 0.05:
+			flake.size = Vector2(size, size)
+	if _weather_intensity >= 0.0:
+		intensity = _weather_intensity
+	else:
+		intensity = get_weather_intensity(WorldClock.day + WorldClock.time_of_day / 24.0)
+	amount_ratio = intensity * max_intensity * lerpf(1.0, 0.5, _height_factor)
 	emitting = amount_ratio > 0.02
+
+
+## Das Wettersystem gibt Stärke (0..1) und Wind vor: Bei starkem Schneefall
+## fallen die Flocken schneller und treiben schräg im Wind.
+func set_weather(strength: float, wind: float) -> void:
+	_weather_intensity = clampf(strength, 0.0, 1.0)
+	var process := process_material as ParticleProcessMaterial
+	if process and absf(wind - _wind) > 0.02:
+		_wind = wind
+		process.direction = Vector3(0.2 + wind * 1.4, -1.0, 0.1 + wind * 0.4)
+		process.initial_velocity_min = 1.4 + wind * 1.2
+		process.initial_velocity_max = 2.2 + wind * 2.0
+		process.turbulence_influence_max = 0.15 + wind * 0.2
+
+
+var _weather_intensity := -1.0
+var _height_factor := 0.0
+var _wind := -1.0
 
 
 ## Schneefall-Stärke (0..1) zu einem Zeitpunkt (Tage als Kommazahl).

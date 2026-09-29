@@ -24,7 +24,12 @@ static func get_sound(sound_name: String) -> AudioStreamWAV:
 		# step_snow_0 … step_snow_2, step_stone_0 … step_stone_2
 		var parts := sound_name.split("_")
 		var variant := int(parts[2]) if parts.size() > 2 else 0
-		stream = _wood_step(variant) if parts[1] == "wood" else _step(parts[1] == "snow", variant)
+		if parts[1] == "wood":
+			stream = _wood_step(variant)
+		elif parts[1] == "grass":
+			stream = _grass_step(variant)
+		else:
+			stream = _step(parts[1] == "snow", variant)
 		_cache[sound_name] = stream
 		return stream
 	match sound_name:
@@ -74,6 +79,22 @@ static func get_sound(sound_name: String) -> AudioStreamWAV:
 			stream = _page()
 		"done_chime":
 			stream = _done_chime()
+		"tree_wind":
+			stream = _tree_wind()
+		"snow_hiss":
+			stream = _snow_hiss()
+		"rain_roof":
+			stream = _rain_roof()
+		"fireplace":
+			stream = _fireplace()
+		"church_bell":
+			stream = _church_bell()
+		"fog_horn":
+			stream = _fog_horn()
+		"crickets":
+			stream = _crickets()
+		"winter_bird_0", "winter_bird_1":
+			stream = _winter_bird(int(sound_name.right(1)))
 		_:
 			push_warning("SoundLibrary: Unbekannter Klang '%s'." % sound_name)
 			stream = _to_wav(PackedFloat32Array([0.0]))
@@ -413,6 +434,22 @@ static func _wood_step(variant: int) -> AudioStreamWAV:
 	return _to_wav(samples)
 
 
+## Schritt auf Wiese: weiches Rascheln von Gras mit dumpfem Auftreten.
+static func _grass_step(variant: int) -> AudioStreamWAV:
+	var rng := _rng(151 + variant * 19)
+	var samples := _silence(0.24)
+	var band := 0.0
+	for i in samples.size():
+		var t := float(i) / MIX_RATE
+		var white := rng.randf_range(-1.0, 1.0)
+		band += 0.4 * (white - band)
+		var rustle := (white - band * 0.7) * exp(-t * 16.0) * (0.7 + 0.3 * sin(TAU * 60.0 * t))
+		var thud := sin(TAU * (90.0 + variant * 8.0) * t) * exp(-t * 30.0)
+		samples[i] = rustle * 0.6 + thud * 0.5
+	_normalize(samples, 0.22)
+	return _to_wav(samples)
+
+
 ## Holzknarren (Bank beim Hinsetzen): langsam gleitender, rauer Ton.
 static func _creak() -> AudioStreamWAV:
 	var rng := _rng(137)
@@ -587,6 +624,178 @@ static func _done_chime() -> AudioStreamWAV:
 			var bell := sin(TAU * frequency * t) + 0.35 * sin(TAU * frequency * 2.76 * t) * exp(-t * 4.0)
 			samples[start + j] += bell * exp(-t * 2.6) * smoothstep(0.0, 0.01, t)
 	_normalize(samples, 0.35)
+	return _to_wav(samples)
+
+
+# --- Wetter und Umgebung (Etappe 9) --------------------------------------------------
+
+## Wind in den Bäumen: helles, böiges Rauschen von Nadeln und Blättern. Schleife (6 s).
+static func _tree_wind() -> AudioStreamWAV:
+	var rng := _rng(301)
+	var length := int(MIX_RATE * 6.0)
+	var fade := int(MIX_RATE * 0.8)
+	var raw := PackedFloat32Array()
+	raw.resize(length + fade)
+	var low := 0.0
+	var high := 0.0
+	for i in raw.size():
+		var t := float(i) / MIX_RATE
+		var white := rng.randf_range(-1.0, 1.0)
+		low += 0.08 * (white - low)
+		high = white - low
+		var gust := 0.55 + 0.3 * sin(TAU * 0.21 * t) + 0.15 * sin(TAU * 0.53 * t + 1.3)
+		var flutter := 0.8 + 0.2 * sin(TAU * 7.0 * t + sin(TAU * 0.4 * t) * 3.0)
+		raw[i] = (high * 0.45 + low * 0.35) * gust * flutter
+	var samples := _crossfade_loop(raw, length, fade)
+	_normalize(samples, 0.25)
+	return _to_wav(samples, true)
+
+
+## Rieselnder Schnee: ganz leises, weiches Flüstern. Schleife (5 s).
+static func _snow_hiss() -> AudioStreamWAV:
+	var rng := _rng(307)
+	var length := int(MIX_RATE * 5.0)
+	var fade := int(MIX_RATE * 0.6)
+	var raw := PackedFloat32Array()
+	raw.resize(length + fade)
+	var band := 0.0
+	var low := 0.0
+	for i in raw.size():
+		var white := rng.randf_range(-1.0, 1.0)
+		band += 0.35 * (white - band)
+		low += 0.02 * (band - low)
+		var tick := (rng.randf_range(-1.0, 1.0) * 0.6) if rng.randf() < 0.002 else 0.0
+		raw[i] = (band - low) * 0.5 + tick
+	var samples := _crossfade_loop(raw, length, fade)
+	_normalize(samples, 0.16)
+	return _to_wav(samples, true)
+
+
+## Regen auf Dächern und Pflaster: viele kleine Tropfen plus gleichmäßiges Rauschen. Schleife (4 s).
+static func _rain_roof() -> AudioStreamWAV:
+	var rng := _rng(311)
+	var length := int(MIX_RATE * 4.0)
+	var fade := int(MIX_RATE * 0.5)
+	var raw := PackedFloat32Array()
+	raw.resize(length + fade)
+	var band := 0.0
+	var drop := 0.0
+	var drop_freq := 2000.0
+	var phase := 0.0
+	for i in raw.size():
+		var white := rng.randf_range(-1.0, 1.0)
+		band += 0.25 * (white - band)
+		if rng.randf() < 0.012:
+			drop = rng.randf_range(0.3, 1.0)
+			drop_freq = rng.randf_range(1400.0, 3600.0)
+		drop *= 0.992
+		phase += TAU * drop_freq / MIX_RATE
+		raw[i] = band * 0.45 + sin(phase) * drop * drop * 0.5
+	var samples := _crossfade_loop(raw, length, fade)
+	_normalize(samples, 0.24)
+	return _to_wav(samples, true)
+
+
+## Kaminfeuer: tiefes Grummeln der Flammen mit Knistern und einzelnen Knacken. Schleife (5 s).
+static func _fireplace() -> AudioStreamWAV:
+	var rng := _rng(313)
+	var length := int(MIX_RATE * 5.0)
+	var fade := int(MIX_RATE * 0.6)
+	var raw := PackedFloat32Array()
+	raw.resize(length + fade)
+	var rumble := 0.0
+	var crackle := 0.0
+	for i in raw.size():
+		var t := float(i) / MIX_RATE
+		var white := rng.randf_range(-1.0, 1.0)
+		rumble += 0.01 * (white - rumble)
+		if rng.randf() < 0.0012:
+			crackle = rng.randf_range(0.4, 1.0)
+		crackle *= 0.97
+		var pop := white * crackle
+		raw[i] = rumble * 3.0 * (0.8 + 0.2 * sin(TAU * 0.7 * t)) + pop * 0.7
+	var samples := _crossfade_loop(raw, length, fade)
+	_normalize(samples, 0.25)
+	return _to_wav(samples, true)
+
+
+## Ferne Kirchenglocke: ein Schlag mit unharmonischen Obertönen, langer Nachklang.
+static func _church_bell() -> AudioStreamWAV:
+	var duration := 4.5
+	var samples := _silence(duration)
+	var base := 294.0
+	var partials := [[0.5, 0.6, 1.2], [1.0, 1.0, 0.9], [1.19, 0.5, 1.6], [1.5, 0.45, 1.4], [2.0, 0.35, 2.0], [2.74, 0.2, 3.0]]
+	for i in samples.size():
+		var t := float(i) / MIX_RATE
+		var value := 0.0
+		for p: Array in partials:
+			value += sin(TAU * base * float(p[0]) * t) * float(p[1]) * exp(-t * float(p[2]) * 0.6)
+		samples[i] = value * smoothstep(0.0, 0.006, t)
+	_normalize(samples, 0.32)
+	return _to_wav(samples)
+
+
+## Nebelhorn eines fernen Zuges: tiefer, gedämpfter Doppelton mit Hall.
+static func _fog_horn() -> AudioStreamWAV:
+	var duration := 3.2
+	var samples := _silence(duration)
+	var smooth := 0.0
+	for i in samples.size():
+		var t := float(i) / MIX_RATE
+		var envelope := smoothstep(0.0, 0.25, t) * (1.0 - smoothstep(1.3, 2.0, t))
+		var value := sin(TAU * 196.0 * t) + 0.6 * sin(TAU * 247.0 * t) + 0.25 * sin(TAU * 392.0 * t)
+		smooth += 0.08 * (value * envelope - smooth)
+		samples[i] = smooth
+	# Einfacher Hall: verzögerte, leisere Kopien
+	for delay: float in [0.23, 0.41, 0.67]:
+		var offset := int(delay * MIX_RATE)
+		for i in range(samples.size() - 1, offset - 1, -1):
+			samples[i] += samples[i - offset] * (0.45 - delay * 0.4)
+	_normalize(samples, 0.3)
+	return _to_wav(samples)
+
+
+## Grillen in Sommernächten: zirpende Pulse, zwei Tiere im Wechsel. Schleife (4 s).
+static func _crickets() -> AudioStreamWAV:
+	var rng := _rng(331)
+	var length := int(MIX_RATE * 4.0)
+	var fade := int(MIX_RATE * 0.4)
+	var raw := PackedFloat32Array()
+	raw.resize(length + fade)
+	for i in raw.size():
+		var t := float(i) / MIX_RATE
+		var chirp_a := smoothstep(0.0, 0.01, fmod(t, 0.8)) * (1.0 - smoothstep(0.12, 0.2, fmod(t, 0.8)))
+		var chirp_b := smoothstep(0.0, 0.01, fmod(t + 0.37, 1.1)) * (1.0 - smoothstep(0.1, 0.16, fmod(t + 0.37, 1.1)))
+		var pulse := 0.5 + 0.5 * sin(TAU * 45.0 * t)
+		raw[i] = (sin(TAU * 4400.0 * t) * chirp_a + sin(TAU * 4900.0 * t) * chirp_b * 0.7) * pulse + rng.randf_range(-0.02, 0.02)
+	var samples := _crossfade_loop(raw, length, fade)
+	_normalize(samples, 0.12)
+	return _to_wav(samples, true)
+
+
+## Wintervögel: Meise ("zi-zi-bäh") und Rotkehlchen (perlende Strophe).
+static func _winter_bird(variant: int) -> AudioStreamWAV:
+	var rng := _rng(337 + variant)
+	var samples := _silence(1.4)
+	var notes: Array = [[0.0, 5200.0, 0.07], [0.14, 5200.0, 0.07], [0.3, 3600.0, 0.22]] if variant == 0 else []
+	if variant == 1:
+		var t0 := 0.0
+		for i in 9:
+			notes.append([t0, rng.randf_range(3800.0, 6200.0), rng.randf_range(0.04, 0.09)])
+			t0 += rng.randf_range(0.06, 0.13)
+	for note: Array in notes:
+		var start := int(float(note[0]) * MIX_RATE)
+		var length := int(float(note[2]) * MIX_RATE)
+		var phase := 0.0
+		for j in length:
+			var i := start + j
+			if i >= samples.size():
+				break
+			var k := float(j) / length
+			var frequency := float(note[1]) * (1.0 + 0.08 * sin(PI * k))
+			phase += TAU * frequency / MIX_RATE
+			samples[i] += sin(phase) * sin(PI * k)
+	_normalize(samples, 0.22)
 	return _to_wav(samples)
 
 

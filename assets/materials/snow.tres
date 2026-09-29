@@ -8,3 +8,4 @@ shader = ExtResource("1_flat")
 shader_parameter/albedo = Color(0.9, 0.93, 0.97, 1)
 shader_parameter/roughness = 1.0
 shader_parameter/metallic = 0.0
+shader_parameter/snow_layer = true

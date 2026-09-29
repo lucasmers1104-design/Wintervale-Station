@@ -9,6 +9,8 @@ const LIGHT_COLOR := Color(1.0, 0.72, 0.42)
 
 static var _smoke_process: ParticleProcessMaterial
 static var _smoke_mesh: QuadMesh
+static var _spark_process: ParticleProcessMaterial
+static var _spark_mesh: QuadMesh
 
 
 ## Hängt die Meshes von [param item_id] unter [param parent]. Mit [param preview]
@@ -38,6 +40,20 @@ static func attach(parent: Node3D, item_id: String, variant: int, length: float,
 			(bulbs as ShaderMaterial).set_shader_parameter(&"glow", 0.0)
 			result["string_glow"] = bulbs
 		_add(parent, data["bulbs"], bulbs, result)
+	# Hängender Lampenkopf: eigener Drehpunkt, schwingt leicht im Wind (Glas und Licht mit)
+	var swing: Node3D = null
+	if data.get("swing"):
+		var info: Dictionary = data["swing"]
+		swing = LampSway.new()
+		swing.name = "Swing"
+		swing.position = info["pivot"]
+		parent.add_child(swing)
+		var holder := Node3D.new()
+		holder.position = -(info["pivot"] as Vector3)
+		swing.add_child(holder)
+		_add(holder, info["body"], preview_material if preview else body_material, result)
+		_add(holder, info["glow"], preview_material if preview else VillageCatalog.GLOW_MATERIAL, result)
+		result["swing"] = swing
 	if small:
 		for mesh: MeshInstance3D in result["meshes"]:
 			mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -59,7 +75,11 @@ static func attach(parent: Node3D, item_id: String, variant: int, length: float,
 		light.light_energy = 0.0
 		light.visible = false
 		light.set_meta(&"energy", float(light_info.get("energy", 0.7 if is_house else 1.0)))
-		parent.add_child(light)
+		if swing:
+			light.position = point - swing.position
+			swing.add_child(light)
+		else:
+			parent.add_child(light)
 		result["lights"].append(light)
 	for chimney: Vector3 in data["chimneys"]:
 		var smoke := create_smoke()
@@ -134,7 +154,54 @@ static func create_smoke() -> GPUParticles3D:
 	smoke.visibility_aabb = AABB(Vector3(-3, -1, -3), Vector3(10, 8, 8))
 	smoke.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	smoke.visibility_range_end = 160.0
+	smoke.add_child(create_sparks())
 	return smoke
+
+
+## Ein paar Funken, die aus dem Schornstein stieben (nachts sieht man sie glühen).
+static func create_sparks() -> GPUParticles3D:
+	if _spark_process == null:
+		var process := ParticleProcessMaterial.new()
+		process.direction = Vector3(0.1, 1.0, 0.0)
+		process.spread = 18.0
+		process.initial_velocity_min = 0.8
+		process.initial_velocity_max = 1.6
+		process.gravity = Vector3(0.2, 0.2, 0.05)
+		process.turbulence_enabled = true
+		process.turbulence_noise_strength = 0.8
+		process.scale_min = 0.6
+		process.scale_max = 1.2
+		var ramp := Gradient.new()
+		ramp.set_color(0, Color(1.0, 0.8, 0.4, 1.0))
+		ramp.set_color(1, Color(1.0, 0.35, 0.1, 0.0))
+		var ramp_texture := GradientTexture1D.new()
+		ramp_texture.gradient = ramp
+		process.color_ramp = ramp_texture
+		_spark_process = process
+		var mesh := QuadMesh.new()
+		mesh.size = Vector2(0.05, 0.05)
+		var material := StandardMaterial3D.new()
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.vertex_color_use_as_albedo = true
+		material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		material.albedo_texture = _puff_texture()
+		material.emission_enabled = true
+		material.emission = Color(1.0, 0.55, 0.2)
+		material.emission_energy_multiplier = 2.5
+		mesh.material = material
+		_spark_mesh = mesh
+	var sparks := GPUParticles3D.new()
+	sparks.name = "Sparks"
+	sparks.amount = 5
+	sparks.lifetime = 1.8
+	sparks.randomness = 0.8
+	sparks.process_material = _spark_process
+	sparks.draw_pass_1 = _spark_mesh
+	sparks.visibility_aabb = AABB(Vector3(-2, -1, -2), Vector3(5, 5, 5))
+	sparks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	sparks.visibility_range_end = 90.0
+	return sparks
 
 
 static func _puff_texture() -> Texture2D:
@@ -171,3 +238,5 @@ static func set_overlay(parts: Dictionary, material: Material) -> void:
 static func clear_cache() -> void:
 	_smoke_process = null
 	_smoke_mesh = null
+	_spark_process = null
+	_spark_mesh = null
