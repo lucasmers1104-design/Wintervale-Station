@@ -11,7 +11,7 @@
 | Achievements | Save selector, fifteen cards, Continue, New Game, Load Save, Settings, Credits, Quit, Back | Displays progress stored in the selected save. Cards open detail views. Continue is disabled when no valid save exists. |
 | Credits | Back | Shows verified project and engine credits. |
 
-The gallery's logo also returns to the main menu. Escape closes the active modal before leaving a page. Keyboard focus receives a visible outline; mouse hover and navigation have restrained paper audio. Decorative transitions block input and have a reduced-motion path.
+The gallery's logo also returns to the main menu. Escape closes the active modal before leaving a page. Keyboard focus receives a visible outline; mouse hover and navigation have restrained paper audio. Switching pages is immediate; closing a page retains a decorative transition with a reduced-motion path.
 
 ## Save and settings changes
 
@@ -32,8 +32,8 @@ Achievement state belongs to each save. `Achievements` observes real railway, tr
 
 ## Automated evidence
 
-- `tests/phase12_menu_test.gd`: 28 checks, zero failures. Covers eight live pages, Continue state, save names and metadata, invalid and corrupt paths, confirmation/cancellation of deletion, settings persistence, unconfirmed display preview, key conflict/rebinding persistence, rapid tab clicks, and reverse navigation.
-- `tests/phase12_journey_test.gd`: 18 checks, zero failures. Creates a real world from New Game, saves and restores it, checks latest-save selection, verifies a real rail event unlocks First Tracks, prevents duplicate progress from restoring the same track, and checks achievement persistence.
+- `tests/phase12_menu_test.gd`: 29 checks, zero failures. Covers eight live pages, Continue state, save names and metadata, invalid and corrupt paths, confirmation/cancellation of deletion, settings persistence, unconfirmed display preview, key conflict/rebinding persistence, immediate tab switches, and animated closing.
+- `tests/phase12_journey_test.gd`: 23 checks, zero failures. Creates a real world from New Game through the illustrated loading screen, saves and restores it, checks latest-save selection, verifies a real rail event unlocks First Tracks, prevents duplicate progress from restoring the same track, and checks achievement persistence. It also follows Continue from a saved journey through the illustrated loading screen and verifies the restored world and achievement.
 - `tests/smoke_test.tscn`: existing world/railway regression suite, zero failures.
 - Eight runtime captures at 1672 × 941 are stored as `docs/phase12_*.png`. These were inspected for layout, clipping, and consistency against the supplied visual pages.
 

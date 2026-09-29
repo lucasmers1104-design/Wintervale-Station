@@ -29,6 +29,7 @@ enum State {
 	GOING_HOME,        ## auf dem Heimweg
 	LEAVING,           ## Reisender geht ins Dorf und verschwindet
 	STROLLING,         ## Spaziergang im Dorf (Lieblingsplatz)
+	FESTIVAL,          ## auf dem Fest (Buden, Stehtische, Karussell, Tanz, Umzug) – Etappe 10
 }
 
 ## Wie weit vor sich die Figur auf die Spielfigur Rücksicht nimmt.
@@ -80,6 +81,8 @@ var _last_yaw := 0.0
 var _lane_offset := 0.0
 var _think_timer := 0.0
 var _blocked_time := 0.0
+var _blocked_total := 0.0
+var _squeeze_time := 0.0
 var _ground_timer := 0
 var _busy := false  ## Übergang läuft (Hinsetzen, Trittstufen …) – keine neuen Entscheidungen
 # Trittstufen: Punkte mit Höhe, die nacheinander begangen werden
@@ -91,6 +94,20 @@ var _tween: Tween
 var _label: Label3D
 var _footsteps: FootstepPlayer
 var _rng := RandomNumberGenerator.new()
+
+# Fest und Gespräche (Etappe 10)
+var _festival: FestivalDirector
+var _festival_until := 0.0
+var _festival_carry := -1
+var _festival_activity := {}
+var _dancing := false
+var _talk_time := 0.0
+var _conversation: Array[String] = []
+var _conversation_index := 0
+var _met_player := false
+var _bubble: SpeechBubble
+## Sonderhandlung für die Taste E (z.B. vergessenen Koffer zurückgeben): {"text", "callback"}.
+var special_interaction := {}
 
 
 ## Richtet den Bewohner ein. [param p_profile] = null für einen Reisenden mit [param look].
@@ -109,6 +126,7 @@ func setup(p_director: NpcDirector, p_profile: NpcProfile, look: CharacterAppear
 	collision_layer = GameDefs.LAYER_CHARACTERS
 	collision_mask = 0
 	sync_to_physics = false
+	add_to_group(PlayerInteraction.GROUP)
 	var shape := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
 	var height := 1.4 * (look.height_scale if look else 1.0)
@@ -120,7 +138,8 @@ func setup(p_director: NpcDirector, p_profile: NpcProfile, look: CharacterAppear
 
 	model = CharacterModel.new()
 	model.appearance = look
-	model.view_distance = 120.0
+	# Aus größerer Entfernung sind die Figuren winzig – dann nicht mehr zeichnen (Leistung)
+	model.view_distance = 80.0
 	model.carry = profile.carry if profile else carry
 	# Jeder geht ein bisschen anders: gemächlich, normal oder munter
 	model.gait_energy = clampf(walk_speed * 0.8 + _rng.randf_range(-0.12, 0.12), 0.6, 1.3)
@@ -275,6 +294,8 @@ func _think() -> void:
 			_think_away(now)
 		State.STROLLING:
 			_think_strolling(now)
+		State.FESTIVAL:
+			_think_festival(now)
 
 
 func _think_at_station(now: float) -> void:
@@ -461,6 +482,8 @@ func get_status_text() -> String:
 			return "mit Koffer auf dem Weg ins neue Zuhause" if is_moving_in() else "auf dem Heimweg"
 		State.STROLLING:
 			return "beim Spaziergang im Dorf"
+		State.FESTIVAL:
+			return "beim %s" % (_festival.get_display_name() if _festival else "Fest")
 	return "unterwegs"
 
 
@@ -534,7 +557,13 @@ func _on_climbed_out() -> void:
 			if not is_instance_valid(self):
 				return
 			_busy = false
-			if _visitor or profile == null:
+			if after_alight.is_valid():
+				var callback := after_alight
+				after_alight = Callable()
+				callback.call(self)
+			elif festival_invite and is_instance_valid(festival_invite) and festival_invite.is_active():
+				visit_festival(festival_invite, festival_invite_until)
+			elif _visitor or profile == null:
 				leave_to_village()
 			else:
 				go_home()), 0.85)
@@ -620,6 +649,391 @@ func boarding_aborted() -> void:
 	if state == State.BOARDING:
 		state = State.AT_STATION
 		_next_behaviour()
+
+
+# --- Gespräche mit der Spielfigur (Taste E) --------------------------------------------
+
+func get_interaction_point() -> Vector3:
+	return global_position
+
+
+func get_interaction_text(_player: Node) -> String:
+	if not is_present() or not _climb.is_empty() or state == State.AWAY or state == State.ALIGHTING and _moving == false:
+		return ""
+	if not special_interaction.is_empty():
+		return String(special_interaction["text"])
+	if _talk_time > 0.0 and _conversation_index < _conversation.size():
+		return "Weiter zuhören"
+	return "Mit %s sprechen" % NpcDialogue.first_name(self) if profile else "Ansprechen"
+
+
+func interact(player: Node) -> void:
+	if not special_interaction.is_empty():
+		var callback: Callable = special_interaction["callback"]
+		special_interaction = {}
+		callback.call(self, player)
+		return
+	if _talk_time <= 0.0 or _conversation_index >= _conversation.size():
+		_conversation = NpcDialogue.conversation(self, _met_player)
+		_conversation_index = 0
+		_met_player = true
+	var line := _conversation[_conversation_index]
+	_conversation_index += 1
+	# Kurz stehen bleiben, zur Spielfigur drehen und erzählen
+	_talk_time = 7.0
+	if not _seated and not is_busy():
+		_face((player as Node3D).global_position - global_position)
+	if not model.is_gesturing():
+		model.play_gesture(CharacterModel.Pose.WAVE if _conversation_index == 1 else CharacterModel.Pose.TALK, 1.8)
+	say(line, 7.0)
+
+
+func is_talking() -> bool:
+	return _talk_time > 0.0
+
+
+## Sprechblase mit Text über dem Kopf.
+func say(text: String, duration := 0.0) -> void:
+	get_bubble().say(text, duration)
+
+
+## Kleines Bild in einer Sprechblase (z.B. "heart", "cup", "star", "train").
+func show_icon(icon_name: String, duration := 2.4) -> void:
+	if not is_present():
+		return
+	get_bubble().show_icon(icon_name, duration)
+
+
+func get_bubble() -> SpeechBubble:
+	if _bubble == null:
+		_bubble = SpeechBubble.new()
+		_bubble.position = Vector3(0.0, 1.62 * (model.appearance.height_scale if model.appearance else 1.0) + 0.42, 0.0)
+		add_child(_bubble)
+	return _bubble
+
+
+func get_routine() -> NpcRoutine:
+	return _routine
+
+
+## Steht in den nächsten [param window] Stunden etwas im Tagesablauf an (oder läuft gerade)?
+func has_plans(hours: float, window: float) -> bool:
+	if profile == null:
+		return false
+	for routine in profile.routines:
+		if routine == null or _is_done(routine):
+			continue
+		if routine.covers(hours):
+			return true
+		var until_start := fposmod(routine.get_start_hours() - hours, 24.0)
+		if until_start <= window:
+			return true
+	return false
+
+
+## Länger auf dem Fest bleiben (z.B. fürs Lichterfest).
+func extend_festival(until_hours: float) -> void:
+	_festival_until = maxf(_festival_until, until_hours)
+
+
+# --- Feste (Etappe 10) -------------------------------------------------------------------
+
+## Geht zum Fest (vom Haus aus oder direkt, z.B. nach dem Aussteigen aus dem Sonderzug)
+## und bleibt bis [param until_hours] – Buden, Stehtische, Karussell, Feuer, Tanz.
+func visit_festival(festival: FestivalDirector, until_hours: float) -> void:
+	_festival = festival
+	_festival_until = until_hours
+	if _routine:
+		_mark_done(_routine)  # statt Bahnhof oder Spaziergang heute aufs Fest
+	if state == State.AT_HOME:
+		_stop_everything()
+		var home := director.get_home(profile.home_name) if profile else null
+		_place_at(home.get_inside_point() if home else director.get_exit_point())
+		_set_present(true, true)
+		state = State.FESTIVAL
+		if home:
+			_walk_path([home.get_inside_point(), home.get_front_point()], _next_festival_activity)
+		else:
+			_next_festival_activity()
+		return
+	_leave_spot()
+	state = State.FESTIVAL
+	_next_festival_activity()
+
+
+## Gast, der zu Fuß ins Dorf kommt: an [param point] sanft einblenden.
+func appear_at(point: Vector3) -> void:
+	_place_at(point)
+	_set_present(true, true)
+
+
+## Nach dem Aussteigen etwas Bestimmtes tun (z.B. den vergessenen Koffer suchen).
+var after_alight := Callable()
+## Nach dem Aussteigen nicht ins Dorf, sondern aufs Fest (Besucher des Sonderzugs).
+var festival_invite: FestivalDirector
+var festival_invite_until := 0.0
+
+
+func is_at_festival() -> bool:
+	return state == State.FESTIVAL
+
+
+func get_festival_behaviour() -> String:
+	return _behaviour if state == State.FESTIVAL else ""
+
+
+func _think_festival(now: float) -> void:
+	var over := _festival == null or not is_instance_valid(_festival) or not _festival.is_active() \
+		or (now >= _festival_until and _behaviour != "gather" and _behaviour != "procession" and not _dancing)
+	if over:
+		_end_festival()
+		return
+	if _dancing or _behaviour in ["gather", "procession", "dance_join"]:
+		if not _moving and not _dancing and _behaviour != "procession":
+			_idle_gestures(false)
+		return
+	if _moving or is_busy() or _talk_time > 0.0:
+		return
+	_behaviour_time -= THINK_INTERVAL * director.speed_factor()
+	_festival_idle()
+	if _behaviour_time <= 0.0:
+		_next_festival_activity()
+
+
+func _next_festival_activity() -> void:
+	if state != State.FESTIVAL or _festival == null or not is_instance_valid(_festival):
+		return
+	if _seated:
+		_stand_up(_next_festival_activity)
+		return
+	_leave_spot()
+	var activity := _festival.claim_activity(self, _rng)
+	if activity.is_empty():
+		_behaviour = "wander"
+		_festival_activity = {}
+		walk_to(_festival.random_point(_rng), func() -> void:
+			model.set_pose(_favourite_pose)
+			_behaviour_time = _rng.randf_range(4.0, 9.0), 0.8)
+		return
+	_festival_activity = activity
+	_behaviour = String(activity["kind"])
+	var spot: StationSpot = activity.get("spot")
+	if spot:
+		_spot = spot
+	var target: Vector3 = spot.get_approach_point() if spot else activity["point"]
+	walk_to(target, _arrive_festival_activity, 0.85)
+
+
+func _arrive_festival_activity() -> void:
+	if state != State.FESTIVAL:
+		return
+	var activity := _festival_activity
+	var spot: StationSpot = activity.get("spot")
+	_behaviour_time = float(activity.get("duration", 20.0))
+	_idle_timer = _rng.randf_range(2.0, 5.0)
+	if spot and spot.kind == StationSpot.Kind.SEAT:
+		_face(spot.get_facing())
+		_sit_down(spot, false)
+		return
+	var facing: Vector3 = activity.get("facing", spot.get_facing() if spot else Vector3.ZERO)
+	if facing != Vector3.ZERO:
+		_face(facing)
+	match _behaviour:
+		"buy":
+			model.set_pose(CharacterModel.Pose.STAND)
+			model.play_gesture(CharacterModel.Pose.TALK, 2.2)
+			_festival.on_customer(self, activity)
+			var mug := bool(activity.get("mug", false))
+			var icon := String(activity.get("icon", ""))
+			get_tree().create_timer(2.4 / director.speed_factor()).timeout.connect(func() -> void:
+				if not is_instance_valid(self) or state != State.FESTIVAL:
+					return
+				if mug:
+					_take_mug()
+				if icon != "":
+					show_icon(icon)
+				model.set_pose(CharacterModel.Pose.WARM_HANDS if model.carry == CharacterModel.Carry.MUG else _favourite_pose))
+		"warm":
+			model.set_pose(CharacterModel.Pose.WARM_HANDS)
+		"table", "chat":
+			model.set_pose(CharacterModel.Pose.WARM_HANDS if model.carry == CharacterModel.Carry.MUG else CharacterModel.Pose.STAND)
+		_:
+			model.set_pose(CharacterModel.Pose.LOOK_UP if bool(activity.get("look_up", false)) else _favourite_pose)
+
+
+## Kleine Gesten und Bildblasen auf dem Fest.
+func _festival_idle() -> void:
+	if _moving or model.is_gesturing():
+		return
+	_idle_timer -= THINK_INTERVAL * director.speed_factor()
+	if _idle_timer > 0.0:
+		return
+	_idle_timer = _rng.randf_range(5.0, 11.0)
+	var icons: Array = _festival_activity.get("icons", [])
+	var roll := _rng.randf()
+	if not icons.is_empty() and roll < 0.35:
+		show_icon(String(icons[_rng.randi() % icons.size()]))
+	elif model.carry == CharacterModel.Carry.MUG and roll < 0.7:
+		# Ein Schluck aus dem Becher
+		model.play_gesture(CharacterModel.Pose.NOD, 1.4)
+	elif _behaviour in ["table", "chat"]:
+		model.play_gesture(CharacterModel.Pose.TALK if roll < 0.85 else CharacterModel.Pose.NOD, 2.0)
+	elif not _seated:
+		model.play_gesture(CharacterModel.Pose.LOOK_UP, 2.0)
+
+
+func _take_mug() -> void:
+	if model.carry == CharacterModel.Carry.MUG:
+		return
+	if _festival_carry < 0:
+		_festival_carry = model.carry
+	model.carry = CharacterModel.Carry.MUG
+
+
+func _restore_festival_carry() -> void:
+	if _festival_carry >= 0:
+		model.carry = _festival_carry as CharacterModel.Carry
+		_festival_carry = -1
+
+
+func _end_festival() -> void:
+	_leave_spot()
+	_dancing = false
+	_festival_activity = {}
+	var festival := _festival
+	_festival = null
+	if profile:
+		go_home()
+		return
+	# Besucher: mit dem Sonderzug zurück (sonst verabschieden sie sich ins Tal)
+	var trip := festival.get_return_trip() if festival and is_instance_valid(festival) else {}
+	if not trip.is_empty():
+		trip_destination = String(trip["destination"])
+		trip_entry_index = int(trip["entry"])
+		state = State.AT_STATION
+		_next_behaviour()
+	else:
+		leave_to_village()
+
+
+## Lichterfest: zum Baum gehen und sich hinstellen (Blick auf [param facing]).
+func gather_at(point: Vector3, facing: Vector3) -> void:
+	if state != State.FESTIVAL or _behaviour == "procession":
+		return
+	_leave_spot()
+	_dancing = false
+	_behaviour = "gather"
+	var go := func() -> void:
+		walk_to(point, func() -> void:
+			_face(facing)
+			model.set_pose(CharacterModel.Pose.WARM_HANDS if model.carry == CharacterModel.Carry.MUG else CharacterModel.Pose.STAND), 1.0)
+	if _seated:
+		_stand_up(go)
+	else:
+		go.call()
+
+
+## Die Lichter gehen an: jubeln, winken, ein Herz oder Stern in der Blase.
+func ceremony_cheer(icon: String) -> void:
+	if state != State.FESTIVAL or _behaviour != "gather" or _moving:
+		return
+	model.play_gesture(CharacterModel.Pose.WAVE if _rng.randf() < 0.6 else CharacterModel.Pose.LOOK_UP, 2.4)
+	show_icon(icon, 3.0)
+
+
+## Ende einer Versammlung (Lichterfest, Umzug): wieder frei über das Fest schlendern.
+func release_gathering() -> void:
+	if state != State.FESTIVAL:
+		return
+	if _behaviour in ["gather", "procession"]:
+		_behaviour = "watch"
+		_behaviour_time = _rng.randf_range(4.0, 16.0)
+		_festival_activity = {"icons": ["heart", "star", "note"]}
+
+
+## Reigen (Herbstfest): erst zum Platz im Kreis gehen, dann bewegt das Fest die Figur.
+func join_dance(point: Vector3) -> void:
+	if state != State.FESTIVAL:
+		return
+	var go := func() -> void:
+		_leave_spot()
+		_behaviour = "dance_join"
+		walk_to(point, func() -> void:
+			_behaviour = "dance"
+			_dancing = true, 1.0)
+	if _seated:
+		_stand_up(go)
+	else:
+		go.call()
+
+
+func is_dancing() -> bool:
+	return _dancing
+
+
+## Ein Tanzschritt: die Position setzt das Fest, die Figur animiert sich aus der Bewegung.
+func dance_to(point: Vector3, facing: Vector3) -> void:
+	if not _dancing:
+		return
+	global_position = point
+	_face(facing)
+
+
+func stop_dance() -> void:
+	if not _dancing and _behaviour != "dance_join":
+		return
+	_dancing = false
+	_moving = false
+	_behaviour = "watch"
+	_behaviour_time = _rng.randf_range(2.0, 8.0)
+	model.play_gesture(CharacterModel.Pose.WAVE, 1.6)
+
+
+## Laternenumzug: nach [param delay] Sekunden mit Laterne die Strecke [param route] abgehen.
+func join_procession(route: PackedVector3Array, delay: float) -> void:
+	if state != State.FESTIVAL or route.size() < 2:
+		return
+	_leave_spot()
+	_dancing = false
+	_behaviour = "procession"
+	var start := func() -> void:
+		if not is_instance_valid(self) or state != State.FESTIVAL or _behaviour != "procession":
+			return
+		if _festival_carry < 0:
+			_festival_carry = model.carry
+		model.carry = CharacterModel.Carry.LANTERN
+		walk_to(route[0], func() -> void:
+			_walk_path(route, func() -> void:
+				_behaviour = "watch"
+				_behaviour_time = _rng.randf_range(10.0, 25.0)
+				model.set_pose(CharacterModel.Pose.STAND)
+				show_icon("lantern", 3.0), 0.62), 0.9)
+	if _seated:
+		_stand_up(func() -> void: get_tree().create_timer(delay).timeout.connect(start))
+	else:
+		get_tree().create_timer(maxf(delay, 0.05)).timeout.connect(start)
+
+
+## Was jemand auf dem Fest gerade erzählt (für Gespräche).
+func get_festival_remark() -> String:
+	var winter := _festival != null and is_instance_valid(_festival) and _festival.get_active_id() == FestivalDirector.CHRISTMAS
+	match _behaviour:
+		"buy":
+			return "Ich hol mir noch einen Glühwein. Der wärmt von innen!" if winter else "Noch ein Becher Most, dann bin ich glücklich."
+		"table", "chat":
+			return "Am Stehtisch trifft man immer jemanden zum Plaudern."
+		"dance", "dance_join":
+			return "Kommen Sie, tanzen Sie mit! Links, rechts, und drehen!"
+		"procession":
+			return "Laterne, Laterne, Sonne, Mond und Sterne …"
+		"gather":
+			return "Psst – gleich gehen die Lichter an!" if winter else "Gleich geht's los!"
+		"warm":
+			return "Am Feuer ist es so schön warm. Hören Sie, wie es knistert?"
+		"sit":
+			return "Einfach sitzen und schauen. So muss ein Festtag sein."
+	return "Was für ein schönes Fest! Das ganze Dorf ist auf den Beinen." if not winter \
+		else "Riechen Sie das? Zimt, Maronen und Tannenduft. Herrlich!"
 
 
 # --- Verhalten am Bahnsteig ------------------------------------------------------------
@@ -883,9 +1297,11 @@ func _physics_process(delta: float) -> void:
 		_think()
 	if not visible:
 		return
+	if _talk_time > 0.0:
+		_talk_time -= delta
 	if not _climb.is_empty():
 		_step_climb(delta)
-	elif _moving and not _busy:
+	elif _moving and not _busy and _talk_time <= 0.0 and not _dancing:
 		_step_along_path(delta)
 		# Boden nur neu abtasten, wenn man sich bewegt (spart Strahltests)
 		_ground_timer -= 1
@@ -936,14 +1352,22 @@ func _step_along_path(delta: float) -> void:
 	var remaining := distance + _remaining_path_length()
 	var ease_out := clampf(remaining / 0.8, 0.35, 1.0)
 	var speed := walk_speed * _pace * director.speed_factor() * minf(ease_in, ease_out)
-	if distance > 0.001 and director.is_path_blocked(self, to_target / distance, PERSONAL_SPACE):
+	if _squeeze_time > 0.0:
+		_squeeze_time -= delta
+	elif distance > 0.001 and director.is_path_blocked(self, to_target / distance, PERSONAL_SPACE):
 		# Höflich warten – und nach einem Moment seitlich ausweichen.
 		_blocked_time += delta * director.speed_factor()
-		if _blocked_time > 1.2:
+		_blocked_total += delta * director.speed_factor()
+		if _blocked_total > 5.0:
+			# Geht es gar nicht vorbei (Gedränge, unebener Boden), vorsichtig durchschlüpfen
+			_blocked_total = 0.0
+			_squeeze_time = 2.0
+		elif _blocked_time > 1.2:
 			_blocked_time = 0.0
 			_detour(to_target / distance)
 		return
 	_blocked_time = 0.0
+	_blocked_total = maxf(_blocked_total - delta * 0.5, 0.0)
 	var step := speed * delta
 	if distance <= step:
 		global_position.x = target.x
@@ -1073,6 +1497,7 @@ func _enter_state_home() -> void:
 	_stop_everything()
 	state = State.AT_HOME
 	_set_present(false)
+	_restore_festival_carry()
 	if _arrival_carry >= 0:
 		# Angekommen im neuen Zuhause: Koffer abgestellt
 		model.carry = _arrival_carry as CharacterModel.Carry
@@ -1104,6 +1529,9 @@ func _stop_everything() -> void:
 	_behaviour = ""
 	_path = PackedVector3Array()
 	_climb = PackedVector3Array()
+	_dancing = false
+	_talk_time = 0.0
+	_festival_activity = {}
 	if model:
 		model.set_pose(CharacterModel.Pose.STAND)
 		model.set_fade(1.0)

@@ -19,8 +19,8 @@ func _ready() -> void:
 	_panel.anchor_right = 1.0
 	_panel.offset_left = -424
 	_panel.offset_right = -22
-	_panel.offset_top = 22
-	_panel.offset_bottom = 132
+	_panel.offset_top = 440
+	_panel.offset_bottom = 550
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_panel.visible = false
 	var style := StyleBoxFlat.new()
@@ -33,6 +33,8 @@ func _ready() -> void:
 	style.shadow_size = 12
 	_panel.add_theme_stylebox_override("panel", style)
 	add_child(_panel)
+	get_viewport().size_changed.connect(_layout_panel)
+	_layout_panel()
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -57,6 +59,15 @@ func _ready() -> void:
 	_sound.stream = SoundLibrary.get_sound("done_chime")
 	_sound.bus = &"WintervaleUI"
 	add_child(_sound)
+
+
+func _layout_panel() -> void:
+	if _panel == null:
+		return
+	var viewport_size := get_viewport().get_visible_rect().size
+	var factor := minf(viewport_size.x / 1672.0, viewport_size.y / 941.0)
+	_panel.offset_top = 440.0 * factor
+	_panel.offset_bottom = _panel.offset_top + 110.0 * factor
 
 
 func _on_unlocked(id: String) -> void:

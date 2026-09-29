@@ -49,6 +49,7 @@ var _roll := 0.0
 var _pitch := 0.0
 var _travel := 0.0
 var _display: Label3D
+var _beacons: Array[Dictionary] = []
 
 ## Größte Neigung des Wagenkastens in Kurven und beim Bremsen (Bogenmaß).
 const MAX_ROLL := 0.035
@@ -94,6 +95,10 @@ func build(p_kind: String, train_type: TrainType, is_first: bool, is_last: bool,
 		_body.add_child(leaf)
 		_doors.append({"node": leaf, "closed": door["position"], "open_offset": door["open_offset"], "side": door["side"]})
 	_build_steps(materials["paint"])
+	for beacon: Vector3 in parts.get("beacons", []):
+		_add_beacon(beacon)
+	if train_type.festive_lights and materials.has("festive"):
+		_add_festive_lights(materials["festive"], train_type.festive_colors, variant)
 	_cargo_material = materials.get("cargo", materials["paint"])
 	_build_cargo(variant)
 	if kind == "loco_freight":
@@ -135,6 +140,8 @@ func build(p_kind: String, train_type: TrainType, is_first: bool, is_last: bool,
 		_snow = _make_snow_spray(materials["snow"])
 		_snow.position = Vector3(0.0, 0.3, -bogie_offset)
 		add_child(_snow)
+		if kind == "loco_plough":
+			_make_plough_spray()
 	if is_last:
 		for lamp_position: Vector3 in parts["lamps_rear"]:
 			_add_lamp(lamp_position, 1.0, materials["lamp_red"])
@@ -336,6 +343,8 @@ func get_destination() -> String:
 
 ## Aufgewirbelter Schnee an der Lok – nur bei zügiger Fahrt und nur, wenn Schnee liegt.
 func set_snow_spray(speed: float) -> void:
+	if not _beacons.is_empty():
+		_update_beacons()
 	if _snow:
 		_snow.emitting = speed > 4.0 and Seasons.get_snow_cover() > 0.3
 		_snow.amount_ratio = clampf((speed - 4.0) / 10.0, 0.1, 1.0)
@@ -369,6 +378,82 @@ func _add_mesh(mesh: Mesh, material: Material, parent: Node3D = self) -> MeshIns
 	instance.material_override = material
 	parent.add_child(instance)
 	return instance
+
+
+## Orange Rundumleuchte (Schneeräumlok): blinkt im Umlauf.
+func _add_beacon(at: Vector3) -> void:
+	var cap := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.075
+	sphere.height = 0.11
+	sphere.radial_segments = 8
+	sphere.rings = 3
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(1.0, 0.55, 0.1)
+	material.emission_enabled = true
+	material.emission = Color(1.0, 0.5, 0.08)
+	material.emission_energy_multiplier = 1.0
+	sphere.material = material
+	cap.mesh = sphere
+	cap.position = at
+	cap.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_body.add_child(cap)
+	var light := OmniLight3D.new()
+	light.light_color = Color(1.0, 0.55, 0.15)
+	light.omni_range = 7.0
+	light.light_energy = 0.0
+	light.position = at + Vector3(0, 0.1, 0)
+	_body.add_child(light)
+	_beacons.append({"light": light, "material": material, "phase": _beacons.size() * PI})
+
+
+## Schneeräumlok: eine breite Schneefontäne vor dem Pflug.
+func _make_plough_spray() -> void:
+	var process := _snow.process_material as ParticleProcessMaterial
+	process.direction = Vector3(0.0, 1.0, -0.35)
+	process.spread = 75.0
+	process.initial_velocity_min = 2.2
+	process.initial_velocity_max = 5.2
+	process.gravity = Vector3(0.0, -3.0, 0.0)
+	process.emission_box_extents = Vector3(1.8, 0.2, 0.3)
+	_snow.amount = 280
+	_snow.lifetime = 1.6
+	_snow.position = Vector3(0.0, 0.5, -length * 0.5 - 1.1)
+	(_snow.draw_pass_1 as QuadMesh).size = Vector2(0.24, 0.24)
+
+
+## Blinken der Rundumleuchten (aus Train.update_visuals über set_snow_spray).
+func _update_beacons() -> void:
+	var t := Time.get_ticks_msec() * 0.001
+	for beacon: Dictionary in _beacons:
+		var pulse := pow(maxf(0.0, sin(t * 7.0 + float(beacon["phase"]))), 3.0)
+		(beacon["light"] as OmniLight3D).light_energy = 2.4 * pulse
+		(beacon["material"] as StandardMaterial3D).emission_energy_multiplier = 0.6 + 4.0 * pulse
+
+
+## Festlicher Sonderzug: Lichterketten in Girlandenbögen entlang beider Dachkanten.
+func _add_festive_lights(material: Material, colors: PackedColorArray, variant: int) -> void:
+	var glow := TrainMeshes._new_st()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 77 + variant
+	var half := length * 0.5 - 0.6
+	var hooks := maxi(2, int(half * 2.0 / 1.4))
+	for side: float in [-1.0, 1.0]:
+		for k in hooks:
+			var z0 := lerpf(-half, half, float(k) / hooks)
+			var z1 := lerpf(-half, half, float(k + 1) / hooks)
+			var a := Vector3(side * 1.37, 3.1, z0)
+			var b := Vector3(side * 1.37, 3.1, z1)
+			for i in 5:
+				var t := (i + 0.5) / 5.0
+				var p := a.lerp(b, t) - Vector3(0, sin(t * PI) * 0.13, 0) + Vector3(side * 0.02, 0, 0)
+				FestivalMeshes._bulb(glow, p, 0.062, colors[(k * 5 + i) % colors.size()], rng.randf())
+	var lights := MeshInstance3D.new()
+	lights.name = "FestiveLights"
+	lights.mesh = glow.commit()
+	lights.material_override = material
+	lights.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_body.add_child(lights)
 
 
 func _add_display(xform: Transform3D) -> void:

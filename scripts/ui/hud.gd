@@ -17,11 +17,16 @@ var _item_row: HFlowContainer
 var _item_buttons: Dictionary[String, Button] = {}
 var _cost_row: HBoxContainer
 var _money_label: Label
+var _day_value: Label
+var _time_value: Label
+var _bar_speed_label: Label
+var _status_bar: Control
 var _money_tween: Tween
 var _shown_money := -1
 
 const COIN_ICON := preload("res://assets/ui/icons/coin.svg")
 const NOTEBOOK_ICON := preload("res://assets/ui/icons/notebook.svg")
+const STATUS_BAR_ART := preload("res://assets/ui/hud_status_bar.png")
 
 @onready var _clock_label: Label = %ClockLabel
 @onready var _speed_label: Label = %SpeedLabel
@@ -84,6 +89,10 @@ func _ready() -> void:
 			_tool_row.add_child(button)
 		_tool_buttons[entry["id"]] = button
 
+	# Fest-Banner und Interaktionshinweis (Etappe 10)
+	var overlay := EventOverlay.new()
+	overlay.name = "EventOverlay"
+	add_child(overlay)
 	_toast_label.modulate.a = 0.0
 	_update_clock()
 	_on_time_scale_changed(WorldClock.time_scale)
@@ -138,6 +147,12 @@ func _update_legend() -> void:
 
 func _update_clock() -> void:
 	_clock_label.text = "Tag %d  ·  %s" % [WorldClock.day, WorldClock.get_time_string()]
+	if _day_value:
+		var day_text := "Tag %d" % WorldClock.day
+		_day_value.text = day_text
+		_day_value.add_theme_font_size_override("font_size", 68 if day_text.length() <= 5 else 56)
+	if _time_value:
+		_time_value.text = WorldClock.get_time_string()
 
 
 func _on_minute_changed(_hour: int, _minute: int) -> void:
@@ -151,6 +166,9 @@ func _on_day_changed(_day: int) -> void:
 func _on_time_scale_changed(time_scale: float) -> void:
 	_speed_label.visible = time_scale > 1.0
 	_speed_label.text = "×%d" % int(time_scale)
+	if _bar_speed_label:
+		_bar_speed_label.visible = time_scale > 1.0
+		_bar_speed_label.text = "×%d" % int(time_scale)
 
 
 func _on_view_mode_changed(mode: GameDefs.ViewMode) -> void:
@@ -190,50 +208,96 @@ func _on_game_loaded(_slot: String) -> void:
 	show_toast("Spielstand geladen")
 
 
-## Gemeindekasse (Münze + Betrag) und ein Knopf fürs Notizbuch neben der Uhr.
+## Der Referenzrahmen bleibt erhalten; Geld, Tag und Uhrzeit sind echte Live-Werte.
 func _build_money_display() -> void:
-	var clock_row := _clock_label.get_parent() as HBoxContainer
-	var coin := TextureRect.new()
-	coin.texture = COIN_ICON
-	coin.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	coin.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	coin.custom_minimum_size = Vector2(24, 24)
-	coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	clock_row.add_child(coin)
-	clock_row.move_child(coin, 0)
-	_money_label = Label.new()
-	_money_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.5))
-	clock_row.add_child(_money_label)
-	clock_row.move_child(_money_label, 1)
-	var dot := Label.new()
-	dot.text = "·"
-	clock_row.add_child(dot)
-	clock_row.move_child(dot, 2)
+	$Root/ClockPanel.visible = false
+	_status_bar = Control.new()
+	_status_bar.name = "PremiumStatusBar"
+	_status_bar.size = Vector2(1410, 213)
+	_status_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	$Root.add_child(_status_bar)
+	var crop := AtlasTexture.new()
+	crop.atlas = STATUS_BAR_ART
+	crop.region = Rect2(130, 83, 1410, 213)
+	var artwork := TextureRect.new()
+	artwork.name = "StatusBarArtwork"
+	artwork.texture = crop
+	artwork.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	artwork.stretch_mode = TextureRect.STRETCH_SCALE
+	artwork.size = _status_bar.size
+	artwork.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_status_bar.add_child(artwork)
+	_money_label = _status_value("MoneyValue", Vector2(263, 58), Vector2(253, 105), 71)
+	_day_value = _status_value("DayValue", Vector2(688, 58), Vector2(250, 105), 68)
+	_time_value = _status_value("TimeValue", Vector2(1100, 58), Vector2(235, 105), 68)
+	_bar_speed_label = _status_value("SpeedValue", Vector2(1217, 155), Vector2(112, 32), 20)
+	_bar_speed_label.visible = false
 	var book := Button.new()
+	book.name = "NotebookButton"
 	book.icon = NOTEBOOK_ICON
 	book.expand_icon = true
 	book.flat = true
 	book.focus_mode = Control.FOCUS_NONE
-	book.custom_minimum_size = Vector2(34, 30)
+	book.position = Vector2(1413, 82)
+	book.size = Vector2(43, 43)
 	book.tooltip_text = "Notizbuch (Taste %s)" % InputConfig.get_action_label(&"toggle_notebook")
 	book.pressed.connect(Events.notebook_requested.emit.bind(""))
-	clock_row.add_child(book)
+	_status_bar.add_child(book)
+	_layout_status_bar()
+	get_viewport().size_changed.connect(_layout_status_bar)
 	Economy.money_changed.connect(_on_money_changed)
 	_on_money_changed(Economy.money)
+
+
+func _status_value(node_name: String, at: Vector2, dimensions: Vector2, font_size: int) -> Label:
+	var value := Label.new()
+	value.name = node_name
+	value.position = at
+	value.size = dimensions
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	value.clip_text = true
+	var font := SystemFont.new()
+	font.font_names = PackedStringArray(["Georgia", "Palatino Linotype", "Noto Serif", "Times New Roman"])
+	value.add_theme_font_override("font", font)
+	value.add_theme_font_size_override("font_size", font_size)
+	value.add_theme_color_override("font_color", Color("542a1b"))
+	value.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_status_bar.add_child(value)
+	return value
+
+
+func _layout_status_bar() -> void:
+	if _status_bar == null:
+		return
+	var viewport_size := get_viewport().get_visible_rect().size
+	var viewport_factor := minf(viewport_size.x / 1672.0, viewport_size.y / 941.0)
+	var factor := viewport_factor * 0.62
+	_status_bar.scale = Vector2.ONE * factor
+	_status_bar.position = Vector2((viewport_size.x - 1410.0 * factor) * 0.5, 28.0 * viewport_factor)
+	var toast_top := _status_bar.position.y + 213.0 * factor + 12.0 * viewport_factor
+	_toast_label.offset_top = toast_top
+	_toast_label.offset_bottom = toast_top + 36.0 * viewport_factor
 
 
 ## Der Betrag zählt weich zum neuen Wert (kein hektisches Springen).
 func _on_money_changed(money: int) -> void:
 	if _shown_money < 0:
 		_shown_money = money
-		_money_label.text = Economy.format_money(money, false)
+		_set_money_text(money)
 		return
 	if _money_tween and _money_tween.is_valid():
 		_money_tween.kill()
 	_money_tween = create_tween()
 	_money_tween.tween_method(func(value: float) -> void:
 		_shown_money = roundi(value)
-		_money_label.text = Economy.format_money(_shown_money, false), float(_shown_money), float(money), 0.6)
+		_set_money_text(_shown_money), float(_shown_money), float(money), 0.6)
+
+
+func _set_money_text(amount: int) -> void:
+	var amount_text := Economy.format_money(amount, false)
+	_money_label.text = amount_text
+	_money_label.add_theme_font_size_override("font_size", 71 if amount_text.length() <= 6 else (59 if amount_text.length() <= 8 else 48))
 
 
 func get_money_text() -> String:

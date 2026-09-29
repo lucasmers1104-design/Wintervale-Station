@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="TrainType" format=3]
+
+[ext_resource type="Script" path="res://scripts/trains/train_type.gd" id="1_type"]
+
+[resource]
+resource_name = "SpecialWinter"
+script = ExtResource("1_type")
+type_code = "SZ"
+display_name = "Weihnachtszug"
+category = 0
+consist = PackedStringArray("railcar_front", "railcar_middle", "railcar_rear")
+max_speed_kmh = 48.0
+acceleration = 0.4
+braking = 0.55
+min_dwell_seconds = 14.0
+primary_color = Color(0.17, 0.33, 0.24, 1)
+secondary_color = Color(0.95, 0.91, 0.82, 1)
+accent_color = Color(0.86, 0.66, 0.26, 1)
+roof_color = Color(0.52, 0.14, 0.12, 1)
+festive_lights = true
+horn_pitch = 1.12

@@ -35,3 +35,10 @@ signal notebook_requested(page: String)
 
 ## Die Kamera folgt jetzt diesem Zug (null = keinem).
 signal followed_train_changed(train: Node)
+
+## Hinweis, womit die Spielfigur gerade interagieren kann (z.B. "Mit Greta sprechen"; "" = nichts).
+signal interaction_prompt_changed(text: String)
+## Großes Fest-Banner in der Bildmitte (Titel, Untertitel, Bildname aus assets/ui/bubbles).
+signal event_banner_requested(title: String, subtitle: String, icon: String)
+## Etwas Schönes ist passiert – fürs Notizbuch (Seite "Feste": Dorfchronik).
+signal chronicle_entry(text: String, icon: String)

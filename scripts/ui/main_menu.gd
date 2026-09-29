@@ -185,7 +185,7 @@ func _add_station_signs() -> void:
 	var direction := _decorative_sign(Vector2(1216, 357), Vector2(98, 50), 0.0, "To New\nHorizons  ➜", 14,
 		Color("593519"), Color("a36a35"), Color("e5a766"))
 	direction.name = "DirectionSign"
-	var train := _decorative_sign(Vector2(772, 432), Vector2(77, 25), 0.0, "WINTERVALE", 11,
+	var train := _decorative_sign(Vector2(772, 432), Vector2(77, 25), 0.0, "WINTERVALE", 9,
 		Color("312018"), Color("a6753d"), Color("ffcf86"))
 	train.name = "TrainDestination"
 	var board := _decorative_sign(Vector2(1563, 391), Vector2(95, 214), -0.05,
@@ -216,6 +216,7 @@ func _decorative_sign(pos: Vector2, dimensions: Vector2, angle: float, caption: 
 	writing.size = dimensions - Vector2(10, 2)
 	writing.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	writing.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	writing.clip_text = true
 	writing.add_theme_font_override("font", _serif())
 	writing.add_theme_font_size_override("font_size", font_size)
 	writing.add_theme_color_override("font_color", lettering)
@@ -382,48 +383,39 @@ func _start_game(load_save: bool, slot: String) -> void:
 		_show_notice("This journey cannot be loaded. Choose another save.")
 		return
 	_starting_game = true
-	var curtain_layer := CanvasLayer.new()
-	curtain_layer.layer = 100
-	get_tree().root.add_child(curtain_layer)
-	var curtain := ColorRect.new()
-	curtain.color = Color("241b22")
-	curtain.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	curtain.mouse_filter = Control.MOUSE_FILTER_STOP
-	curtain.modulate.a = 0.0
-	curtain_layer.add_child(curtain)
-	if not GameSettings.get_pref("reduced_motion"):
-		var fade_in := get_tree().create_tween()
-		fade_in.tween_property(curtain, "modulate:a", 1.0, 0.38).set_trans(Tween.TRANS_SINE)
-		await fade_in.finished
-	else:
-		curtain.modulate.a = 1.0
+	var loading_screen := MenuLoadingScreen.new()
+	get_tree().root.add_child(loading_screen)
+	await loading_screen.reveal()
+	var shown_at := Time.get_ticks_msec()
+	loading_screen.set_progress(0.08)
+	await get_tree().process_frame
 	var scene := load("res://scenes/main/main.tscn") as PackedScene
 	if scene == null:
 		_show_notice("Unable to open the game world.")
-		curtain_layer.queue_free()
+		await loading_screen.dismiss()
 		_starting_game = false
 		return
+	loading_screen.set_progress(0.70)
+	await get_tree().process_frame
 	if load_save:
 		Achievements.suspend(true)
 	var world := scene.instantiate()
 	get_tree().root.add_child(world)
+	loading_screen.set_progress(0.88)
 	if load_save and not SaveManager.load_game(slot):
 		world.queue_free()
 		Achievements.suspend(false)
 		_show_notice("This journey could not be restored. Your save was not changed.")
-		var restore := get_tree().create_tween()
-		restore.tween_property(curtain, "modulate:a", 0.0, 0.25)
-		await restore.finished
-		curtain_layer.queue_free()
+		await loading_screen.dismiss()
 		_starting_game = false
 		return
 	get_tree().current_scene = world
 	visible = false
-	if not GameSettings.get_pref("reduced_motion"):
-		var fade_out := get_tree().create_tween()
-		fade_out.tween_property(curtain, "modulate:a", 0.0, 0.55).set_trans(Tween.TRANS_SINE)
-		await fade_out.finished
-	curtain_layer.queue_free()
+	loading_screen.set_progress(1.0)
+	var remaining := 650 - (Time.get_ticks_msec() - shown_at)
+	if remaining > 0:
+		await get_tree().create_timer(float(remaining) / 1000.0).timeout
+	await loading_screen.dismiss()
 	if not load_save:
 		await get_tree().process_frame
 		if not SaveManager.save_game(slot):

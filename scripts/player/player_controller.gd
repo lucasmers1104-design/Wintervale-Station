@@ -63,6 +63,7 @@ var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 
 func _ready() -> void:
 	add_to_group(GameDefs.GROUP_SAVEABLE)
+	add_to_group(&"player")
 	_target_distance = third_person_distance
 	_spring_arm.spring_length = _target_distance
 	_spring_arm.add_excluded_object(get_rid())
@@ -75,6 +76,10 @@ func _ready() -> void:
 	add_child(_footsteps)
 	_model.footstep.connect(_footsteps.play_step)
 	_apply_perspective()
+	# Sprechen, Aufheben, Übergeben (Taste E) – Etappe 10
+	var interaction := PlayerInteraction.new()
+	interaction.name = "Interaction"
+	add_child(interaction)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -137,6 +142,17 @@ func _process(delta: float) -> void:
 
 func get_camera() -> Camera3D:
 	return _camera
+
+
+func get_model() -> CharacterModel:
+	return _model
+
+
+## Blickrichtung der Figur (waagrecht).
+func get_facing() -> Vector3:
+	var forward := -_model.global_basis.z
+	forward.y = 0.0
+	return forward.normalized() if forward.length() > 0.01 else Vector3.FORWARD
 
 
 ## Horizontale Blickrichtung der Kamera (für den Übergang zur Vogelperspektive).

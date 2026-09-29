@@ -38,11 +38,21 @@ func _run() -> void:
 			break
 	_check(start != null, "New Game start control exists")
 	start.pressed.emit()
-	for i in 10:
+	_check(root.get_children().any(func(node: Node) -> bool: return node is MenuLoadingScreen),
+		"illustrated loading screen appears during world loading")
+	var slot: String = saves.get("active_slot")
+	var deadline := Time.get_ticks_msec() + 30000
+	while Time.get_ticks_msec() < deadline:
+		if current_scene and current_scene.scene_file_path == "res://scenes/main/main.tscn" \
+				and saves.call("has_save", slot):
+			break
 		await process_frame
 	var world: Node = current_scene
 	_check(world != null and world.scene_file_path == "res://scenes/main/main.tscn", "New Game opens real world")
-	var slot: String = saves.get("active_slot")
+	if world == null or world.scene_file_path != "res://scenes/main/main.tscn":
+		print("Phase 12 journey failures: ", failures)
+		quit(1)
+		return
 	_check(slot != "" and slot != "quicksave", "unique journey slot selected")
 	var data: Dictionary = saves.call("read_save_data", slot)
 	_check(not data.is_empty(), "new journey saved")
@@ -78,6 +88,30 @@ func _run() -> void:
 	_check(saves.call("load_game", slot), "named journey loads")
 	_check(int(clock.get("day")) == int(data["objects"]["world_clock"]["day"]), "game day restored")
 	_check(achievements.call("is_unlocked", "first_tracks"), "achievement unlock persists in save")
+	current_scene = null
+	world.queue_free()
+	await process_frame
+	var load_menu: Node = load("res://scenes/ui/main_menu.tscn").instantiate()
+	root.add_child(load_menu)
+	current_scene = load_menu
+	await process_frame
+	var continue_button := load_menu.get_node("ReferenceCanvas/Continue") as Button
+	_check(not continue_button.disabled, "Continue is available for valid named save")
+	continue_button.pressed.emit()
+	_check(root.get_children().any(func(node: Node) -> bool: return node is MenuLoadingScreen),
+		"Continue displays illustrated loading screen")
+	deadline = Time.get_ticks_msec() + 30000
+	while Time.get_ticks_msec() < deadline:
+		if current_scene and current_scene.scene_file_path == "res://scenes/main/main.tscn":
+			break
+		await process_frame
+	world = current_scene
+	_check(world != null and world.scene_file_path == "res://scenes/main/main.tscn",
+		"Continue restores the real world")
+	_check(achievements.call("is_unlocked", "first_tracks"), "Continue restores saved achievement")
+	while Time.get_ticks_msec() < deadline and root.get_children().any(
+		func(node: Node) -> bool: return node is MenuLoadingScreen):
+		await process_frame
 	saves.call("delete_save", slot)
 	_check(not saves.call("has_save", slot), "probe save removed")
 	print("Phase 12 journey failures: ", failures)

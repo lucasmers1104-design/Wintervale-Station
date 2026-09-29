@@ -7,6 +7,7 @@
 ##   Fahrplan    – Personenzüge und Güterzüge mit ihrer Ladung
 ##   Bauprojekte – Baustellen mit Fortschritt und Material, Baukosten aller Häuser
 ##   Finanzen    – Gemeindekasse, Tagesbilanz, Kassenbuch
+##   Feste       – Festkalender, heutiges Programm, Sonderzüge, Dorfchronik (Etappe 10)
 ##
 ## Das Buch wird komplett per Code gezeichnet (keine Texturen außer den eigenen
 ## Icons). Es liest nur Daten ([code]Economy[/code], Dorf, Güterbahnhof,
@@ -20,6 +21,7 @@ const PAGES: Array[Dictionary] = [
 	{"id": "timetable", "label": "Fahrplan", "icon": preload("res://assets/ui/icons/tab_timetable.svg"), "color": Color(0.64, 0.76, 0.86)},
 	{"id": "projects", "label": "Bauprojekte", "icon": preload("res://assets/ui/icons/tab_projects.svg"), "color": Color(0.93, 0.72, 0.48)},
 	{"id": "finances", "label": "Finanzen", "icon": preload("res://assets/ui/icons/tab_finances.svg"), "color": Color(0.93, 0.83, 0.46)},
+	{"id": "festivals", "label": "Feste", "icon": preload("res://assets/ui/icons/tab_festivals.svg"), "color": Color(0.9, 0.62, 0.6)},
 ]
 const COIN := preload("res://assets/ui/icons/coin.svg")
 const INK := Color(0.2, 0.16, 0.13)
@@ -338,6 +340,8 @@ func _fill_page() -> void:
 			_page_projects()
 		"finances":
 			_page_finances()
+		"festivals":
+			_page_festivals()
 	_restore_scroll.call_deferred(scrolls)
 
 
@@ -614,6 +618,84 @@ func _page_finances() -> void:
 		text.clip_text = true
 		var amount := int(entry["amount"])
 		_label(row, ("+" if amount > 0 else "") + Economy.format_money(amount, false), 16, INK_GREEN if amount > 0 else INK_RED, true)
+
+
+## Seite "Feste": Festkalender, heutiges Programm, Sonderzüge und die Dorfchronik.
+func _page_festivals() -> void:
+	var festivals := FestivalDirector.find(get_tree())
+	var events := get_tree().get_first_node_in_group(&"train_events") as TrainEvents
+	_heading(_left, "Feste im Dorf")
+	if festivals == null:
+		_note(_left, "Keine Feste geplant.")
+		return
+	for row: Dictionary in festivals.get_calendar():
+		var line := _row(_left, 12)
+		_icon(line, SpeechBubble.icon_texture(String(row["icon"])), 46)
+		var column := VBoxContainer.new()
+		column.add_theme_constant_override("separation", -2)
+		column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		line.add_child(column)
+		_label(column, String(row["name"]), 22, INK, true)
+		var when := ""
+		if bool(row["running"]):
+			var left := roundi(float(row["days_left"]))
+			when = "Jetzt – %s · täglich %s–%s Uhr" % ["letzter Tag" if left < 1 else ("noch 1 Tag" if left == 1 else "noch %d Tage" % left),
+				TimetableEntry.format_time(float(row["open"])), TimetableEntry.format_time(float(row["close"]))]
+		else:
+			when = "in %s" % _days_text(float(row["days_until"]))
+		_label(column, when, 15, INK_GREEN if bool(row["running"]) else INK_SOFT)
+		_label(column, "%s um %s" % [row["highlight_name"], TimetableEntry.format_time(float(row["highlight"]))], 15, INK_SOFT)
+	_divider(_left)
+	if festivals.is_active():
+		_label(_left, "Heute beim %s" % festivals.get_display_name(), 21, INK, true)
+		var program: Array[Array] = [
+			[festivals.get_open_hour(), "Die Buden öffnen"],
+			[festivals.get_highlight_hour(), "%s" % FestivalDirector.FESTIVALS[festivals.get_active_id()]["highlight_name"]],
+			[festivals.get_close_hour(), "Die Buden schließen"],
+		]
+		for entry in festivals.get_special_entries():
+			var arrival := entry.get_arrival_hours()
+			program.append([arrival, "%s aus %s (Gleis %d)" % [entry.train_number, entry.origin, entry.platform]])
+		program.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
+		for item: Array in program:
+			var line := _row(_left, 10)
+			var past := WorldClock.time_of_day > float(item[0])
+			_label(line, TimetableEntry.format_time(float(item[0])), 17, INK_FADED if past else INK_BLUE, true)
+			_label(line, String(item[1]), 16, INK_FADED if past else INK)
+		var stats := festivals.get_stats()
+		_note(_left, "Gerade auf dem Fest: %d · Besucher bisher: %d · an den Buden verkauft: %d" % [
+			festivals.get_visitors_now(), int(stats["visitors"]), int(stats["sold"])])
+	else:
+		_note(_left, "Zwischen den Festen ist es ruhig im Dorf – der Weihnachtsmarkt steht im Winter, das Herbstfest im Herbst.")
+	if events:
+		var train_stats := events.get_stats()
+		_note(_left, "Zug-Ereignisse: %d Verspätungen, %d× Schneeräumzug, %d Koffer zurückgebracht" % [
+			int(train_stats["delays"]), int(train_stats["ploughs"]), int(train_stats["luggage_returned"])])
+	_heading(_right, "Dorfchronik")
+	var scroll := _scroll(_right, "chronicle")
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 6)
+	scroll.add_child(list)
+	if festivals.chronicle.is_empty():
+		_note(list, "Noch ist nichts Besonderes passiert. Das ändert sich bestimmt bald …")
+	for entry: Dictionary in festivals.chronicle:
+		var line := _row(list, 10)
+		_icon(line, SpeechBubble.icon_texture(String(entry.get("icon", "star"))), 30)
+		var column := VBoxContainer.new()
+		column.add_theme_constant_override("separation", -3)
+		column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		line.add_child(column)
+		_label(column, "Tag %d · %s" % [int(entry["day"]), entry["time"]], 13, INK_FADED)
+		var text := _label(column, String(entry["text"]), 16, INK)
+		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+
+func _days_text(days: float) -> String:
+	if days < 1.0:
+		return "weniger als einem Tag" if days > 0.05 else "heute"
+	var whole := roundi(days)
+	return "einem Tag" if whole == 1 else "%d Tagen" % whole
 
 
 # --- Daten -------------------------------------------------------------------------------

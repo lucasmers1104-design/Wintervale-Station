@@ -38,6 +38,7 @@ var _served_day: Dictionary[int, int] = {}
 var _travel_hours: Dictionary[int, float] = {}
 var _materials := {}
 var _schedule_timer := 0.0
+var _delays := {}
 var _dark := false
 var _glow_tween: Tween
 
@@ -54,6 +55,7 @@ func _ready() -> void:
 		"lamp_idle_white": _lens_material(Color(0.62, 0.62, 0.6)),
 		"snow": _snow_material(),
 		"cargo": cargo_material,
+		"festive": _festive_material(),
 	}
 	WorldClock.darkness_changed.connect(_on_darkness_changed)
 	_on_darkness_changed(WorldClock.is_dark())
@@ -113,7 +115,18 @@ func check_timetable() -> void:
 
 ## Einsetzzeit: Ankunft minus geschätzte Fahrzeit vom Portal zum Bahnsteig.
 func get_spawn_hours(index: int) -> float:
-	return timetable.entries[index].get_arrival_hours() - _estimate_travel_hours(index)
+	var entry := timetable.entries[index]
+	return entry.get_arrival_hours() + get_delay(entry) - _estimate_travel_hours(index)
+
+
+## Verspätung eines Zuges heute (Stunden), z.B. wegen Schnee auf der Strecke ([TrainEvents]).
+func set_delay(entry: TimetableEntry, hours: float) -> void:
+	_delays[entry] = {"day": WorldClock.day, "hours": hours}
+
+
+func get_delay(entry: TimetableEntry) -> float:
+	var delay: Dictionary = _delays.get(entry, {})
+	return float(delay.get("hours", 0.0)) if int(delay.get("day", -1)) == WorldClock.day else 0.0
 
 
 ## Setzt den Zug zur Fahrplanzeile [param index] ein (sofern die Einfahrt frei ist).
@@ -164,6 +177,45 @@ func retire(train: Train, reason: String) -> void:
 func clear_trains() -> void:
 	for train in _trains.duplicate():
 		retire(train, "")
+
+
+## Zusätzliche Fahrplanzeilen einhängen (Sonderzüge der Feste). Sie hängen hinten an,
+## die Nummern der festen Züge bleiben also gleich.
+func add_entries(entries: Array[TimetableEntry]) -> void:
+	if timetable == null:
+		return
+	for entry in entries:
+		if not timetable.entries.has(entry):
+			timetable.entries.append(entry)
+	trains_changed.emit()
+
+
+## Sonderzüge wieder austragen (fahrende Sonderzüge fahren zu Ende).
+func remove_entries(entries: Array[TimetableEntry]) -> void:
+	if timetable == null:
+		return
+	# Zwischenspeicher hängen an Zeilennummern – vorher nach Zeilen merken, danach neu zuordnen
+	var served := {}
+	for index: int in _served_day:
+		if index < timetable.entries.size():
+			served[timetable.entries[index]] = _served_day[index]
+	for entry in entries:
+		var index := timetable.entries.find(entry)
+		if index < 0:
+			continue
+		timetable.entries.remove_at(index)
+		for train in _trains:
+			var meta := int(train.get_meta(&"entry_index", -1))
+			if meta == index:
+				train.set_meta(&"entry_index", -1)
+			elif meta > index:
+				train.set_meta(&"entry_index", meta - 1)
+	_served_day.clear()
+	_travel_hours.clear()
+	for i in timetable.entries.size():
+		if served.has(timetable.entries[i]):
+			_served_day[i] = served[timetable.entries[i]]
+	trains_changed.emit()
 
 
 # --- Wegplanung -----------------------------------------------------------------------
@@ -317,7 +369,7 @@ func get_departure_rows(station: String, count: int) -> Array[Dictionary]:
 func _estimate_delay(entry: TimetableEntry, train: Train) -> int:
 	var departure := entry.get_departure_hours()
 	var dwell := WorldClock.seconds_to_hours(entry.train_type.min_dwell_seconds + Train.DOOR_TIME * 2.0)
-	var expected := departure
+	var expected := departure + (get_delay(entry) if train == null else 0.0)
 	if train and train.state == Train.State.DWELLING:
 		expected = maxf(departure, train.arrived_at + dwell)
 	elif train and train.stop_at >= 0.0:
@@ -404,6 +456,14 @@ func _lamp_material(color: Color, energy: float) -> StandardMaterial3D:
 	material.emission_enabled = true
 	material.emission = color
 	material.emission_energy_multiplier = energy
+	return material
+
+
+## Lichterketten der festlichen Sonderzüge (funkeln wie die Marktbuden).
+func _festive_material() -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://assets/materials/festival_lights.gdshader")
+	material.set_shader_parameter(&"energy", 4.2)
 	return material
 
 

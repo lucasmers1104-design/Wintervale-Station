@@ -269,3 +269,19 @@ class _WeightedAStar extends AStar3D:
 
 	func _estimate_cost(from_id: int, end_id: int) -> float:
 		return get_point_position(from_id).distance_to(get_point_position(end_id)) * WalkGraph.COST_PATH
+
+
+## Kürzester Abstand (Draufsicht) von [param point] zu einer Verbindung des Netzes –
+## damit Festbuden & Co. keine Fußwege der Bewohner versperren.
+func distance_to_links(point: Vector3) -> float:
+	var p := Vector2(point.x, point.z)
+	var best := INF
+	for id in _astar.get_point_ids():
+		var a := _astar.get_point_position(id)
+		for other in _astar.get_point_connections(id):
+			if other < id:
+				continue
+			var b := _astar.get_point_position(other)
+			var closest := Geometry2D.get_closest_point_to_segment(p, Vector2(a.x, a.z), Vector2(b.x, b.z))
+			best = minf(best, closest.distance_to(p))
+	return best

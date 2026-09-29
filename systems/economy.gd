@@ -35,6 +35,7 @@ const KIND_LABELS := {
 	"build": "Baukosten",
 	"refund": "Rückerstattung",
 	"upkeep": "Unterhalt",
+	"reward": "Finderlohn",
 }
 
 ## Kostenlos bauen (Sandbox, automatische Tests).

@@ -103,14 +103,12 @@ func _run() -> void:
 	settings.get("values")["reduced_motion"] = false
 	gallery.call("show_page", "settings_graphics")
 	gallery.call("show_page", "settings_audio")
-	for i in 55:
-		await process_frame
-	_check(gallery.get_node("PageArt").texture == load("res://assets/ui/menu_screens/settings_graphics.png"), "rapid tab click does not overlap transition")
-	gallery.call("show_page", "settings_audio")
-	for i in 55:
-		await process_frame
-	_check(gallery.get_node("PageArt").texture == load("res://assets/ui/menu_screens/settings_audio.png"), "tab transition reaches Audio")
+	_check(gallery.get_node("PageArt").texture == load("res://assets/ui/menu_screens/settings_audio.png") \
+		and is_equal_approx(gallery.modulate.a, 1.0), "settings tab switches without animation")
+	gallery.call("show_page", "settings_controls")
+	_check(gallery.get_node("PageArt").texture == load("res://assets/ui/menu_screens/settings_controls.png"), "rapid tab changes stay responsive")
 	gallery.call("close_page")
+	_check(gallery.visible and bool(gallery.get("_transitioning")), "closing page retains exit animation")
 	for i in 35:
 		await process_frame
 	_check(not gallery.visible, "reverse transition returns to menu")

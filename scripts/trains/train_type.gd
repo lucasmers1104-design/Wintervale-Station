@@ -37,6 +37,11 @@ enum Category { PASSENGER, FREIGHT }
 @export var accent_color := Color(0.95, 0.72, 0.22)
 @export var roof_color := Color(0.42, 0.43, 0.45)
 
+## Lichterketten entlang der Dachkanten (festliche Sonderzüge).
+@export var festive_lights := false
+## Farben der Lichterkette.
+@export var festive_colors: PackedColorArray = PackedColorArray([Color(1.0, 0.25, 0.2), Color(1.0, 0.78, 0.35), Color(0.35, 0.9, 0.45), Color(1.0, 0.92, 0.75)])
+
 @export_group("Klang")
 ## Tonhöhe des Signalhorns (1 = normal, kleiner = tiefer).
 @export var horn_pitch := 1.0

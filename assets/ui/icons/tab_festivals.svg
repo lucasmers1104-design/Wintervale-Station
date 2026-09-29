@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Feste: Marktbude mit Lichterkette und Stern -->
+  <path d="M6 26 L32 10 L58 26 Z" fill="#b8392a" stroke="#3b2a20" stroke-width="2.6" stroke-linejoin="round"/>
+  <path d="M10 25 L32 12 L54 25" fill="none" stroke="#f4f7fb" stroke-width="3" stroke-linecap="round"/>
+  <rect x="11" y="26" width="42" height="28" fill="#c98a4e" stroke="#3b2a20" stroke-width="2.6"/>
+  <rect x="16" y="31" width="32" height="12" fill="#3b2a20"/>
+  <rect x="11" y="43" width="42" height="5" fill="#8a5a32" stroke="#3b2a20" stroke-width="2"/>
+  <path d="M8 29 Q20 36 32 29 Q44 36 56 29" fill="none" stroke="#3b2a20" stroke-width="1.6"/>
+  <g stroke="#3b2a20" stroke-width="1.2">
+    <circle cx="14" cy="31.5" r="2.4" fill="#ffd66b"/><circle cx="22" cy="33.6" r="2.4" fill="#ff7a5c"/>
+    <circle cx="30" cy="31" r="2.4" fill="#8fe39a"/><circle cx="38" cy="31.8" r="2.4" fill="#ffd66b"/>
+    <circle cx="46" cy="33.6" r="2.4" fill="#ff7a5c"/><circle cx="53" cy="31.2" r="2.4" fill="#ffd66b"/>
+  </g>
+  <path d="M32 1 L34 6 L39 6 L35 9 L36.5 14 L32 11 L27.5 14 L29 9 L25 6 L30 6 Z" fill="#f4c64a" stroke="#3b2a20" stroke-width="1.5"/>
+  <circle cx="24" cy="38" r="3" fill="#e0504a"/><circle cx="40" cy="38" r="3" fill="#f4c64a"/>
+</svg>

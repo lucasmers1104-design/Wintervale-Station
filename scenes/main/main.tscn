@@ -58,6 +58,8 @@
 [ext_resource type="Script" path="res://scripts/world/weather_system.gd" id="56_weather"]
 [ext_resource type="Script" path="res://scripts/world/rainfall.gd" id="57_rain"]
 [ext_resource type="Script" path="res://scripts/world/footprints.gd" id="58_prints"]
+[ext_resource type="Script" path="res://scripts/festival/festival_director.gd" id="59_festivals"]
+[ext_resource type="Script" path="res://scripts/festival/train_events.gd" id="60_train_events"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("2_sky")
@@ -787,3 +789,20 @@ freight_yard = NodePath("../World/FreightYard")
 dispatcher = NodePath("../World/Railway/TrainDispatcher")
 npc_director = NodePath("../NpcDirector")
 finances = NodePath("../TownFinances")
+
+[node name="Festivals" type="Node3D" parent="." node_paths=PackedStringArray("village", "terrain", "npc_director", "dispatcher", "walk_graph", "network", "nature")]
+script = ExtResource("59_festivals")
+village = NodePath("../World/Village")
+terrain = NodePath("../World/Terrain")
+npc_director = NodePath("../NpcDirector")
+dispatcher = NodePath("../World/Railway/TrainDispatcher")
+walk_graph = NodePath("../World/WalkGraph")
+network = NodePath("../World/Railway/RailNetwork")
+nature = NodePath("../World/Nature")
+
+[node name="TrainEvents" type="Node3D" parent="." node_paths=PackedStringArray("dispatcher", "npc_director", "weather", "network")]
+script = ExtResource("60_train_events")
+dispatcher = NodePath("../World/Railway/TrainDispatcher")
+npc_director = NodePath("../NpcDirector")
+weather = NodePath("../Weather")
+network = NodePath("../World/Railway/RailNetwork")

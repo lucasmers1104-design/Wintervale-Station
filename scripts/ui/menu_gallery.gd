@@ -77,40 +77,12 @@ func show_page(page: String) -> void:
 		return
 	if _transitioning:
 		return
-	var opening := not visible
 	visible = true
-	_transitioning = true
-	_blocker.visible = true
-	_blocker.grab_focus()
 	SoundLibrary.play(_paper_sound)
-	if GameSettings.get_pref("reduced_motion"):
-		_set_page(page)
-		visible = true
-		modulate.a = 1.0
-		_finish_open()
-		return
-	var incoming := _entry_offset(page)
-	if opening:
-		_set_page(page)
-		visible = true
-		modulate.a = 0.0
-		position.x = incoming
-		_transition = create_tween().set_parallel(true)
-		_transition.tween_property(self, "modulate:a", 1.0, 0.41).set_trans(Tween.TRANS_SINE)
-		_transition.tween_property(self, "position:x", 0.0, 0.41).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		_transition.finished.connect(_finish_open)
-		return
-	_transition = create_tween()
-	_transition.set_parallel(true)
-	_transition.tween_property(self, "modulate:a", 0.12, 0.16).set_trans(Tween.TRANS_SINE)
-	_transition.tween_property(self, "position:x", -incoming * 0.45, 0.16).set_trans(Tween.TRANS_SINE)
-	_transition.set_parallel(false)
-	_transition.tween_callback(_set_page.bind(page))
-	_transition.tween_callback(func() -> void: position.x = incoming)
-	_transition.set_parallel(true)
-	_transition.tween_property(self, "modulate:a", 1.0, 0.30).set_trans(Tween.TRANS_SINE)
-	_transition.tween_property(self, "position:x", 0.0, 0.33).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	_transition.finished.connect(_finish_open)
+	_set_page(page)
+	modulate.a = 1.0
+	position = Vector2.ZERO
+	_finish_open()
 
 
 func _finish_open() -> void:
@@ -159,21 +131,6 @@ func _set_page(page: String) -> void:
 	_rebuild_controls()
 	_live.build(page)
 	_live.modulate.a = 1.0
-	if not GameSettings.get_pref("reduced_motion"):
-		_live.modulate.a = 0.0
-		var settle := create_tween()
-		settle.tween_interval(0.11 if page.begins_with("settings_") else 0.18)
-		settle.tween_property(_live, "modulate:a", 1.0, 0.24).set_trans(Tween.TRANS_SINE)
-
-
-func _entry_offset(page: String) -> float:
-	if page == "load_save" or page == "new_game":
-		return 34.0
-	if page == "achievements":
-		return -24.0
-	if page.begins_with("settings_"):
-		return 9.0 if _page.begins_with("settings_") else 18.0
-	return 15.0
 
 
 func _unhandled_input(event: InputEvent) -> void:

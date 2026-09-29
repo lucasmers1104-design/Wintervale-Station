@@ -42,8 +42,13 @@ func _ready() -> void:
 	dispatcher = main.get_node("World/Railway/TrainDispatcher")
 	starter = main.get_node("World/Railway/StarterRailway")
 	dispatcher.enabled = false
+	# Dieser Test prüft den Grundfahrplan – ohne Sonderzüge der Feste und ohne Zug-Ereignisse
+	var festivals: FestivalDirector = main.get_node("Festivals")
+	festivals.forced_festival = "none"
+	(main.get_node("TrainEvents") as TrainEvents).enabled = false
 	for i in 5:
 		await get_tree().physics_frame
+	festivals.tick()
 
 	_test_layout()
 	_test_timetable()
