@@ -25,6 +25,7 @@ Voraussetzung: Eine Grafikkarte mit aktuellem Vulkan-Treiber (Forward+).
 | Maus | Umsehen |
 | Mausrad | Kameraabstand |
 | V | Ich-Perspektive ↔ Verfolgerperspektive |
+| E | Sprechen / Aufheben / Übergeben (Bewohner, vergessener Koffer) |
 | Tab | Zur Vogelperspektive |
 
 | Vogelperspektive | |
@@ -38,7 +39,7 @@ Voraussetzung: Eine Grafikkarte mit aktuellem Vulkan-Treiber (Forward+).
 | Linksklick auf Weiche | Weiche umstellen |
 | B | Build-Mode ein/aus |
 | Tab | Zurück zur Figur |
-| N | Notizbuch (Lager, Einwohner, Fahrplan, Bauprojekte, Finanzen) – Reiter per Klick, 1–5 oder Q/E, Esc schließt |
+| N | Notizbuch (Lager, Einwohner, Fahrplan, Bauprojekte, Finanzen, Feste) – Reiter per Klick, 1–6 oder Q/E, Esc schließt |
 
 | Build-Mode | |
 |---|---|
@@ -72,6 +73,7 @@ godot --headless --path . --fixed-fps 60 res://tests/npc_test.tscn
 godot --headless --path . --fixed-fps 60 res://tests/village_test.tscn
 godot --headless --path . --fixed-fps 60 res://tests/economy_test.tscn
 godot --headless --path . --fixed-fps 60 res://tests/world_test.tscn
+godot --headless --path . --fixed-fps 60 res://tests/festival_test.tscn
 ```
 
 Exit-Code 0 = alle Prüfungen bestanden.
@@ -86,4 +88,5 @@ Exit-Code 0 = alle Prüfungen bestanden.
 - [docs/WIRTSCHAFT.md](docs/WIRTSCHAFT.md) – Etappe 8: Güterbahnhof, Materialien, Güterzüge, Bauprojekte, Bewohner, Notizbuch, Fehlerliste
 - [docs/JAHRESZEITEN.md](docs/JAHRESZEITEN.md) – Etappe 9: Jahreszeiten, Wetter, Wege-Materialien, Schnee, Fehlerliste
 - [docs/ZUG_UND_WELT.md](docs/ZUG_UND_WELT.md) – Etappe 9.5: neuer Triebzug, Zug-Animationen, Güterzug- und Bahnhofsdetails, Fehlerliste, Leistung
+- [docs/FESTE.md](docs/FESTE.md) – Etappe 10: Weihnachtsmarkt, Herbstfest, Sonderzüge, Zug-Ereignisse, Gespräche, Festmusik
 - [CLAUDE.md](CLAUDE.md) – Projektregeln & Vision

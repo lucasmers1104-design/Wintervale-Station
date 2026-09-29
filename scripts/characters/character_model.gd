@@ -25,7 +25,8 @@ signal footstep
 
 enum Pose { STAND, SIT, LOOK_UP, CHECK_WATCH, WAVE, HANDS_BEHIND, STRETCH, WARM_HANDS, NOD, TALK }
 ## Gepäck in der Hand oder auf dem Rücken.
-enum Carry { NONE, SUITCASE, BACKPACK, SHOPPING_BAG }
+## MUG = heißer Becher (Glühwein, Most) in beiden Händen, LANTERN = Laterne am Stab (Laternenumzug).
+enum Carry { NONE, SUITCASE, BACKPACK, SHOPPING_BAG, MUG, LANTERN }
 
 const PLAID_SHADER := preload("res://assets/materials/plaid.gdshader")
 ## Augenhöhe über den Füßen (für die Ich-Perspektive).
@@ -54,9 +55,11 @@ const DETAIL_RANGE := 45.0
 			rebuild()
 @export var carry := Carry.NONE:
 	set(value):
+		if value == carry:
+			return
 		carry = value
 		if is_node_ready():
-			rebuild()
+			_rebuild_carry()
 ## Temperament des Gangs: 0,7 = gemütlich schlendernd, 1,0 = normal, 1,2 = lebhaft.
 @export_range(0.5, 1.4, 0.05) var gait_energy := 1.0
 ## Ab dieser Entfernung wird die ganze Figur nicht mehr gezeichnet (0 = immer sichtbar).
@@ -104,6 +107,7 @@ var _glance_timer := 2.0
 var _blink_timer := 3.0
 var _blink := 0.0
 var _rng := RandomNumberGenerator.new()
+var _lantern_swing := 0.0
 
 static var _material_cache := {}
 
@@ -236,6 +240,12 @@ func set_shadows_only(enabled: bool) -> void:
 		else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	for mesh in _meshes:
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if mesh in _details else mode
+
+
+## Gar keine Schatten (z.B. Verkäufer im Schatten ihrer Bude – spart Zeichenaufrufe).
+func disable_shadows() -> void:
+	for mesh in _meshes:
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 ## Sanft ein-/ausblenden (1 = sichtbar, 0 = unsichtbar), z.B. beim Heimgehen.
@@ -380,6 +390,7 @@ func _apply_animation() -> void:
 
 	# Wer mit der Hand, die das Gepäck trägt, eine Geste macht, stellt es kurz ab.
 	var hand_busy := maxf(maxf(warm, stretch), maxf(behind, talk if carry == Carry.SUITCASE else watch))
+	_lantern_swing = sin(_phase) * 0.18 * walk + sin(_time * 1.3) * 0.05
 	if carry == Carry.SUITCASE:
 		hand_busy = maxf(hand_busy, wave)
 	_update_carried(sit, hand_busy)
@@ -422,6 +433,14 @@ func _emit_steps() -> void:
 func _update_carried(sit: float, hand_busy: float) -> void:
 	if _carried == null or carry == Carry.BACKPACK:
 		return
+	if carry == Carry.MUG or carry == Carry.LANTERN:
+		# In der rechten Hand; der Becher bleibt aufrecht, die Laterne pendelt am Stab
+		var grip := to_local(_shoulder_right.to_global(Vector3(0.0, -0.33, 0.0)))
+		_carried.position = grip
+		_carried.rotation = Vector3.ZERO
+		if carry == Carry.LANTERN and _carried.get_child_count() > 0:
+			(_carried.get_child(0) as Node3D).rotation.x = _lantern_swing
+		return
 	var shoulder := _shoulder_right if carry == Carry.SUITCASE else _shoulder_left
 	var hand := to_local(shoulder.to_global(Vector3(0.0, -0.33, 0.0)))
 	var side := 1.0 if carry == Carry.SUITCASE else -1.0
@@ -431,9 +450,30 @@ func _update_carried(sit: float, hand_busy: float) -> void:
 	_carried.rotation = Vector3(0.0, 0.0, _body.rotation.z * 0.5 * (1.0 - sit) * (1.0 - hand_busy))
 
 
+## Nur das Getragene neu bauen (z.B. wenn jemand am Stand einen Becher bekommt).
+func _rebuild_carry() -> void:
+	if _carried:
+		for mesh in _carried.find_children("*", "MeshInstance3D", true, false):
+			_meshes.erase(mesh)
+			_details.erase(mesh)
+		_carried.get_parent().remove_child(_carried)
+		_carried.queue_free()
+		_carried = null
+	_build_carry(appearance if appearance else CharacterAppearance.new())
+	if _carried:
+		var alpha := 1.0 - (_meshes[0].transparency if not _meshes.is_empty() else 0.0)
+		for mesh in _carried.find_children("*", "MeshInstance3D", true, false):
+			(mesh as MeshInstance3D).transparency = 1.0 - alpha
+			if view_distance > 0.0:
+				(mesh as MeshInstance3D).visibility_range_end = view_distance
+
+
 func _build_carry(look: CharacterAppearance) -> void:
 	_carried = null
 	if carry == Carry.NONE:
+		return
+	if carry == Carry.MUG or carry == Carry.LANTERN:
+		_build_festive_carry(look)
 		return
 	var color := look.accent_color.lerp(look.shirt_color, 0.5)
 	match carry:
@@ -472,6 +512,59 @@ func _build_carry(look: CharacterAppearance) -> void:
 				strap.rotation.x = 0.1
 				strap.scale = Vector3(1.0, 1.0, 0.5)
 
+
+
+## Becher (rot mit weißem Stern, dampfend) oder Papierlaterne am Holzstab.
+func _build_festive_carry(look: CharacterAppearance) -> void:
+	_carried = _pivot(self, "Mug" if carry == Carry.MUG else "Lantern", Vector3.ZERO)
+	if carry == Carry.MUG:
+		var mug := _material(Color(0.72, 0.16, 0.14).lerp(look.accent_color, 0.2), 0.45)
+		_part(_carried, _cylinder(0.042, 0.038, 0.1, 12), mug, Vector3(0.0, 0.03, -0.07))
+		_part(_carried, _cylinder(0.036, 0.036, 0.004, 10), _material(Color(0.38, 0.06, 0.08), 0.2), Vector3(0.0, 0.078, -0.07))
+		var handle := _part(_carried, _torus(0.012, 0.03, 10), mug, Vector3(0.05, 0.03, -0.07))
+		handle.rotation.x = PI * 0.5
+		# Ein Hauch Dampf
+		var steam := _part(_carried, _sphere(0.03, 8, 4), _steam_material(), Vector3(0.0, 0.13, -0.07), Vector3(0.8, 1.6, 0.8))
+		steam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		return
+	# Laterne: Stab schräg nach vorne oben, Laterne hängt am Ende und pendelt
+	var stick_pivot := _pivot(_carried, "Stick", Vector3.ZERO)
+	var stick := _part(stick_pivot, _cylinder(0.01, 0.01, 0.62, 5), _material(Color(0.5, 0.34, 0.2), 0.8), Vector3(0.0, 0.2, -0.2))
+	stick.rotation.x = -0.75
+	var tip := Vector3(0.0, 0.42, -0.42)
+	var string := _part(stick_pivot, _cylinder(0.003, 0.003, 0.12, 4), _material(Color(0.2, 0.18, 0.16), 0.8), tip - Vector3(0.0, 0.06, 0.0))
+	string.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var colors := [Color(1.0, 0.55, 0.2), Color(1.0, 0.8, 0.35), Color(0.95, 0.32, 0.25), Color(0.5, 0.8, 1.0)]
+	var color: Color = colors[absi(hash(look.resource_path + str(look.shirt_color))) % colors.size()]
+	var paper := StandardMaterial3D.new()
+	paper.albedo_color = color
+	paper.emission_enabled = true
+	paper.emission = color
+	paper.emission_energy_multiplier = 3.4
+	paper.roughness = 0.6
+	var lantern := _part(stick_pivot, _sphere(0.15, 12, 6), paper, tip - Vector3(0.0, 0.24, 0.0), Vector3(1.0, 0.85, 1.0))
+	lantern.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for y: float in [-0.12, -0.36]:
+		_part(stick_pivot, _cylinder(0.075, 0.075, 0.02, 10), _material(Color(0.2, 0.18, 0.16), 0.7), tip + Vector3(0.0, y, 0.0))
+	var light := OmniLight3D.new()
+	light.light_color = color.lerp(Color(1.0, 0.8, 0.5), 0.5)
+	light.light_energy = 1.1
+	light.omni_range = 3.2
+	light.shadow_enabled = false
+	light.position = tip - Vector3(0.0, 0.24, 0.0)
+	stick_pivot.add_child(light)
+
+
+static var _steam: StandardMaterial3D
+
+
+static func _steam_material() -> StandardMaterial3D:
+	if _steam == null:
+		_steam = StandardMaterial3D.new()
+		_steam.albedo_color = Color(1.0, 1.0, 1.0, 0.28)
+		_steam.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_steam.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	return _steam
 
 
 # --- Aufbau -----------------------------------------------------------------------

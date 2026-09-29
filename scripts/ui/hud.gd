@@ -84,6 +84,10 @@ func _ready() -> void:
 			_tool_row.add_child(button)
 		_tool_buttons[entry["id"]] = button
 
+	# Fest-Banner und Interaktionshinweis (Etappe 10)
+	var overlay := EventOverlay.new()
+	overlay.name = "EventOverlay"
+	add_child(overlay)
 	_toast_label.modulate.a = 0.0
 	_update_clock()
 	_on_time_scale_changed(WorldClock.time_scale)

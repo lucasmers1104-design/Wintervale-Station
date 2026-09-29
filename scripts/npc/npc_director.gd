@@ -165,10 +165,36 @@ func _update_social() -> void:
 			_greeted[key] = WorldClock.time_of_day
 			a.greet(b)
 			b.greet(a)
+			# Ein kurzer Plausch in Bildern: Wetter, Jahreszeit, Züge, Herzliches
+			if _rng.randf() < 0.4:
+				a.show_icon(small_talk_icon(_rng))
+				var reply := small_talk_icon(_rng)
+				var partner := b
+				get_tree().create_timer(1.4).timeout.connect(func() -> void:
+					if is_instance_valid(partner):
+						partner.show_icon(reply))
 	for npc in present:
 		if npc.get_behaviour() == "chat" and npc.get_spot() and npc.get_spot().partner \
 				and npc.get_spot().partner.occupant is Npc and _rng.randf() < 0.3:
 			npc.chat_gesture()
+			if _rng.randf() < 0.18:
+				npc.show_icon(small_talk_icon(_rng))
+
+
+## Worüber man gerade plaudert (Bildblase): Wetter, Jahreszeit, Züge, Nettes.
+func small_talk_icon(rng: RandomNumberGenerator) -> String:
+	var options: Array[String] = ["heart", "train", "clock", "star"]
+	match Seasons.get_season():
+		Seasons.Season.WINTER:
+			options.append_array(["snowflake", "snowflake", "cup", "gift"])
+		Seasons.Season.AUTUMN:
+			options.append_array(["leaf", "leaf", "cup"])
+		_:
+			options.append_array(["sun", "sun", "note"])
+	var festival := FestivalDirector.find(get_tree())
+	if festival and festival.is_active():
+		options.append_array(["tree", "note"] if festival.get_active_id() == FestivalDirector.CHRISTMAS else ["lantern", "note"])
+	return options[rng.randi() % options.size()]
 
 
 ## Gesprächsplatz: am liebsten gegenüber von jemandem, der dort schon steht.
@@ -273,7 +299,8 @@ func has_departed(entry_index: int, now: float) -> bool:
 		if int(train.get_meta(&"entry_index", -1)) == entry_index:
 			return false
 	var entry := dispatcher.timetable.entries[entry_index]
-	return _hours_between(entry.get_departure_hours(), now) > 0.25
+	# Verspätete Züge (Schnee, Nebel) kommen später – so lange wird gewartet
+	return _hours_between(entry.get_departure_hours() + dispatcher.get_delay(entry), now) > 0.25
 
 
 # --- Türen und Warteschlangen --------------------------------------------------------
@@ -477,7 +504,7 @@ func _watch_trains() -> void:
 		rng.seed = train.train_id * 131 + WorldClock.day * 17
 		var count := rng.randi_range(travellers_per_train.x, travellers_per_train.y)
 		for i in count:
-			if get_travellers().size() >= max_travellers:
+			if regular_traveller_count() >= max_travellers:
 				break
 			var visitor := spawn_traveller(rng)
 			visitor.alight_from(train, true)
@@ -506,7 +533,7 @@ func _spawn_departing_travellers(now: float) -> void:
 		rng.seed = index * 977 + WorldClock.day * 31
 		var count := rng.randi_range(travellers_per_train.x, travellers_per_train.y)
 		for i in count:
-			if get_travellers().size() >= max_travellers:
+			if regular_traveller_count() >= max_travellers:
 				break
 			var traveller := spawn_traveller(rng)
 			var start := get_exit_point() + Vector3(rng.randf_range(-1.0, 1.0), 0.0, rng.randf_range(-1.0, 1.0))
@@ -532,6 +559,15 @@ func spawn_traveller(rng: RandomNumberGenerator) -> Npc:
 	_relay_signals(npc)
 	_travellers.append(npc)
 	return npc
+
+
+## Reisende ohne Festgäste (die Gäste der Feste zählen nicht zur Obergrenze).
+func regular_traveller_count() -> int:
+	var count := 0
+	for npc in _travellers:
+		if is_instance_valid(npc) and not npc.has_meta(&"festival_guest"):
+			count += 1
+	return count
 
 
 func _relay_signals(npc: Npc) -> void:

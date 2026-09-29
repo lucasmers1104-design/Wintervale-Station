@@ -32,6 +32,7 @@ const KEY_BINDINGS := {
 	&"toggle_notebook": [KEY_N],
 	&"next_season": [KEY_J],
 	&"next_weather": [KEY_K],
+	&"interact": [KEY_E],
 	&"build_tool_rail": [KEY_1],
 	&"build_tool_switch": [KEY_2],
 	&"build_tool_signal": [KEY_3],
@@ -88,6 +89,7 @@ const LEGENDS := {
 		{"literal": ["Maus"], "text": "Umsehen"},
 		{"actions": [&"zoom_in"], "text": "Abstand"},
 		{"actions": [&"toggle_perspective"], "text": "Ich-Perspektive"},
+		{"actions": [&"interact"], "text": "Sprechen / Aufheben"},
 		{"actions": [&"toggle_view"], "text": "Vogelperspektive"},
 	],
 	&"bird_eye": [

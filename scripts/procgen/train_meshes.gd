@@ -21,6 +21,7 @@ const SPECS := {
 	"loco_regional": {"length": 10.0, "bogie": 3.3, "wheel_base": 2.2},
 	"coach": {"length": 12.0, "bogie": 4.3, "wheel_base": 2.2},
 	"loco_freight": {"length": 8.6, "bogie": 2.7, "wheel_base": 2.0},
+	"loco_plough": {"length": 9.8, "bogie": 2.7, "wheel_base": 2.0},
 	"wagon_timber": {"length": 9.0, "bogie": 3.1, "wheel_base": 1.8},
 	"wagon_container": {"length": 9.6, "bogie": 3.3, "wheel_base": 1.8},
 	"wagon_hopper": {"length": 8.4, "bogie": 2.9, "wheel_base": 1.8},
@@ -116,6 +117,8 @@ static func build_car(kind: String, livery: Dictionary, variant := 0) -> Diction
 			result = _build_loco_regional(livery, rng)
 		"loco_freight":
 			result = _build_loco_freight(livery, rng)
+		"loco_plough":
+			result = _build_loco_freight(livery, rng, true)
 		"wagon_timber":
 			result = _build_wagon_timber(rng)
 		"wagon_container":
@@ -263,7 +266,7 @@ static func _build_loco_regional(livery: Dictionary, rng: RandomNumberGenerator)
 
 # --- Güterverkehr --------------------------------------------------------------------
 
-static func _build_loco_freight(livery: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
+static func _build_loco_freight(livery: Dictionary, rng: RandomNumberGenerator, plough := false) -> Dictionary:
 	var paint := _new_st()
 	var glass := _new_st()
 	var half := 4.3
@@ -319,15 +322,53 @@ static func _build_loco_freight(livery: Dictionary, rng: RandomNumberGenerator) 
 	LowPolyBuilder.add_box(paint, Vector3(0.0, 3.53, 2.7), Vector3(1.6, 0.03, 2.2), SNOW)
 	_underframe_equipment(paint, 1.4)
 	_freight_loco_details(paint, livery, half)
+	var beacons: Array = []
+	if plough:
+		beacons = _plough_gear(paint, livery, half)
 	for end: float in [-1.0, 1.0]:
 		_add_buffers(paint, end * half, end)
 		for side: float in [-1.0, 1.0]:
 			LowPolyBuilder.add_box(paint, Vector3(side * 1.2, 0.72, end * (half - 0.25)), Vector3(0.35, 0.05, 0.3), livery["accent"])
 	return {
-		"paint": paint.commit(), "glass": glass.commit(), "doors": [],
+		"paint": paint.commit(), "glass": glass.commit(), "doors": [], "beacons": beacons,
 		"lamps_front": [Vector3(0.0, 2.6, -3.98), Vector3(-0.95, 1.42, -half - 0.06), Vector3(0.95, 1.42, -half - 0.06)],
 		"lamps_rear": [Vector3(-0.95, 1.42, half + 0.06), Vector3(0.95, 1.42, half + 0.06)],
 	}
+
+
+## Schneeräumlok (Etappe 10): großer Keilpflug mit Warnstreifen vorne, Räumschilde
+## seitlich, zwei orange Rundumleuchten auf dem Führerhaus. Rückgabe: Leuchtenpunkte.
+static func _plough_gear(paint: SurfaceTool, livery: Dictionary, half: float) -> Array:
+	var steel: Color = livery["secondary"]
+	var tip := Vector3(0.0, 0.15, -half - 1.35)
+	var top_tip := Vector3(0.0, 1.55, -half - 0.95)
+	for side: float in [-1.0, 1.0]:
+		var wing_low := Vector3(side * 1.38, 0.1, -half - 0.2)
+		var wing_top := Vector3(side * 1.38, 1.35, -half - 0.05)
+		var outward := Vector3(side * 0.6, 0.35, -1.0)
+		LowPolyBuilder.add_quad_facing(paint, tip, wing_low, wing_top, top_tip, steel, outward)
+		LowPolyBuilder.add_quad_facing(paint, tip + Vector3(0, 0, 0.08), wing_low + Vector3(0, 0, 0.08), wing_top + Vector3(0, 0, 0.08),
+			top_tip + Vector3(0, 0, 0.08), UNDER, -outward)
+		# Warnstreifen schräg über den Pflug
+		for k in 4:
+			var t := 0.15 + k * 0.22
+			var p := tip.lerp(wing_top, t) + outward.normalized() * 0.012
+			LowPolyBuilder.add_oriented_box(paint, Transform3D(Basis.looking_at(outward, Vector3.UP).rotated(outward.normalized(), 0.7), p),
+				Vector3(0.14, 0.9, 0.01), livery["accent"])
+		# Seitliche Räumschilde an den Drehgestellen
+		LowPolyBuilder.add_oriented_box(paint, Transform3D(Basis(Vector3.UP, side * 0.25), Vector3(side * 1.18, 0.35, -2.7)),
+			Vector3(0.06, 0.45, 1.2), steel)
+		# Streben zum Rahmen
+		LowPolyBuilder.add_beam(paint, Vector3(side * 0.9, 1.0, -half + 0.1), Vector3(side * 0.9, 0.8, -half - 0.6), 0.1, UNDER)
+	LowPolyBuilder.add_box(paint, top_tip + Vector3(0, 0.06, 0.2), Vector3(0.3, 0.12, 0.5), steel)
+	LowPolyBuilder.add_box(paint, top_tip + Vector3(0, 0.14, 0.3), Vector3(2.5, 0.08, 0.4), SNOW)
+	var beacons: Array = []
+	for x: float in [-0.7, 0.7]:
+		var p := Vector3(x, 3.55, 2.9)
+		LowPolyBuilder.add_cylinder(paint, p, 0.1, 0.1, 0.04, 8, UNDER)
+		LowPolyBuilder.add_cylinder(paint, p + Vector3(0, 0.04, 0), 0.08, 0.07, 0.14, 8, Color(1.0, 0.55, 0.1))
+		beacons.append(p + Vector3(0, 0.12, 0))
+	return beacons
 
 
 ## Feinheiten der Güterlok (Etappe 9.5): Wartungstüren am Vorbau, runde Lampengehäuse,

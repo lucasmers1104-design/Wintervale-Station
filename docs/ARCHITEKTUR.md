@@ -265,3 +265,13 @@ Ausführlich in [ZUG_UND_WELT.md](ZUG_UND_WELT.md). Kurz:
 - **TrainCar:** Der Wagenkasten hängt an einem Node „Body“ (Federung: Kurvenneigung, Nicken, Wiegen – `update_motion()`), Innenlicht je Wagen über den Instanz-Parameter `cabin` des Fenster-Shaders (`set_cabin_light()`), Zielanzeige (`set_destination()`), unbeleuchtete Lampen (`lamps_idle`).
 - **LowPolyTerrain.get_surface_height():** Höhe der gezeichneten Dreiecke – für alles, was flach auf dem Boden liegt (Wege).
 - **VillageManager:** `is_on_other_path()`, `wider_surface_depth()` – Wege enden sauber an breiteren Wegen, keine Schneewälle über Einmündungen.
+
+## Etappe 10: Feste und Dorfleben
+
+Ausführlich in [FESTE.md](FESTE.md). Kurz:
+
+- **Neu:** `Festivals` (`FestivalDirector`) und `TrainEvents` in `main.tscn`; Fest-Bauteile `MarketStall`, `FestivalTree`, `FestivalCarousel`, `FestivalFire`, `LostLuggage`; Modelle `FestivalMeshes`; Musik `FestivalSounds`; Gespräche `NpcDialogue`, `PlayerInteraction` (Taste E), `SpeechBubble`, `EventOverlay`.
+- **Schnittstelle "interactable"** (Gruppe `PlayerInteraction.GROUP`): `get_interaction_point()`, `get_interaction_text(player)`, `interact(player)` – Bewohner und Koffer; weitere Dinge lassen sich so leicht ansprechbar machen.
+- **Npc:** Zustand `FESTIVAL`; Hooks `special_interaction` (Sonderhandlung für E), `after_alight` (nach dem Aussteigen), `festival_invite` (Sonderzuggäste).
+- **Events:** `interaction_prompt_changed`, `event_banner_requested`, `chronicle_entry`.
+- **TrainDispatcher:** `add_entries()`/`remove_entries()` (Sonderzüge hinten im Fahrplan), `set_delay()`/`get_delay()`.

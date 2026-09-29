@@ -278,6 +278,10 @@ func _test_arrival_by_train() -> void:
 	dispatcher.enabled = false
 	dispatcher.clear_trains()
 	check(npcs.all(func(npc: Npc) -> bool: return alighted.has(npc)), "the family got off a train at Wintervale")
+	for npc in npcs:
+		if npc.state != Npc.State.AT_HOME or npc.is_moving_in():
+			print("      %s: state %d, moving %s, busy %s, at %s, frames %d, time %.2f" % [npc.display_name, npc.state, npc.is_moving(),
+				npc.is_busy(), npc.global_position, n, WorldClock.time_of_day])
 	check(npcs.all(func(npc: Npc) -> bool: return npc.state == Npc.State.AT_HOME and not npc.is_moving_in()),
 		"and walked home with their suitcases")
 
