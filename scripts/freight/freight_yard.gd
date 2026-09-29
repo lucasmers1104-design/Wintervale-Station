@@ -1321,10 +1321,11 @@ func _update_birds(delta: float) -> void:
 	var hook := _hook.global_position if _hook else Vector3.INF
 	for i in range(_birds.size() - 1, -1, -1):
 		var bird: Dictionary = _birds[i]
-		var node: Node3D = bird["node"]
-		if not is_instance_valid(node):
+		# Erst prüfen, dann typisiert zuweisen (ein gelöschter Vogel darf keine Variable füllen)
+		if not is_instance_valid(bird["node"]):
 			_birds.remove_at(i)
 			continue
+		var node: Node3D = bird["node"]
 		if float(bird["fly"]) >= 0.0:
 			bird["fly"] = float(bird["fly"]) + delta
 			var t: float = bird["fly"]

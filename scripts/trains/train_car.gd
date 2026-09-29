@@ -4,6 +4,11 @@
 ## an ihrer Position folgen – so fahren die Wagen sauber durch Kurven.
 ## Außerdem: drehende Radsätze, Schiebetüren, Stirn-/Schlusslichter,
 ## Scheinwerfer, aufgewirbelter Schnee und Klänge (Schienenstoß, Türen).
+##
+## Etappe 9.5: Der Wagenkasten ("Body") ist federnd gelagert – er neigt sich in
+## Kurven leicht nach außen, nickt beim Bremsen und Anfahren und wiegt sich sanft
+## bei der Fahrt ([method update_motion]). Das Innenlicht wird im Stand und bei
+## Dunkelheit warm hell ([method set_cabin_light]); Scheinwerfer blenden im Stand ab.
 class_name TrainCar
 extends Node3D
 
@@ -35,6 +40,21 @@ var _step_amount := 0.0
 var _cargo: Array[Dictionary] = []
 var _cargo_material: Material
 var _exhaust: GPUParticles3D
+var _body: Node3D
+var _glass_nodes: Array[GeometryInstance3D] = []
+var _cabin := 0.0
+var _dark := false
+var _standing := true
+var _roll := 0.0
+var _pitch := 0.0
+var _travel := 0.0
+var _display: Label3D
+
+## Größte Neigung des Wagenkastens in Kurven und beim Bremsen (Bogenmaß).
+const MAX_ROLL := 0.035
+const MAX_PITCH := 0.012
+## Drehpunkt der Federung (Höhe über Schienenoberkante).
+const SUSPENSION_Y := 1.0
 
 
 ## Baut das Fahrzeug. [param materials]: {"paint", "glass", "lamp_white", "lamp_red", "snow"}.
@@ -46,17 +66,32 @@ func build(p_kind: String, train_type: TrainType, is_first: bool, is_last: bool,
 	length = parts["length"]
 	bogie_offset = parts["bogie"]
 
-	_add_mesh(parts["paint"], materials["paint"])
+	# Wagenkasten auf der Federung: alles, was mitschwingt, hängt an _body
+	_body = Node3D.new()
+	_body.name = "Body"
+	add_child(_body)
+	_add_mesh(parts["paint"], materials["paint"], _body)
 	if parts["glass"]:
-		_add_mesh(parts["glass"], materials["glass"])
+		var glass := _add_mesh(parts["glass"], materials["glass"], _body)
+		# Die Scheiben liegen auf dem Wagenkasten – dessen Schatten genügt
+		glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_glass_nodes.append(glass)
 	for door: Dictionary in parts["doors"]:
 		var leaf := MeshInstance3D.new()
 		leaf.mesh = door["mesh"]
-		leaf.material_override = materials["paint"]
+		if leaf.mesh.get_surface_count() > 1:
+			# Türblatt aus Lack, Türfenster aus Glas (leuchtet mit dem Innenlicht)
+			leaf.set_surface_override_material(0, materials["paint"])
+			leaf.set_surface_override_material(1, materials["glass"])
+			_glass_nodes.append(leaf)
+		else:
+			leaf.material_override = materials["paint"]
 		leaf.position = door["position"]
+		# Kleine Teile unter bzw. im Schatten des Wagenkastens werfen keinen eigenen Schatten (Leistung)
+		leaf.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		if float(door["side"]) < 0.0:
 			leaf.rotation.y = PI
-		add_child(leaf)
+		_body.add_child(leaf)
 		_doors.append({"node": leaf, "closed": door["position"], "open_offset": door["open_offset"], "side": door["side"]})
 	_build_steps(materials["paint"])
 	_cargo_material = materials.get("cargo", materials["paint"])
@@ -71,15 +106,21 @@ func build(p_kind: String, train_type: TrainType, is_first: bool, is_last: bool,
 		var bogie := Node3D.new()
 		bogie.position = Vector3(0.0, 0.0, z)
 		add_child(bogie)
-		_add_mesh(bogie_mesh, materials["paint"], bogie)
+		_add_mesh(bogie_mesh, materials["paint"], bogie).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		for axle: float in [-0.5, 0.5]:
 			var wheelset := Node3D.new()
 			wheelset.position = Vector3(0.0, TrainMeshes.WHEEL_RADIUS, axle * float(parts["wheel_base"]))
 			bogie.add_child(wheelset)
-			_add_mesh(wheel_mesh, materials["paint"], wheelset)
+			_add_mesh(wheel_mesh, materials["paint"], wheelset).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_wheelsets.append(wheelset)
 		_bogies.append(bogie)
 
+	# Lampen, die in dieser Fahrtrichtung nicht leuchten (z.B. Schlusslichter am Zuganfang)
+	for idle: Dictionary in parts.get("lamps_idle", []):
+		var idle_material: Material = materials.get("lamp_idle_%s" % idle["color"], materials["paint"])
+		_add_lamp(idle["position"], float(idle["facing"]), idle_material)
+	if parts.has("display"):
+		_add_display(parts["display"])
 	if is_first:
 		for lamp_position: Vector3 in parts["lamps_front"]:
 			_add_lamp(lamp_position, -1.0, materials["lamp_white"])
@@ -210,6 +251,8 @@ func set_steps(amount: float, side: float) -> void:
 		var unit: Node3D = step["unit"]
 		var hinge: Node3D = step["hinge"]
 		unit.position.x = float(step["side"]) * lerpf(TrainMeshes.STEP_RETRACTED_X, TrainMeshes.STEP_EXTENDED_X, slide * active)
+		# Eingefahren liegt die Stufe unsichtbar unter dem Wagen: gar nicht erst zeichnen
+		unit.visible = slide * active > 0.001
 		hinge.rotation.z = -TrainMeshes.STEP_FOLD_ANGLE * (1.0 - unfold * active)
 
 
@@ -225,12 +268,70 @@ func get_door_amount() -> float:
 	return _door_amount
 
 
-## Lichtstärke der Scheinwerfer (nachts heller).
+## Lichtstärke der Scheinwerfer (nachts heller, im Stand abgeblendet).
 func set_light_level(dark: bool) -> void:
+	_dark = dark
 	if _headlight:
-		_headlight.light_energy = 3.0 if dark else 0.6
+		_headlight.light_energy = (3.0 if dark else 0.6) * (0.35 if _standing else 1.0)
 	if _tail_glow:
 		_tail_glow.light_energy = 0.6 if dark else 0.15
+
+
+## Warmes Innenlicht (0..1): scheint durch alle Fenster und Türfenster.
+func set_cabin_light(level: float) -> void:
+	if absf(level - _cabin) < 0.005:
+		return
+	_cabin = level
+	for node in _glass_nodes:
+		node.set_instance_shader_parameter(&"cabin", level)
+
+
+func get_cabin_light() -> float:
+	return _cabin
+
+
+## Federung des Wagenkastens: [param speed] (m/s), [param acceleration] (m/s², negativ =
+## bremsen). Neigt sich in Kurven nach außen, nickt beim Bremsen nach vorne, beim
+## Anfahren leicht zurück, und wiegt sich bei der Fahrt ganz sanft.
+func update_motion(speed: float, acceleration: float, delta: float) -> void:
+	var standing := speed < 0.05
+	if standing != _standing:
+		_standing = standing
+		set_light_level(_dark)
+	if _body == null or _bogies.size() < 2:
+		return
+	# Krümmung aus dem Winkel zwischen den beiden Drehgestellen
+	var front := -_bogies[0].global_basis.z
+	var rear := -_bogies[1].global_basis.z
+	var turn := atan2(rear.cross(front).y, rear.dot(front))
+	var curvature := turn / maxf(bogie_offset * 2.0, 1.0)
+	var lateral := speed * speed * curvature
+	var target_roll := clampf(-lateral * 0.03, -MAX_ROLL, MAX_ROLL)
+	# Bremsen (negativ) senkt die Front (Drehung um +X hebt -Z an, daher gleiches Vorzeichen)
+	var target_pitch := clampf(acceleration * 0.012, -MAX_PITCH, MAX_PITCH)
+	var blend := 1.0 - exp(-delta * 3.0)
+	_roll = lerpf(_roll, target_roll, blend)
+	_pitch = lerpf(_pitch, target_pitch, blend)
+	_travel += speed * delta
+	var sway := sin(_travel * 0.9) * 0.0035 * clampf(speed / 8.0, 0.0, 1.0)
+	var bounce := sin(_travel * 2.3) * 0.006 * clampf(speed / 10.0, 0.0, 1.0)
+	var basis := Basis.from_euler(Vector3(_pitch, 0.0, _roll + sway))
+	var pivot := Vector3(0.0, SUSPENSION_Y, 0.0)
+	_body.transform = Transform3D(basis, pivot - basis * pivot + Vector3(0.0, bounce, 0.0))
+
+
+func get_body_tilt() -> Vector2:
+	return Vector2(_roll, _pitch)
+
+
+## Zielanzeige an der Front (orange Leuchtschrift).
+func set_destination(text: String) -> void:
+	if _display:
+		_display.text = text
+
+
+func get_destination() -> String:
+	return _display.text if _display else ""
 
 
 ## Aufgewirbelter Schnee an der Lok – nur bei zügiger Fahrt und nur, wenn Schnee liegt.
@@ -270,6 +371,20 @@ func _add_mesh(mesh: Mesh, material: Material, parent: Node3D = self) -> MeshIns
 	return instance
 
 
+func _add_display(xform: Transform3D) -> void:
+	_display = Label3D.new()
+	_display.name = "Display"
+	_display.text = ""
+	_display.font_size = 40
+	_display.pixel_size = 0.0036
+	_display.modulate = Color(1.0, 0.62, 0.18)
+	_display.outline_size = 0
+	_display.double_sided = false
+	_display.shaded = false
+	_display.transform = xform
+	_body.add_child(_display)
+
+
 ## Kleine leuchtende Lampenscheibe; [param facing] -1 = nach vorne, +1 = nach hinten.
 func _add_lamp(lamp_position: Vector3, facing: float, material: Material) -> void:
 	var disc := CylinderMesh.new()
@@ -284,7 +399,7 @@ func _add_lamp(lamp_position: Vector3, facing: float, material: Material) -> voi
 	lamp.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	lamp.rotation.x = PI * 0.5
 	lamp.position = lamp_position + Vector3(0.0, 0.0, facing * 0.01)
-	add_child(lamp)
+	(_body if _body else self).add_child(lamp)
 
 
 func _make_player(stream: AudioStream, volume: float, distance: float) -> AudioStreamPlayer3D:
@@ -511,10 +626,11 @@ func _build_steps(material: Material) -> void:
 			if side < 0.0:
 				unit.rotation.y = PI
 			add_child(unit)
-			_add_mesh(upper, material, unit)
+			unit.visible = false
+			_add_mesh(upper, material, unit).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			var hinge := Node3D.new()
 			hinge.position = Vector3(TrainMeshes.STEP_DEPTH * 0.5, TrainMeshes.STEP_UPPER_Y - 0.02, 0.0)
 			hinge.rotation.z = -TrainMeshes.STEP_FOLD_ANGLE
 			unit.add_child(hinge)
-			_add_mesh(lower, material, hinge)
+			_add_mesh(lower, material, hinge).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_steps.append({"unit": unit, "hinge": hinge, "side": side})

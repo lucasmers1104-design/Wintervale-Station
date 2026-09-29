@@ -39,13 +39,51 @@ func _ready() -> void:
 
 ## Neu an das Gelände anpassen (z.B. nachdem ein Haus den Boden geebnet hat).
 func rebuild() -> void:
-	var height := func(x: float, z: float) -> float: return terrain.get_height(x, z) if terrain else 0.0
-	_mesh.mesh = PathMeshes.build(item_id, start_point, end_point, height)
+	var height := func(x: float, z: float) -> float: return terrain.get_surface_height(x, z) if terrain else 0.0
+	# Schneewälle nicht auf anderen Wegen oder dem Dorfplatz (Kreuzungen bleiben frei)
+	var manager := get_parent()
+	var blocked := Callable()
+	if manager and manager.has_method(&"is_on_other_path"):
+		blocked = func(p: Vector3) -> bool: return bool(manager.call(&"is_on_other_path", p, object_id))
+	# Endet der Weg auf einem breiteren Weg (Hauszugang an der Straße) oder dem Dorfplatz,
+	# hört er kurz hinter dessen Rand ohne eigene Knotenscheibe auf – sonst schaut seine
+	# Scheibe mit Schnee-Bankett als heller Fleck durch die Straße.
+	var a := start_point
+	var b := end_point
+	var caps := [true, true]
+	if manager and manager.has_method(&"wider_surface_depth"):
+		for k in 2:
+			var end := a if k == 0 else b
+			var other := b if k == 0 else a
+			if float(manager.call(&"wider_surface_depth", end, object_id, get_width())) > 0.0:
+				var cut := _clip_to_edge(manager, other, end)
+				if k == 0:
+					a = cut
+				else:
+					b = cut
+				caps[k] = false
+	_mesh.mesh = PathMeshes.build(item_id, a, b, height, caps, blocked)
 	# Oberfläche 0: Wege-Shader (Kies, Pflaster, Straße), Oberfläche 1: Randsteine und Schneewall
 	if _mesh.mesh.get_surface_count() > 0:
 		_mesh.set_surface_override_material(0, PathMeshes.material(item_id))
 	if _mesh.mesh.get_surface_count() > 1:
 		_mesh.set_surface_override_material(1, preload("res://assets/materials/nature_vertex_color.tres"))
+
+
+## Punkt zwischen [param inside_from] (frei) und [param into] (auf dem breiteren Weg), an dem
+## der Weg 0,25 m weit auf den breiteren Belag reicht (Halbierungssuche).
+func _clip_to_edge(manager: Node, inside_from: Vector3, into: Vector3) -> Vector3:
+	if float(manager.call(&"wider_surface_depth", inside_from, object_id, get_width())) > 0.0:
+		return into
+	var lo := 0.0
+	var hi := 1.0
+	for i in 16:
+		var mid := (lo + hi) * 0.5
+		if float(manager.call(&"wider_surface_depth", inside_from.lerp(into, mid), object_id, get_width())) > 0.25:
+			hi = mid
+		else:
+			lo = mid
+	return inside_from.lerp(into, hi)
 
 
 func get_data() -> Dictionary:

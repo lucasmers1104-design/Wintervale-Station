@@ -248,7 +248,7 @@ func _show_ghost(item_id: String, position: Vector3, angle: float, end: Vector3)
 		if VillageCatalog.get_kind(item_id) == "path":
 			var mesh := MeshInstance3D.new()
 			var terrain := context.terrain
-			mesh.mesh = PathMeshes.build(item_id, position, end, func(x: float, z: float) -> float: return terrain.get_height(x, z) + 0.02)
+			mesh.mesh = PathMeshes.build(item_id, position, end, func(x: float, z: float) -> float: return terrain.get_surface_height(x, z) + 0.02)
 			mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_ghost.add_child(mesh)
 		else:

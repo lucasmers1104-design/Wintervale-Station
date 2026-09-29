@@ -129,15 +129,16 @@ func _test_weather() -> void:
 
 func _test_paths() -> void:
 	print("--- Paths")
-	var height := func(x: float, z: float) -> float: return terrain.get_height(x, z)
+	var height := func(x: float, z: float) -> float: return terrain.get_surface_height(x, z)
 	var styles := {}
 	for id in ["path_gravel", "path_stone", "path_road"]:
 		var material := PathMeshes.material(id) as ShaderMaterial
 		check(material != null and material.shader.resource_path.ends_with("path.gdshader"), "%s uses the path shader" % id)
 		if material:
 			styles[int(material.get_shader_parameter(&"style"))] = true
-		var a := Vector3(-60.0, 0.0, 40.0)
-		var b := Vector3(-52.0, 0.0, 44.0)
+		# Die Dorfstraße im Startdorf (hügeliges, eingeebnetes Gelände – hier stieß früher Gelände durch)
+		var a := Vector3(-52.0, 0.0, 12.5)
+		var b := Vector3(-30.0, 0.0, 12.5)
 		var mesh := PathMeshes.build(id, a, b, height)
 		check(mesh.get_surface_count() == 2, "%s: path surface + detail surface" % id)
 		var arrays := mesh.surface_get_arrays(0)
@@ -148,8 +149,16 @@ func _test_paths() -> void:
 		var disc_lanes := 0.0
 		for i in vertices.size():
 			var v := vertices[i]
-			if absf(uvs[i].x) <= 1.0 and v.y < terrain.get_height(v.x, v.z) + 0.02:
+			if absf(uvs[i].x) <= 1.0 and v.y < terrain.get_surface_height(v.x, v.z) + 0.02:
 				buried += 1
+		# Auch innerhalb der Dreiecke: nirgends darf eine Geländespitze durch den Weg stoßen
+		for i in range(0, vertices.size() - 2, 3):
+			if absf(uvs[i].x) > 1.0 or absf(uvs[i + 1].x) > 1.0 or absf(uvs[i + 2].x) > 1.0:
+				continue
+			for w: Vector3 in [Vector3(1, 1, 1) / 3.0, Vector3(0.6, 0.2, 0.2), Vector3(0.2, 0.6, 0.2), Vector3(0.2, 0.2, 0.6)]:
+				var q := vertices[i] * w.x + vertices[i + 1] * w.y + vertices[i + 2] * w.z
+				if q.y < terrain.get_surface_height(q.x, q.z) + 0.01:
+					buried += 1
 			if is_zero_approx(uvs[i].y) and absf(uvs[i].x) < 0.9:
 				disc_lanes = maxf(disc_lanes, colors[i].r)
 		check(buried == 0, "%s: the path band never sinks into the ground (%d)" % [id, buried])

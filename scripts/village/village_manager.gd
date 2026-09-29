@@ -230,6 +230,8 @@ func place(data: Dictionary):
 	if obj.has_method("set_dark") and _dark:
 		obj.set_dark(true)
 	_level_terrain(obj)
+	if obj is VillagePath:
+		_rebuild_paths_near(obj as VillagePath)
 	if obj is VillageHouse:
 		var house := obj as VillageHouse
 		house.finished.connect(_on_house_finished)
@@ -313,6 +315,8 @@ func remove(id: int) -> Dictionary:
 	var footprint: Dictionary = obj.get_footprint()
 	remove_child(obj)
 	obj.queue_free()
+	if obj is VillagePath:
+		_rebuild_paths_near(obj as VillagePath)
 	_after_change(null, footprint)
 	return data
 
@@ -477,6 +481,42 @@ func is_on_path(point: Vector3) -> bool:
 				and Vector2(point.x - obj.position.x, point.z - obj.position.z).length() < 6.0:
 			return true
 	return false
+
+
+## Liegt der Punkt auf einem anderen Weg als [param exclude_id] (oder auf dem Dorfplatz)?
+## Die Schneewälle an Wegrändern enden dort, statt in die Kreuzung zu ragen.
+func is_on_other_path(point: Vector3, exclude_id: int, margin := 0.3) -> bool:
+	for obj in _objects.values():
+		if obj is VillagePath and (obj as VillagePath).object_id != exclude_id \
+				and (obj as VillagePath).distance_to(point) < (obj as VillagePath).get_width() * 0.5 + margin:
+			return true
+		if obj is VillageObject and (obj as VillageObject).item_id == "plaza" \
+				and Vector2(point.x - obj.position.x, point.z - obj.position.z).length() < 6.2:
+			return true
+	return false
+
+
+## Wie weit reicht an [param point] ein anderer, breiterer Weg (oder der Dorfplatz) noch?
+## Rückgabe: Abstand bis zu dessen Rand (> 0 = der Punkt liegt darauf), sonst -1.
+func wider_surface_depth(point: Vector3, exclude_id: int, width: float) -> float:
+	var best := -1.0
+	for obj in _objects.values():
+		if obj is VillagePath and (obj as VillagePath).object_id != exclude_id and (obj as VillagePath).get_width() > width + 0.01:
+			best = maxf(best, (obj as VillagePath).get_width() * 0.5 - (obj as VillagePath).distance_to(point))
+		elif obj is VillageObject and (obj as VillageObject).item_id == "plaza":
+			best = maxf(best, 6.0 - Vector2(point.x - obj.position.x, point.z - obj.position.z).length())
+	return best if best > 0.0 else -1.0
+
+
+## Wege, die [param path] berühren, neu bauen (ihre Schneewälle an der Kreuzung anpassen).
+func _rebuild_paths_near(path: VillagePath) -> void:
+	for obj in _objects.values():
+		if obj is VillagePath and obj != path and obj.is_inside_tree():
+			var other := obj as VillagePath
+			var reach := other.get_width() * 0.5 + path.get_width() * 0.5 + 1.0
+			if path.distance_to(other.start_point) < reach or path.distance_to(other.end_point) < reach \
+					or other.distance_to(path.start_point) < reach or other.distance_to(path.end_point) < reach:
+				other.rebuild()
 
 
 ## Nächster Weg und Abstand dazu (für die automatische Ausrichtung von Häusern).

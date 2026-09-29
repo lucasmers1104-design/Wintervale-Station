@@ -21,6 +21,10 @@ extends StaticBody3D
 @export var canopy_height := 3.5
 ## Helligkeit der warmen Hängelampen bei Nacht.
 @export var lamp_energy := 1.3
+## Gleisnummern auf den Schildern unter dem Dach: (Gleis an der -X-Seite, Gleis an der +X-Seite).
+@export var track_numbers := Vector2i(2, 1)
+## Pflanzkübel mit kleinen Tannen an den Bahnsteigenden.
+@export var with_planters := true
 
 var _lamp_lights: Array[OmniLight3D] = []
 var _lamp_glow: StandardMaterial3D
@@ -67,6 +71,13 @@ func rebuild() -> void:
 	var lamps: Array[Vector3] = []
 	if canopy_length > 0.0:
 		lamps = StationMeshes.add_canopy(st, Vector3(0.0, height, 0.0), canopy_length, width + 0.6, canopy_height, rng)
+		for end: float in [-1.0, 1.0]:
+			_add_track_sign(st, Vector3(0.0, height + canopy_height - 0.62, end * (canopy_length * 0.5 - 0.7)))
+	if with_planters:
+		var planter_z := length * 0.5 - StationMeshes.RAMP_LENGTH - 1.0
+		for end: float in [-1.0, 1.0]:
+			for side: float in [-1.0, 1.0]:
+				StationMeshes.add_planter(st, Vector3(side * 0.95, height, end * planter_z), rng)
 	var mesh := st.commit()
 
 	_lamp_lights.clear()
@@ -121,6 +132,28 @@ func rebuild() -> void:
 		label.position = Vector3(back_x + facing * 0.04, height + board_y, sign_z)
 		label.rotation.y = PI * 0.5 * facing
 		_add_generated(label)
+
+
+## Hängendes Gleisnummer-Schild (blau, weiße Ziffern über dem jeweiligen Gleis).
+func _add_track_sign(st: SurfaceTool, center: Vector3) -> void:
+	var board := Color(0.13, 0.22, 0.4)
+	LowPolyBuilder.add_box(st, center, Vector3(1.5, 0.42, 0.05), board)
+	LowPolyBuilder.add_box(st, center + Vector3(0.0, 0.225, 0.0), Vector3(1.54, 0.03, 0.08), StationMeshes.IRON)
+	for x: float in [-0.6, 0.6]:
+		LowPolyBuilder.add_box(st, center + Vector3(x, 0.4, 0.0), Vector3(0.02, 0.36, 0.02), StationMeshes.IRON)
+	for face: float in [1.0, -1.0]:
+		for k in 2:
+			var label := Label3D.new()
+			label.text = str(track_numbers.x if k == 0 else track_numbers.y)
+			label.font_size = 72
+			label.pixel_size = 0.004
+			label.modulate = Color(0.97, 0.96, 0.92)
+			label.outline_size = 0
+			label.double_sided = false
+			label.position = center + Vector3(-0.45 if k == 0 else 0.45, 0.0, face * 0.03)
+			if face < 0.0:
+				label.rotation.y = PI
+			_add_generated(label)
 
 
 func _add_generated(node: Node) -> void:

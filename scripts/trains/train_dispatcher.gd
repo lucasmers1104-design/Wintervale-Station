@@ -49,6 +49,9 @@ func _ready() -> void:
 		"glass": glass_material,
 		"lamp_white": _lamp_material(Color(1.0, 0.92, 0.75), 6.0),
 		"lamp_red": _lamp_material(Color(1.0, 0.12, 0.08), 4.0),
+		# Nicht leuchtende Lampen (Schlusslicht vorne, Scheinwerfer hinten): nur glänzendes Glas
+		"lamp_idle_red": _lens_material(Color(0.32, 0.07, 0.06)),
+		"lamp_idle_white": _lens_material(Color(0.62, 0.62, 0.6)),
 		"snow": _snow_material(),
 		"cargo": cargo_material,
 	}
@@ -401,6 +404,14 @@ func _lamp_material(color: Color, energy: float) -> StandardMaterial3D:
 	material.emission_enabled = true
 	material.emission = color
 	material.emission_energy_multiplier = energy
+	return material
+
+
+func _lens_material(color: Color) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.roughness = 0.15
+	material.metallic_specular = 0.9
 	return material
 
 

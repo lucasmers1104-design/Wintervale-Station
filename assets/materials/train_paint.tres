@@ -5,7 +5,7 @@
 [resource]
 resource_name = "TrainPaint"
 shader = ExtResource("1_paint")
-shader_parameter/roughness = 0.45
+shader_parameter/roughness = 0.5
 shader_parameter/specular = 0.55
-shader_parameter/clearcoat_amount = 0.35
+shader_parameter/clearcoat_amount = 0.22
 shader_parameter/clearcoat_roughness = 0.35

@@ -53,8 +53,11 @@ static func material(item_id: String) -> Material:
 
 ## Baut ein Wegstück von [param a] nach [param b]. [param height] liefert die
 ## Geländehöhe an (x, z). [param caps] = [Scheibe am Anfang, Scheibe am Ende].
+## [param blocked] (optional) liefert für einen Punkt true, wenn dort ein anderer Weg
+## liegt – dort entsteht kein Schneewall (Kreuzungen und Einmündungen bleiben frei).
 ## Rückgabe: Mesh mit Oberfläche 0 (Weg, [method material]) und 1 (Details, Vertexfarben).
-static func build(item_id: String, a: Vector3, b: Vector3, height: Callable, caps := [true, true]) -> ArrayMesh:
+static func build(item_id: String, a: Vector3, b: Vector3, height: Callable, caps := [true, true],
+		blocked := Callable()) -> ArrayMesh:
 	var style: Dictionary = STYLES.get(item_id, STYLES["path_gravel"])
 	var width := float(style["width"])
 	var lift := float(style["lift"])
@@ -95,10 +98,12 @@ static func build(item_id: String, a: Vector3, b: Vector3, height: Callable, cap
 			var u1 := offsets[k + 1] / half
 			_quad(surface, rows[i][k], rows[i][k + 1], rows[i + 1][k + 1], rows[i + 1][k],
 				[Vector2(u0, d0), Vector2(u1, d0), Vector2(u1, d1), Vector2(u0, d1)], [l0, l0, l1, l1])
-		_edge_details(details, item_id, style, flat_a + dir * d0, flat_a + dir * d1, dir, side, half, lift, height)
+		_edge_details(details, item_id, style, flat_a + dir * d0, flat_a + dir * d1, dir, side, half, lift, height, blocked)
 	for k in 2:
 		if caps[k]:
-			_disc(surface, flat_a if k == 0 else flat_b, half, lift + 0.003, height)
+			# Knapp unter dem Band: die Scheibe füllt nur die Lücken (Kurven, Enden); ihr Rand
+			# würde sonst als helle Linse mitten auf dem Weg erscheinen
+			_disc(surface, flat_a if k == 0 else flat_b, half, lift - 0.004, height)
 	surface.commit(mesh)
 	details.commit(mesh)
 	return mesh
@@ -128,12 +133,16 @@ static func _vertex(p: Vector3, offset: float, half: float, lift: float, height:
 	return Vector3(p.x, lerpf(top, ground - 0.04, t), p.z)
 
 
-## Höchste Geländehöhe in einem kleinen Kreuz um [param p] (verhindert, dass
-## Geländekanten zwischen den Wegpunkten durch den Weg stoßen).
+## Höchste Geländehöhe in einem kleinen 3×3-Raster um [param p] (auch schräg – sonst
+## stoßen Geländespitzen zwischen den Wegpunkten durch den Weg).
 static func _max_ground(p: Vector3, height: Callable, dir: Vector3, side: Vector3) -> float:
 	var best := height.call(p.x, p.z) as float
-	for o: Vector3 in [dir * 0.3, -dir * 0.3, side * 0.3, -side * 0.3]:
-		best = maxf(best, height.call(p.x + o.x, p.z + o.z) as float)
+	for a: float in [-0.3, 0.0, 0.3]:
+		for b: float in [-0.3, 0.0, 0.3]:
+			if a == 0.0 and b == 0.0:
+				continue
+			var o := dir * a + side * b
+			best = maxf(best, height.call(p.x + o.x, p.z + o.z) as float)
 	return best
 
 
@@ -164,10 +173,14 @@ static func _disc(st: SurfaceTool, center: Vector3, half: float, lift: float, he
 
 ## Randsteine (Steinweg) und flacher Wall aus geräumtem Schnee an beiden Rändern.
 static func _edge_details(st: SurfaceTool, item_id: String, style: Dictionary, p0: Vector3, p1: Vector3, dir: Vector3,
-		side: Vector3, half: float, lift: float, height: Callable) -> void:
+		side: Vector3, half: float, lift: float, height: Callable, blocked := Callable()) -> void:
 	var seed_value := absf(sin(p0.x * 12.9898 + p0.z * 78.233) * 43758.5453)
 	var jitter := fposmod(seed_value, 1.0)
 	for sign_value: float in [-1.0, 1.0]:
+		# Wo ein anderer Weg anschließt, bleibt der Rand offen (kein Randstein, kein Schneewall)
+		if blocked.is_valid() and (bool(blocked.call(p0 + side * sign_value * (half + 0.3)))
+				or bool(blocked.call(p1 + side * sign_value * (half + 0.3)))):
+			continue
 		if bool(style["border"]):
 			var mid := (p0 + p1) * 0.5 + side * sign_value * (half - 0.05)
 			var h := _max_ground(mid, height, dir, side) + lift

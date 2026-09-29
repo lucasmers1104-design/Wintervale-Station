@@ -92,6 +92,10 @@ var _squeal_played := false
 ## Lade- und Entladearbeiten (Güterbahnhof): Solange ein Eintrag besteht, fährt der Zug nicht ab.
 var _cargo_holds: Dictionary[String, bool] = {}
 var _cargo_hold_time := 0.0
+var _visual_speed := 0.0
+var _acceleration := 0.0
+var _cabin := 0.2
+var _dark := false
 
 
 ## Richtet den Zug ein und baut seine Fahrzeuge.
@@ -117,6 +121,8 @@ func setup(p_id: int, p_entry: TimetableEntry, p_path: TrainPath, p_dispatcher: 
 		offset += car.length + TrainMeshes.COUPLING_GAP
 		cars.append(car)
 	length = offset - TrainMeshes.COUPLING_GAP
+	for car in cars:
+		car.set_destination("%s  %s" % [entry.train_number, entry.destination])
 
 	head = length + 0.5
 	_visual_head = head
@@ -185,6 +191,16 @@ func update_visuals(_delta: float) -> void:
 			var old_front := front - moved
 			if path.index_at(maxf(old_front, 0.0)) != path.index_at(maxf(front, 0.0)):
 				car.play_clack(speed / maxf(max_speed, 1.0))
+	# Federung (Kurvenneigung, Nicken) und Innenlicht: im Stand hell, nachts warm, sonst gedämpft
+	if _delta > 0.0:
+		var measured := (speed - _visual_speed) / _delta
+		_acceleration = lerpf(_acceleration, measured, 1.0 - exp(-_delta * 4.0))
+		_visual_speed = speed
+		var target_cabin := 1.0 if state == State.DWELLING else (0.8 if _dark else 0.15)
+		_cabin = move_toward(_cabin, target_cabin, _delta * 0.6)
+	for car in cars:
+		car.update_motion(speed, _acceleration, _delta)
+		car.set_cabin_light(_cabin)
 	cars[0].set_snow_spray(speed)
 	cars[0].set_exhaust(speed, speed > 0.05 and _drive_time < START_RAMP_TIME * 1.5)
 	if previous < emerge_at + 6.0 and head >= emerge_at + 6.0 and not _emerged:
@@ -193,6 +209,7 @@ func update_visuals(_delta: float) -> void:
 
 
 func set_dark(dark: bool) -> void:
+	_dark = dark
 	for car in cars:
 		car.set_light_level(dark)
 

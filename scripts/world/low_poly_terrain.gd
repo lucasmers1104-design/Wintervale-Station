@@ -115,6 +115,54 @@ func get_height(x: float, z: float) -> float:
 	return _deformer.sample(x, z, base).x
 
 
+## Höhe der tatsächlich gezeichneten Oberfläche (die flachen Dreiecke im 2-m-Raster).
+## In Mulden liegt sie etwas über [method get_height] – Dinge, die flach auf dem Boden
+## liegen (Wege), richten sich danach, damit kein Gelände durch sie hindurchstößt.
+@warning_ignore("integer_division")
+func get_surface_height(x: float, z: float) -> float:
+	var smooth := get_height(x, z)
+	var n := cells_per_side
+	if _heights.size() != (n + 1) * (n + 1):
+		return smooth
+	var half := get_half_extent()
+	var cx := floori((x + half) / cell_size)
+	var cz := floori((z + half) / cell_size)
+	var p := Vector2(x, z)
+	# Durch das Verrücken der Eckpunkte kann der Punkt auch in einer Nachbarzelle liegen
+	for dz in [0, -1, 1]:
+		for dx in [0, -1, 1]:
+			var gx: int = cx + dx
+			var gz: int = cz + dz
+			if gx < 0 or gz < 0 or gx >= n or gz >= n:
+				continue
+			var ia := gz * (n + 1) + gx
+			var ib := ia + 1
+			var ic := ia + n + 1
+			var id := ic + 1
+			var triangles: Array = [[ia, ib, id], [ia, id, ic]] if (gx + gz) % 2 == 0 else [[ia, ib, ic], [ib, id, ic]]
+			for tri: Array in triangles:
+				var a := _grid_xz[tri[0]]
+				var b := _grid_xz[tri[1]]
+				var c := _grid_xz[tri[2]]
+				if Geometry2D.point_is_inside_triangle(p, a, b, c):
+					var w := _barycentric(p, a, b, c)
+					var h := _heights[tri[0]] * w.x + _heights[tri[1]] * w.y + _heights[tri[2]] * w.z
+					return maxf(smooth, h)
+	return smooth
+
+
+static func _barycentric(p: Vector2, a: Vector2, b: Vector2, c: Vector2) -> Vector3:
+	var v0 := b - a
+	var v1 := c - a
+	var v2 := p - a
+	var d := v0.x * v1.y - v1.x * v0.y
+	if absf(d) < 0.000001:
+		return Vector3(1, 0, 0)
+	var v := (v2.x * v1.y - v1.x * v2.y) / d
+	var w := (v0.x * v2.y - v2.x * v0.y) / d
+	return Vector3(1.0 - v - w, v, w)
+
+
 ## Natürliche Geländehöhe ohne Gleisanpassungen. Funktioniert schon vor generate().
 func get_base_height(x: float, z: float) -> float:
 	if _height_noise == null:

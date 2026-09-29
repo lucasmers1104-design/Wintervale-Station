@@ -11,7 +11,8 @@
 ## -Z = vorne, +X = rechts. Alle Maße in Metern.
 ##
 ## Fahrzeugtypen: loco_regional, coach, loco_freight, wagon_timber,
-## wagon_container, wagon_hopper. Ergebnisse werden je Lackierung zwischengespeichert.
+## wagon_container, wagon_hopper, wagon_flat, wagon_stake – dazu der moderne Triebzug
+## railcar_front, railcar_middle, railcar_rear ([RailcarMeshes]). Ergebnisse werden je Lackierung zwischengespeichert.
 class_name TrainMeshes
 extends RefCounted
 
@@ -81,6 +82,9 @@ const BARK := Color(0.33, 0.23, 0.16)
 const LOG_END := Color(0.8, 0.65, 0.45)
 const GRAVEL := Color(0.46, 0.44, 0.42)
 
+## Anstrich der Güterwagen (Langträger, Stirnwände): Oxidrot, Graublau, Tannengrün.
+const WAGON_COLORS: Array[Color] = [Color(0.45, 0.2, 0.15), Color(0.32, 0.37, 0.42), Color(0.24, 0.33, 0.27)]
+
 static var _cache := {}
 
 
@@ -90,12 +94,16 @@ static func clear_cache() -> void:
 
 
 static func get_spec(kind: String) -> Dictionary:
+	if RailcarMeshes.SPECS.has(kind):
+		return RailcarMeshes.SPECS[kind]
 	return SPECS.get(kind, SPECS["coach"])
 
 
 ## Baut ein Fahrzeug. Rückgabe:
 ## {"paint": ArrayMesh, "glass": ArrayMesh, "doors": [{"mesh","position","open_offset","side"}],
 ##  "lamps_front": [Vector3], "lamps_rear": [Vector3], "length", "bogie", "wheel_base"}
+## Triebwagen ([RailcarMeshes]) zusätzlich: "lamps_idle" (unbeleuchtete Lampen) und
+## "display" (Lage der Zielanzeige).
 static func build_car(kind: String, livery: Dictionary, variant := 0) -> Dictionary:
 	var key := "%s|%s|%d" % [kind, livery, variant]
 	if _cache.has(key):
@@ -118,6 +126,8 @@ static func build_car(kind: String, livery: Dictionary, variant := 0) -> Diction
 			result = _build_wagon_flat(rng)
 		"wagon_stake":
 			result = _build_wagon_stake(rng)
+		"railcar_front", "railcar_middle", "railcar_rear":
+			result = RailcarMeshes.build(kind, livery, rng)
 		_:
 			result = _build_coach(livery, rng)
 	var spec := get_spec(kind)
@@ -308,6 +318,7 @@ static func _build_loco_freight(livery: Dictionary, rng: RandomNumberGenerator) 
 	LowPolyBuilder.add_box(paint, Vector3(0.0, 2.95, -3.0), Vector3(0.9, 0.03, 1.5), SNOW)
 	LowPolyBuilder.add_box(paint, Vector3(0.0, 3.53, 2.7), Vector3(1.6, 0.03, 2.2), SNOW)
 	_underframe_equipment(paint, 1.4)
+	_freight_loco_details(paint, livery, half)
 	for end: float in [-1.0, 1.0]:
 		_add_buffers(paint, end * half, end)
 		for side: float in [-1.0, 1.0]:
@@ -317,6 +328,44 @@ static func _build_loco_freight(livery: Dictionary, rng: RandomNumberGenerator) 
 		"lamps_front": [Vector3(0.0, 2.6, -3.98), Vector3(-0.95, 1.42, -half - 0.06), Vector3(0.95, 1.42, -half - 0.06)],
 		"lamps_rear": [Vector3(-0.95, 1.42, half + 0.06), Vector3(0.95, 1.42, half + 0.06)],
 	}
+
+
+## Feinheiten der Güterlok (Etappe 9.5): Wartungstüren am Vorbau, runde Lampengehäuse,
+## Sonnenblenden, Signalhorn, Tank, Sandkästen, Aufstiegstritte und Nummernschild.
+static func _freight_loco_details(paint: SurfaceTool, livery: Dictionary, half: float) -> void:
+	var primary: Color = livery["primary"]
+	for side: float in [-1.0, 1.0]:
+		# Wartungstüren: feine Fugen und Griffe am Vorbau
+		for i in 5:
+			var z := -3.6 + i * 0.95
+			LowPolyBuilder.add_box(paint, Vector3(side * 0.875, 1.75, z), Vector3(0.012, 0.9, 0.025), primary.darkened(0.3))
+			LowPolyBuilder.add_box(paint, Vector3(side * 0.88, 1.85, z + 0.45), Vector3(0.02, 0.1, 0.03), METAL)
+		# Sonnenblenden über den Seitenfenstern des Führerhauses
+		LowPolyBuilder.add_oriented_box(paint, Transform3D(Basis(Vector3.BACK, side * 0.35), Vector3(side * 1.33, 3.16, 2.05)),
+			Vector3(0.14, 0.02, 1.9), UNDER)
+		# Sandkästen an den Drehgestellen
+		for end: float in [-1.0, 1.0]:
+			LowPolyBuilder.add_box(paint, Vector3(side * 1.18, 0.86, end * 3.9), Vector3(0.22, 0.26, 0.3), primary.darkened(0.15))
+			# Aufstiegstritte an den Ecken
+			for k in 2:
+				LowPolyBuilder.add_box(paint, Vector3(side * 1.2, 0.58 + k * 0.28, end * (half - 0.3)), Vector3(0.28, 0.035, 0.3),
+					STEP_YELLOW)
+			LowPolyBuilder.add_beam(paint, Vector3(side * 1.33, 0.55, end * (half - 0.16)), Vector3(side * 1.33, 1.0, end * (half - 0.16)),
+				0.03, FRAME)
+	# Runde Lampengehäuse vorne (Vorbau oben, Pufferbohle) und hinten
+	for lamp: Vector3 in [Vector3(0.0, 2.6, -3.96), Vector3(-0.95, 1.42, -half - 0.02), Vector3(0.95, 1.42, -half - 0.02),
+			Vector3(-0.95, 1.42, half + 0.02), Vector3(0.95, 1.42, half + 0.02)]:
+		var out := -1.0 if lamp.z < 0.0 else 1.0
+		LowPolyBuilder.add_cylinder_between(paint, lamp - Vector3(0.0, 0.0, out * 0.04), lamp + Vector3(0.0, 0.0, out * 0.03), 0.15, 12, FRAME)
+	# Nummernschild unter der oberen Lampe, Signalhorn auf dem Führerhaus
+	LowPolyBuilder.add_box(paint, Vector3(0.0, 2.3, -3.975), Vector3(0.62, 0.16, 0.02), UNDER)
+	LowPolyBuilder.add_box(paint, Vector3(0.0, 2.3, -3.99), Vector3(0.5, 0.1, 0.01), Color(0.9, 0.88, 0.8))
+	for x: float in [-0.12, 0.12]:
+		LowPolyBuilder.add_cylinder_between(paint, Vector3(x, 3.56, 2.6), Vector3(x, 3.56, 2.3 - absf(x)), 0.045, 8, METAL)
+		LowPolyBuilder.add_cylinder_between(paint, Vector3(x, 3.56, 2.3 - absf(x)), Vector3(x, 3.56, 2.24 - absf(x)), 0.075, 8, METAL)
+	# Kraftstofftank zwischen den Drehgestellen
+	LowPolyBuilder.add_cylinder_between(paint, Vector3(0.0, 0.7, -1.45), Vector3(0.0, 0.7, 1.45), 0.38, 12, UNDER)
+	LowPolyBuilder.add_box(paint, Vector3(0.0, 0.95, 0.0), Vector3(0.12, 0.08, 0.3), METAL)
 
 
 ## Rungenwagen für Holz: Rungen, Querhölzer; die Stammbündel sind Ladung ([constant CARGO]).
@@ -426,6 +475,16 @@ static func _build_wagon_hopper(rng: RandomNumberGenerator) -> Dictionary:
 	for end: float in [-1.0, 1.0]:
 		_add_buffers(paint, end * half, end)
 		LowPolyBuilder.add_box(paint, Vector3(0.0, 1.05, end * (half - 0.05)), Vector3(2.5, 0.3, 0.1), UNDER)
+		# Leiter an der Stirnwand und Laufblech oben
+		for x: float in [-0.95, -0.55]:
+			LowPolyBuilder.add_beam(paint, Vector3(x, 1.3, end * (half - 0.28)), Vector3(x, 3.35, end * (half - 0.28)), 0.03, FRAME)
+		for k in 6:
+			LowPolyBuilder.add_beam(paint, Vector3(-0.97, 1.5 + k * 0.33, end * (half - 0.28)),
+				Vector3(-0.53, 1.5 + k * 0.33, end * (half - 0.28)), 0.025, FRAME)
+	# Obergurt: kräftige Kante rund um die Öffnung
+	for side: float in [-1.0, 1.0]:
+		LowPolyBuilder.add_box(paint, Vector3(side * 1.37, 3.36, 0.0), Vector3(0.1, 0.08, half * 2.0 - 0.7), body_color.darkened(0.2))
+	_wagon_details(paint, half, body_color)
 	return {"paint": paint.commit(), "glass": null, "doors": [], "lamps_front": [],
 		"lamps_rear": [Vector3(-0.95, 1.3, half + 0.02), Vector3(0.95, 1.3, half + 0.02)]}
 
@@ -639,39 +698,91 @@ static func _cargo_stone_heap(st: SurfaceTool, rng: RandomNumberGenerator) -> vo
 # --- Drehgestelle --------------------------------------------------------------------
 
 ## Drehgestellrahmen (ohne Radsätze). Ursprung = Mitte auf Schienenoberkante.
+##
+## Etappe 9.5: geformte Seitenrahmen (hoch über den Achsen, tief in der Mitte),
+## Achslager mit Deckeln, je zwei Schraubenfedern (Primärfederung), Luftfeder
+## unter dem Wagenkasten (Sekundärfederung), Querträger, Dämpfer und Bremsen.
 static func create_bogie(wheel_base: float) -> ArrayMesh:
 	var key := "bogie|%f" % wheel_base
 	if _cache.has(key):
 		return _cache[key]
 	var st := _new_st()
+	var half := wheel_base * 0.5
+	var spring := METAL.darkened(0.15)
 	for side: float in [-1.0, 1.0]:
-		LowPolyBuilder.add_box(st, Vector3(side * 0.98, 0.5, 0.0), Vector3(0.12, 0.26, wheel_base + 0.7), FRAME)
-		LowPolyBuilder.add_box(st, Vector3(side * 0.98, 0.36, 0.0), Vector3(0.1, 0.12, wheel_base * 0.5), FRAME)
-		for axle: float in [-0.5, 0.5]:
-			LowPolyBuilder.add_box(st, Vector3(side * 0.98, WHEEL_RADIUS, axle * wheel_base), Vector3(0.18, 0.24, 0.3), UNDER)
-			LowPolyBuilder.add_cylinder(st, Vector3(side * 0.98, 0.62, axle * wheel_base * 0.55), 0.08, 0.08, 0.16, 8, METAL)
-	LowPolyBuilder.add_box(st, Vector3(0.0, 0.74, 0.0), Vector3(2.1, 0.16, 0.4), FRAME)
+		var x := side * 0.98
+		# Seitenrahmen: über den Achsen hoch, in der Mitte zur Luftfeder abgesenkt
+		var ends := half + 0.38
+		var profile: Array[Vector3] = [Vector3(x, 0.6, -ends), Vector3(x, 0.62, -half + 0.18), Vector3(x, 0.47, -half * 0.35),
+			Vector3(x, 0.47, half * 0.35), Vector3(x, 0.62, half - 0.18), Vector3(x, 0.6, ends)]
+		for i in profile.size() - 1:
+			var a := profile[i]
+			var b := profile[i + 1]
+			var dir := (b - a).normalized()
+			LowPolyBuilder.add_oriented_box(st, Transform3D(Basis.looking_at(dir, Vector3.UP), (a + b) * 0.5),
+				Vector3(0.13, 0.22, a.distance_to(b) + 0.06), FRAME)
+		# Obergurt über der Mitte (Aufnahme der Luftfeder)
+		LowPolyBuilder.add_box(st, Vector3(x, 0.6, 0.0), Vector3(0.16, 0.06, half * 0.9), FRAME.lightened(0.05))
+		for axle: float in [-1.0, 1.0]:
+			var z := axle * half
+			# Achslager mit rundem Deckel
+			LowPolyBuilder.add_box(st, Vector3(x, WHEEL_RADIUS, z), Vector3(0.2, 0.24, 0.32), UNDER)
+			LowPolyBuilder.add_cylinder_between(st, Vector3(x + side * 0.1, WHEEL_RADIUS, z),
+				Vector3(x + side * 0.16, WHEEL_RADIUS, z), 0.1, 10, METAL)
+			LowPolyBuilder.add_cylinder_between(st, Vector3(x + side * 0.16, WHEEL_RADIUS, z),
+				Vector3(x + side * 0.175, WHEEL_RADIUS, z), 0.045, 8, METAL.lightened(0.2))
+			# Zwei Schraubenfedern zwischen Achslager und Rahmen
+			for offset: float in [-0.1, 0.1]:
+				var base := Vector3(x, WHEEL_RADIUS + 0.12, z + offset)
+				LowPolyBuilder.add_cylinder(st, base, 0.055, 0.055, 0.12, 8, spring)
+				for ring in 3:
+					LowPolyBuilder.add_cylinder(st, base + Vector3(0.0, 0.02 + ring * 0.04, 0.0), 0.062, 0.062, 0.012, 8,
+						spring.darkened(0.25))
+			# Bremseinheit zwischen Rahmen und Rad
+			LowPolyBuilder.add_box(st, Vector3(side * 0.74, 0.55, z - axle * 0.46), Vector3(0.12, 0.16, 0.14), UNDER)
+			LowPolyBuilder.add_box(st, Vector3(side * 0.74, WHEEL_RADIUS, z - axle * 0.43), Vector3(0.1, 0.22, 0.05), METAL.darkened(0.3))
+		# Luftfeder (Gummibalg) und Dämpfer
+		LowPolyBuilder.add_cylinder(st, Vector3(x * 0.92, 0.63, 0.0), 0.16, 0.18, 0.14, 12, RUBBER)
+		LowPolyBuilder.add_cylinder(st, Vector3(x * 0.92, 0.77, 0.0), 0.2, 0.2, 0.03, 12, FRAME)
+		LowPolyBuilder.add_cylinder_between(st, Vector3(side * 1.08, 0.52, -half * 0.45), Vector3(side * 1.08, 0.66, half * 0.1),
+			0.035, 6, METAL.darkened(0.1))
+	# Querträger und Mittelzapfen
+	LowPolyBuilder.add_box(st, Vector3(0.0, 0.5, 0.0), Vector3(1.9, 0.18, 0.46), FRAME)
+	LowPolyBuilder.add_cylinder(st, Vector3(0.0, 0.59, 0.0), 0.16, 0.16, 0.2, 10, UNDER)
 	var mesh := st.commit()
 	_cache[key] = mesh
 	return mesh
 
 
-## Radsatz: zwei Räder mit Speichenmarkierung (damit man das Drehen sieht) und Achse.
+## Radsatz: Räder mit Spurkranz, Radscheibe und Nabe, Achse mit Bremsscheiben.
+## Drei Löcher in der Radscheibe zeigen, dass sich das Rad dreht.
 ## Ursprung = Achsmitte; dreht sich um X.
 static func create_wheelset() -> ArrayMesh:
 	if _cache.has("wheelset"):
 		return _cache["wheelset"]
 	var st := _new_st()
-	LowPolyBuilder.add_cylinder_between(st, Vector3(-0.72, 0.0, 0.0), Vector3(0.72, 0.0, 0.0), 0.07, 8, METAL)
+	LowPolyBuilder.add_cylinder_between(st, Vector3(-0.9, 0.0, 0.0), Vector3(0.9, 0.0, 0.0), 0.075, 10, METAL)
+	for x: float in [-0.3, 0.3]:
+		LowPolyBuilder.add_cylinder_between(st, Vector3(x - 0.02, 0.0, 0.0), Vector3(x + 0.02, 0.0, 0.0), 0.28, 14,
+			METAL.darkened(0.2))
 	for side: float in [-1.0, 1.0]:
 		var inner := side * 0.68
 		var outer := side * 0.8
-		LowPolyBuilder.add_cylinder_between(st, Vector3(inner, 0.0, 0.0), Vector3(outer, 0.0, 0.0), WHEEL_RADIUS, 12, UNDER)
+		# Lauffläche (blank), Radscheibe (dunkel), Spurkranz innen
+		LowPolyBuilder.add_cylinder_between(st, Vector3(inner, 0.0, 0.0), Vector3(outer, 0.0, 0.0), WHEEL_RADIUS, 16,
+			METAL.lightened(0.1))
+		LowPolyBuilder.add_cylinder_between(st, Vector3(outer - side * 0.01, 0.0, 0.0), Vector3(outer + side * 0.004, 0.0, 0.0),
+			WHEEL_RADIUS - 0.05, 16, UNDER)
 		LowPolyBuilder.add_cylinder_between(st, Vector3(inner - side * 0.03, 0.0, 0.0), Vector3(inner, 0.0, 0.0),
-			WHEEL_RADIUS + 0.035, 12, METAL)
-		var face := side * 0.805
-		LowPolyBuilder.add_box(st, Vector3(face, 0.0, 0.0), Vector3(0.012, WHEEL_RADIUS * 1.6, 0.07), METAL)
-		LowPolyBuilder.add_box(st, Vector3(face, 0.0, 0.0), Vector3(0.012, 0.07, WHEEL_RADIUS * 1.6), METAL)
+			WHEEL_RADIUS + 0.035, 16, METAL)
+		# Nabe und drei Löcher in der Radscheibe
+		LowPolyBuilder.add_cylinder_between(st, Vector3(outer, 0.0, 0.0), Vector3(outer + side * 0.04, 0.0, 0.0), 0.11, 10,
+			METAL.darkened(0.1))
+		for k in 3:
+			var angle := TAU * k / 3.0
+			var hole := Vector3(outer + side * 0.006, cos(angle) * 0.22, sin(angle) * 0.22)
+			LowPolyBuilder.add_cylinder_between(st, hole, hole + Vector3(side * 0.004, 0.0, 0.0), 0.045, 8,
+				Color(0.06, 0.06, 0.07))
 	var mesh := st.commit()
 	_cache["wheelset"] = mesh
 	return mesh
@@ -913,6 +1024,37 @@ static func _underframe_equipment(st: SurfaceTool, half_span: float) -> void:
 	LowPolyBuilder.add_box(st, Vector3(0.55, 0.78, half_span * 0.55), Vector3(0.6, 0.3, half_span * 0.5), UNDER)
 
 
+## Ausrüstung eines Güterwagens: Rangiertritte und Griffe an allen Ecken, Handbremsrad
+## an einem Ende, Bremszylinder und Luftbehälter unter dem Rahmen, Bremsschläuche.
+static func _wagon_details(st: SurfaceTool, half: float, color: Color) -> void:
+	for end: float in [-1.0, 1.0]:
+		for side: float in [-1.0, 1.0]:
+			# Rangiertritt (gelb) und senkrechter Griff
+			var corner := Vector3(side * 1.25, 0.0, end * (half - 0.35))
+			LowPolyBuilder.add_box(st, corner + Vector3(0.0, 0.62, 0.0), Vector3(0.3, 0.035, 0.32), STEP_YELLOW)
+			LowPolyBuilder.add_beam(st, corner + Vector3(side * 0.05, 0.64, -end * 0.12), corner + Vector3(side * 0.05, 0.9, -end * 0.12),
+				0.03, FRAME)
+			LowPolyBuilder.add_beam(st, corner + Vector3(side * 0.07, 1.25, end * 0.1), corner + Vector3(side * 0.07, 1.75, end * 0.1),
+				0.03, STEP_YELLOW)
+		# Bremsschlauch neben dem Kupplungshaken
+		LowPolyBuilder.add_cylinder_between(st, Vector3(0.3, 0.95, end * (half + 0.02)), Vector3(0.36, 0.7, end * (half + 0.2)),
+			0.03, 5, RUBBER)
+	# Handbremsrad an der Stirnseite (+Z)
+	var wheel_center := Vector3(-0.85, 1.55, half + 0.07)
+	LowPolyBuilder.add_cylinder_between(st, wheel_center, wheel_center + Vector3(0.0, 0.0, 0.03), 0.24, 12, FRAME)
+	LowPolyBuilder.add_cylinder_between(st, wheel_center + Vector3(0.0, 0.0, -0.005), wheel_center + Vector3(0.0, 0.0, 0.035), 0.19,
+		12, color.darkened(0.35))
+	for k in 3:
+		var angle := TAU * k / 3.0
+		LowPolyBuilder.add_beam(st, wheel_center + Vector3(0.0, 0.0, 0.04), wheel_center + Vector3(cos(angle) * 0.2, sin(angle) * 0.2, 0.04),
+			0.025, FRAME)
+	LowPolyBuilder.add_beam(st, wheel_center + Vector3(0.0, -0.1, 0.0), Vector3(-0.85, 1.05, half - 0.02), 0.05, FRAME)
+	# Bremszylinder und Luftbehälter unter dem Rahmen
+	LowPolyBuilder.add_cylinder_between(st, Vector3(0.35, 0.76, -0.9), Vector3(0.35, 0.76, 0.1), 0.17, 10, UNDER)
+	LowPolyBuilder.add_cylinder_between(st, Vector3(-0.35, 0.8, 0.3), Vector3(-0.35, 0.8, 0.8), 0.13, 8, UNDER.lightened(0.05))
+	LowPolyBuilder.add_beam(st, Vector3(0.35, 0.76, 0.1), Vector3(0.35, 0.76, 1.6), 0.04, METAL)
+
+
 ## Keilförmiger Schneepflug unter der Lokfront.
 static func _snow_plough(st: SurfaceTool, z_front: float, color: Color) -> void:
 	var tip := Vector3(0.0, 0.12, z_front - 0.55)
@@ -926,10 +1068,19 @@ static func _snow_plough(st: SurfaceTool, z_front: float, color: Color) -> void:
 	LowPolyBuilder.add_box(st, Vector3(0.0, 0.88, z_front - 0.22), Vector3(2.45, 0.06, 0.5), SNOW)
 
 
-## Flachwagen-Unterbau: Langträger, Holzboden, Puffer.
+## Flachwagen-Unterbau: lackierte Langträger mit Rippen, Holzboden, Puffer und
+## die Ausrüstung eines echten Güterwagens (siehe [method _wagon_details]).
 static func _flat_wagon_base(st: SurfaceTool, half: float, rng: RandomNumberGenerator) -> void:
+	var sill: Color = WAGON_COLORS[rng.randi() % WAGON_COLORS.size()]
 	for side: float in [-1.0, 1.0]:
 		LowPolyBuilder.add_box(st, Vector3(side * 1.18, 0.98, 0.0), Vector3(0.18, 0.34, half * 2.0), UNDER)
+		# Außenlangträger in Wagenfarbe mit senkrechten Rippen
+		LowPolyBuilder.add_box(st, Vector3(side * 1.285, 1.06, 0.0), Vector3(0.04, 0.3, half * 2.0 - 0.1), sill)
+		var ribs := int(half * 2.0 / 0.9)
+		for i in ribs + 1:
+			var z := -half + 0.1 + i * ((half * 2.0 - 0.2) / ribs)
+			LowPolyBuilder.add_box(st, Vector3(side * 1.31, 1.06, z), Vector3(0.025, 0.3, 0.06), sill.darkened(0.2))
+	_wagon_details(st, half, sill)
 	var planks := int(half * 2.0 / 0.5)
 	for i in planks:
 		var z := -half + 0.25 + i * 0.5

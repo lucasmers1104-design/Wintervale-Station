@@ -256,3 +256,12 @@ Ausführlich in [JAHRESZEITEN.md](JAHRESZEITEN.md) (Jahreslauf, Wetter, Schnee-M
 - **Schnee-Merker im Alpha-Kanal der Vertexfarbe:** < 0.6 Schneeauflage (taut weg), < 0.9 Bodenschnee (wird Erde), sonst normale Farbe. Das Gelände nutzt denselben Kanal für Schnee/Erde/Fels.
 - **Erweiterungen bestehender Systeme (nichts neu geschrieben):** `DayNightCycle` (Tageslänge, Sonnenhöhe, Farbton, Wolken, Nebel je Jahreszeit und Wetter), `WorldClock` (Dämmerung nach Jahreszeit), `Snowfall` (Stärke/Wind vom Wetter), `AmbientSoundscape` (Wetter- und Jahreszeitenklänge), `PathMeshes` (neue Geometrie, gleiche Schnittstelle), `VillageObject`/`StationProp` (Wintersachen), `VillageVisual` (Funken, schwingende Laternen).
 - `tests/world_test.*`: neue Prüfungen für Etappe 9.
+
+## Etappe 9.5: Premium-Zug und Welt-Feinschliff
+
+Ausführlich in [ZUG_UND_WELT.md](ZUG_UND_WELT.md). Kurz:
+
+- **Neu:** `RailcarMeshes` – moderner Triebzug (`railcar_front`, `railcar_middle`, `railcar_rear`), eingebunden über `TrainMeshes.build_car()`/`get_spec()`. RE und RB nutzen ihn (`assets/trains/regional_*.tres`).
+- **TrainCar:** Der Wagenkasten hängt an einem Node „Body“ (Federung: Kurvenneigung, Nicken, Wiegen – `update_motion()`), Innenlicht je Wagen über den Instanz-Parameter `cabin` des Fenster-Shaders (`set_cabin_light()`), Zielanzeige (`set_destination()`), unbeleuchtete Lampen (`lamps_idle`).
+- **LowPolyTerrain.get_surface_height():** Höhe der gezeichneten Dreiecke – für alles, was flach auf dem Boden liegt (Wege).
+- **VillageManager:** `is_on_other_path()`, `wider_surface_depth()` – Wege enden sauber an breiteren Wegen, keine Schneewälle über Einmündungen.

@@ -85,4 +85,5 @@ Exit-Code 0 = alle Prüfungen bestanden.
 - [docs/POLISH.md](docs/POLISH.md) – Etappe 7: behobene Fehler, Verbesserungen, Performance
 - [docs/WIRTSCHAFT.md](docs/WIRTSCHAFT.md) – Etappe 8: Güterbahnhof, Materialien, Güterzüge, Bauprojekte, Bewohner, Notizbuch, Fehlerliste
 - [docs/JAHRESZEITEN.md](docs/JAHRESZEITEN.md) – Etappe 9: Jahreszeiten, Wetter, Wege-Materialien, Schnee, Fehlerliste
+- [docs/ZUG_UND_WELT.md](docs/ZUG_UND_WELT.md) – Etappe 9.5: neuer Triebzug, Zug-Animationen, Güterzug- und Bahnhofsdetails, Fehlerliste, Leistung
 - [CLAUDE.md](CLAUDE.md) – Projektregeln & Vision

@@ -143,7 +143,8 @@ func _test_timetable() -> void:
 func _test_models() -> void:
 	print("--- Models")
 	var livery := (load("res://assets/trains/regional_express.tres") as TrainType).get_livery()
-	for kind: String in TrainMeshes.SPECS:
+	var kinds: Array = TrainMeshes.SPECS.keys() + RailcarMeshes.SPECS.keys()
+	for kind: String in kinds:
 		var parts := TrainMeshes.build_car(kind, livery)
 		var paint: ArrayMesh = parts["paint"]
 		var box := paint.get_aabb()
@@ -157,6 +158,21 @@ func _test_models() -> void:
 	check(coach["glass"] != null and (coach["doors"] as Array).size() == 8, "coach has windows and 8 door leaves")
 	var loco := TrainMeshes.build_car("loco_regional", livery)
 	check((loco["lamps_front"] as Array).size() == 3, "regional loco has three headlights")
+	# Moderner Triebzug (Etappe 9.5)
+	var front := TrainMeshes.build_car("railcar_front", livery)
+	var middle := TrainMeshes.build_car("railcar_middle", livery)
+	var rear := TrainMeshes.build_car("railcar_rear", livery)
+	check((front["lamps_front"] as Array).size() == 3 and (front["lamps_idle"] as Array).size() == 2,
+		"railcar front: three headlights, unlit tail lights")
+	check((rear["lamps_rear"] as Array).size() == 2 and (rear["lamps_front"] as Array).is_empty()
+		and (rear["lamps_idle"] as Array).size() == 3, "railcar rear: red tail lights at the nose, headlights dark")
+	check((front["paint"] as ArrayMesh).get_aabb().position.z < -6.0 and (rear["paint"] as ArrayMesh).get_aabb().end.z > 6.0,
+		"front car has its nose ahead, rear car behind (mirrored)")
+	check((front["doors"] as Array).size() == 8 and (middle["doors"] as Array).size() == 8, "railcar: two double doors per side")
+	check((front["doors"][0]["mesh"] as ArrayMesh).get_surface_count() == 2, "door leaf has paint and window glass")
+	check(front.has("display") and rear.has("display"), "both cab ends have a destination display")
+	var consist := (load("res://assets/trains/regional_express.tres") as TrainType).consist
+	check(consist == PackedStringArray(["railcar_front", "railcar_middle", "railcar_rear"]), "RE runs as modern railcar")
 
 
 func _test_sounds() -> void:
@@ -208,6 +224,12 @@ func _test_scheduled_run() -> void:
 	check(arrivals.get("RB 316", {}).get("platform", 0) == 2, "RB 316 stopped at platform 2")
 	check(float(arrivals.get("RB 315", {}).get("error", 9.0)) < 0.1, "stopped precisely at the stop marker")
 	check(both_in_station, "trains crossed in the station (both dwelling at once)")
+	# Etappe 9.5: Federung und Innenlicht
+	check(max_roll > 0.003 and max_roll <= TrainCar.MAX_ROLL + 0.001, "car bodies lean gently in curves (max %.4f rad)" % max_roll)
+	check(max_pitch > 0.001 and max_pitch <= TrainCar.MAX_PITCH + 0.001, "car bodies pitch when braking/accelerating (max %.4f rad)" % max_pitch)
+	check(dwell_cabin > 0.9, "interior light is bright at the platform (%.2f)" % dwell_cabin)
+	check(running_cabin < 0.35, "interior light is dimmed while driving by day (%.2f)" % running_cabin)
+	check(destination_ok, "front display shows number and destination")
 	check(float(departures.get("RB 315", 0.0)) >= 15.2 - 0.001, "RB 315 did not leave before 15:12")
 	check(float(departures.get("RB 316", 0.0)) >= 15.2667 - 0.001, "RB 316 did not leave before 15:16")
 	_check_safety()
@@ -393,6 +415,16 @@ func _monitor() -> void:
 		if train.state == Train.State.DWELLING and not arrivals.has(number):
 			var stop_error := absf(train.head - float(_last_stop.get(key, -100.0)))
 			arrivals[number] = {"platform": train.platform_number, "error": stop_error}
+		for car in train.cars:
+			var tilt := car.get_body_tilt()
+			max_roll = maxf(max_roll, absf(tilt.x))
+			max_pitch = maxf(max_pitch, absf(tilt.y))
+		if train.state == Train.State.DWELLING and train.dwell_phase == Train.Dwell.WAITING:
+			dwell_cabin = maxf(dwell_cabin, train.cars[0].get_cabin_light())
+		if train.state == Train.State.RUNNING and train.speed > 5.0 and not WorldClock.is_dark():
+			running_cabin = train.cars[0].get_cabin_light()
+		if train.cars[0].get_destination().contains(number):
+			destination_ok = true
 		if train.state == Train.State.DWELLING:
 			var door := 0.0
 			for car in train.cars:
@@ -411,6 +443,11 @@ func _monitor() -> void:
 
 
 var _present_before := {}
+var max_roll := 0.0
+var max_pitch := 0.0
+var dwell_cabin := 0.0
+var running_cabin := 1.0
+var destination_ok := false
 var _last_stop := {}
 
 
