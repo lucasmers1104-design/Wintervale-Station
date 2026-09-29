@@ -79,7 +79,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		var relative := (event as InputEventMouseMotion).relative
 		if _drag_rotating:
 			_target_yaw -= relative.x * drag_sensitivity
-			_target_pitch = clampf(_target_pitch + relative.y * drag_sensitivity,
+			_target_pitch = clampf(_target_pitch + relative.y * drag_sensitivity * (-1.0 if GameSettings.get_pref("invert_camera_y") else 1.0),
 				deg_to_rad(min_pitch_degrees), deg_to_rad(max_pitch_degrees))
 		elif _drag_panning:
 			# "Boden greifen": der Boden folgt der Maus.

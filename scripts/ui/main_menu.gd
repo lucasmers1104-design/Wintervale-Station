@@ -27,6 +27,8 @@ var _notice: PanelContainer
 var _notice_text: Label
 var _snow: MenuSnow
 var _gallery: Node
+var _starting_game := false
+var _hover_sound: AudioStreamPlayer
 
 
 class MenuSnow extends Control:
@@ -60,7 +62,8 @@ func _ready() -> void:
 	_build()
 	_rescale()
 	get_viewport().size_changed.connect(_rescale)
-	_buttons[0].grab_focus.call_deferred()
+	_refresh_continue()
+	(_buttons[0] if not _buttons[0].disabled else _buttons[1]).grab_focus.call_deferred()
 
 
 func _build() -> void:
@@ -91,6 +94,11 @@ func _build() -> void:
 	_snow.position = Vector2.ZERO
 	_snow.size = DESIGN_SIZE
 	_canvas.add_child(_snow)
+	_hover_sound = AudioStreamPlayer.new()
+	_hover_sound.stream = SoundLibrary.get_sound("page")
+	_hover_sound.bus = &"WintervaleUI"
+	_hover_sound.volume_db = -23.0
+	_canvas.add_child(_hover_sound)
 
 	for i in ENTRIES.size():
 		_add_entry(i)
@@ -153,6 +161,9 @@ func _build() -> void:
 	_gallery = GALLERY_SCENE.instantiate()
 	_canvas.add_child(_gallery)
 	_gallery.connect("closed", Callable(self, "_on_gallery_closed"))
+	_gallery.connect("start_requested", Callable(self, "_on_start_requested"))
+	_gallery.connect("load_requested", Callable(self, "_on_load_requested"))
+	_gallery.connect("action_requested", Callable(self, "_on_gallery_action"))
 
 
 func _add_image(texture: Texture2D, pos: Vector2, dimensions: Vector2, label: String) -> void:
@@ -227,6 +238,7 @@ func _add_entry(index: int) -> void:
 	button.add_theme_stylebox_override("hover_pressed", _button_style())
 	button.pressed.connect(_activate.bind(index))
 	button.mouse_entered.connect(button.grab_focus)
+	button.mouse_entered.connect(func() -> void: SoundLibrary.play(_hover_sound))
 	_canvas.add_child(button)
 	_buttons.append(button)
 
@@ -310,12 +322,13 @@ func _rescale() -> void:
 func _activate(index: int) -> void:
 	match index:
 		0:
-			if SaveManager.has_save():
-				_start_game(true)
+			var slot := SaveManager.most_recent_valid_slot()
+			if slot != "":
+				_start_game(true, slot)
 			else:
 				_show_notice("No saved journey yet. Start a New Game to visit Wintervale.")
 		1:
-			_start_game(false)
+			_gallery.call("show_page", "new_game")
 		2:
 			_gallery.call("show_page", "load_save")
 		3:
@@ -329,19 +342,92 @@ func _activate(index: int) -> void:
 
 
 func _on_gallery_closed() -> void:
-	_buttons[0].grab_focus()
+	_refresh_continue()
+	(_buttons[0] if not _buttons[0].disabled else _buttons[1]).grab_focus()
 
 
-func _start_game(load_save: bool) -> void:
+func _refresh_continue() -> void:
+	var slot := SaveManager.most_recent_valid_slot()
+	_buttons[0].disabled = slot == ""
+	_buttons[0].tooltip_text = "No valid saved journey yet. Choose New Game." if slot == "" else "Continue %s" % slot
+
+
+func _on_start_requested(name: String, season: int) -> void:
+	var slot := SaveManager.make_unique_slot(name)
+	SaveManager.journey_name = name
+	SaveManager.active_slot = slot
+	SaveManager.playtime_seconds = 0.0
+	Achievements.reset()
+	WorldClock.day = 1
+	WorldClock.set_time(15.0)
+	Seasons.set_season(season, 0.5)
+	_start_game(false, slot)
+
+
+func _on_load_requested(slot: String) -> void:
+	_start_game(true, slot)
+
+
+func _on_gallery_action(action: String) -> void:
+	match action:
+		"continue": _activate(0)
+		"new_game": _gallery.call("show_page", "new_game")
+		"quit": get_tree().quit()
+
+
+func _start_game(load_save: bool, slot: String) -> void:
+	if _starting_game:
+		return
+	if load_save and not SaveManager.list_saves().any(func(entry: Dictionary) -> bool: return entry["slot"] == slot):
+		_show_notice("This journey cannot be loaded. Choose another save.")
+		return
+	_starting_game = true
+	var curtain_layer := CanvasLayer.new()
+	curtain_layer.layer = 100
+	get_tree().root.add_child(curtain_layer)
+	var curtain := ColorRect.new()
+	curtain.color = Color("241b22")
+	curtain.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	curtain.mouse_filter = Control.MOUSE_FILTER_STOP
+	curtain.modulate.a = 0.0
+	curtain_layer.add_child(curtain)
+	if not GameSettings.get_pref("reduced_motion"):
+		var fade_in := get_tree().create_tween()
+		fade_in.tween_property(curtain, "modulate:a", 1.0, 0.38).set_trans(Tween.TRANS_SINE)
+		await fade_in.finished
+	else:
+		curtain.modulate.a = 1.0
 	var scene := load("res://scenes/main/main.tscn") as PackedScene
 	if scene == null:
 		_show_notice("Unable to open the game world.")
+		curtain_layer.queue_free()
+		_starting_game = false
 		return
+	if load_save:
+		Achievements.suspend(true)
 	var world := scene.instantiate()
 	get_tree().root.add_child(world)
+	if load_save and not SaveManager.load_game(slot):
+		world.queue_free()
+		Achievements.suspend(false)
+		_show_notice("This journey could not be restored. Your save was not changed.")
+		var restore := get_tree().create_tween()
+		restore.tween_property(curtain, "modulate:a", 0.0, 0.25)
+		await restore.finished
+		curtain_layer.queue_free()
+		_starting_game = false
+		return
 	get_tree().current_scene = world
-	if load_save and not SaveManager.load_game():
-		push_warning("The saved game could not be loaded after entering the world.")
+	visible = false
+	if not GameSettings.get_pref("reduced_motion"):
+		var fade_out := get_tree().create_tween()
+		fade_out.tween_property(curtain, "modulate:a", 0.0, 0.55).set_trans(Tween.TRANS_SINE)
+		await fade_out.finished
+	curtain_layer.queue_free()
+	if not load_save:
+		await get_tree().process_frame
+		if not SaveManager.save_game(slot):
+			push_warning("The new journey opened, but its first save could not be written.")
 	queue_free()
 
 

@@ -29,7 +29,22 @@ func _ready() -> void:
 	_align_portals()
 	if nature:
 		nature.refresh_clearings.call_deferred()
+	var achievement_toast := AchievementToast.new()
+	achievement_toast.name = "AchievementToast"
+	add_child(achievement_toast)
+	Achievements.attach_world(self)
 	Events.notification_requested.emit("Willkommen in Wintervale")
+	GameSettings.apply_gameplay.call_deferred()
+	WorldClock.day_changed.connect(_on_autosave_day)
+
+
+func _on_autosave_day(_day: int) -> void:
+	if GameSettings.get_pref("autosave"):
+		SaveManager.save_game(SaveManager.active_slot)
+
+
+func _exit_tree() -> void:
+	Achievements.detach_world()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -37,9 +52,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		var time_factor := WorldClock.cycle_time_scale()
 		Events.notification_requested.emit("Zeit ×%d" % int(time_factor))
 	elif event.is_action_pressed(&"quick_save"):
-		SaveManager.save_game()
+		SaveManager.save_game(SaveManager.active_slot)
 	elif event.is_action_pressed(&"quick_load"):
-		if not SaveManager.load_game():
+		if not SaveManager.load_game(SaveManager.active_slot):
 			Events.notification_requested.emit("Noch kein Spielstand vorhanden")
 	else:
 		return

@@ -83,7 +83,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and GameInput.is_mouse_captured():
 		var motion := (event as InputEventMouseMotion).screen_relative
 		_yaw -= motion.x * mouse_sensitivity
-		_set_pitch(_pitch - motion.y * mouse_sensitivity)
+		_set_pitch(_pitch - motion.y * mouse_sensitivity * (-1.0 if GameSettings.get_pref("invert_camera_y") else 1.0))
 	elif event.is_action_pressed(&"toggle_perspective"):
 		set_first_person(not first_person)
 	elif event.is_action_pressed(&"zoom_in") and not first_person:

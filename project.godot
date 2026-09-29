@@ -24,6 +24,7 @@ GameSettings="*res://systems/game_settings.gd"
 GameInput="*res://systems/game_input.gd"
 WorldClock="*res://systems/world_clock.gd"
 SaveManager="*res://systems/save_manager.gd"
+Achievements="*res://systems/achievement_manager.gd"
 Economy="*res://systems/economy.gd"
 Seasons="*res://systems/seasons.gd"
 
