@@ -563,8 +563,10 @@ static func hedge(st: SurfaceTool, length: float, rng: RandomNumberGenerator) ->
 		var x := length * (i + 0.5) / blobs
 		var color := NEEDLES.lerp(NEEDLES_LIGHT, rng.randf() * 0.5)
 		LowPolyBuilder.add_rock(st, rng, Vector3(x, 0.55, 0), 0.62, color, SNOW, 4, 7)
-	LowPolyBuilder.add_box(st, Vector3(length * 0.5, 0.45, 0), Vector3(maxf(length - 0.4, 0.2), 0.9, 0.8), NEEDLES_DARK)
-	LowPolyBuilder.add_box(st, Vector3(length * 0.5, 0.92, 0), Vector3(maxf(length - 0.3, 0.2), 0.08, 0.7), SNOW)
+	# Dunkler Kern hält die Hecke dicht; er bleibt unter den Buschkugeln, deren
+	# Oberseiten die Schneehauben tragen (früher lag eine flache Schneeplatte darüber
+	# und die Hecke wirkte wie eine weiße Leiste mit Zacken).
+	LowPolyBuilder.add_box(st, Vector3(length * 0.5, 0.36, 0), Vector3(maxf(length - 0.4, 0.2), 0.72, 0.8), NEEDLES_DARK)
 
 
 # --- Hilfen -----------------------------------------------------------------------------

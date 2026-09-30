@@ -50,6 +50,7 @@ func _run() -> void:
 			"houses": await _house_shots()
 			"station": await _station_shots()
 			"anim": await _animation_strips()
+			"nature": await _nature_shots()
 	quit(0)
 
 
@@ -110,6 +111,44 @@ func _animation_strips() -> void:
 			await process_frame
 		frames.append(root.get_viewport().get_texture().get_image())
 	_save_strip("anim_train_doors", frames)
+	# Fahrgastwechsel: warten, bis jemand eine Tür festhält, dann diese Tür filmen
+	_clock.set("time_scale", 10.0)
+	for i in 6000:
+		await physics_frame
+		if int(train.get("state")) != 1 or bool(train.call("is_held")):
+			break
+	_clock.set("time_scale", 1.0)
+	var paths: Array = train.call("get_door_paths")
+	if paths.is_empty():
+		printerr("no door paths for boarding strip")
+		return
+	var door_path: Dictionary = paths[0]
+	var busiest := 0.0
+	var director: Node = null
+	for node in _main.find_children("*", "Node", true, false):
+		if node.has_method("get_npcs"):
+			director = node
+			break
+	if director:
+		for path: Dictionary in paths:
+			var near := 0.0
+			for npc: Node3D in director.call("get_npcs"):
+				if npc.visible and npc.global_position.distance_to(path["door"]) < 3.0:
+					near += 1.0
+			if near > busiest:
+				busiest = near
+				door_path = path
+	var door: Vector3 = door_path["door"]
+	var along: Vector3 = door_path["along"]
+	frames.clear()
+	for i in 8:
+		_camera.global_position = door + side * 3.6 + along * 2.2 + Vector3.UP * 0.9
+		_camera.look_at(door + side * 0.6 + Vector3.UP * 0.1, Vector3.UP)
+		_camera.make_current()
+		for k in 12:
+			await process_frame
+		frames.append(root.get_viewport().get_texture().get_image())
+	_save_strip("anim_boarding", frames)
 
 
 ## Fügt Einzelbilder zu einem 4×2-Raster zusammen (halbe Auflösung).
@@ -288,6 +327,27 @@ func _free_direction(from: Vector3, preferred: Vector3, distance: float) -> Vect
 		if space.intersect_ray(query).is_empty():
 			return direction
 	return preferred
+
+
+# --- Natur ------------------------------------------------------------------------------
+
+func _nature_shots() -> void:
+	var village: Node = _main.get_node(^"World/Village")
+	var seasons: Node = root.get_node(^"/root/Seasons")
+	_clock.call("set_time", 12.5)
+	for season: int in [3, 1]:
+		seasons.call("set_season", season, 0.5)
+		var seen := {}
+		for object: Node3D in village.call("get_objects"):
+			var item := String(object.get("item_id"))
+			if seen.has(item) or not (item.begins_with("tree_") or item.begins_with("bush_") or item == "hedge"):
+				continue
+			seen[item] = true
+			var c := object.global_position
+			var height := 5.0 if item.begins_with("tree_") else 1.2
+			await _shot("nature_%s_%s" % [item, "winter" if season == 3 else "summer"],
+				c + Vector3(height * 1.3 + 2.0, height * 0.8 + 1.0, height * 1.3 + 2.0), c + Vector3.UP * height * 0.5)
+	seasons.call("set_season", 3, 0.5)
 
 
 # --- Häuser -----------------------------------------------------------------------------

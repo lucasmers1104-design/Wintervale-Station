@@ -27,6 +27,22 @@ Den zwischenzeitlich umgestalteten Notizbuch-Knopf im HUD habe ich auf das urspr
 
 Bewusst verbleibende Unterschiede zur Referenz (keine Attrappen): erfundene Beispielwerte der Bilder (z. B. „28 / 60 Achievements“, „Busy Platform“) sind durch echte Spieldaten ersetzt; Optionen ohne Spielfunktion fehlen. Bei mehreren Reisen erscheint unter den Achievements eine Reise-Auswahl (in der Referenz nicht vorhanden, für per-Reise-Fortschritt nötig).
 
+## Modelle und Animationen (Durchgang 2)
+
+Werkzeug: `tests/qa/model_review.gd` – freie Kamera nimmt Züge (Front, ¾, Seite, Drehgestell, Trittstufe, Kupplung, Dach, Nacht), Güterzug, Figuren, alle Hausformen, Bahnhof, alle Pflanzen in Winter und Sommer sowie Bildstreifen (Gehzyklus, Türsequenz, Fahrgastwechsel) auf.
+
+| Motiv | Befund | Änderung | Geprüft |
+| --- | --- | --- | --- |
+| Triebzug-Front | Frontscheibe wirkte wie eine flache schwarze Platte, keine Wischer | getöntes Glas mit Himmelsspiegelung und weichem Glanz, nachts Pultschimmer; zwei geparkte Scheibenwischer | Front ¾ Tag und Nacht |
+| Zugschürzen, Figuren | Sägezahn-Schattenakne bei tiefer Wintersonne | Schatten-Bias von Sonne und Mond angepasst | Türsequenz-Streifen vorher/nachher |
+| Laternen | harte, gezackte Schattenkanten | weichere Schatten; Schatten ab 35 m ausgeblendet (Leistung) | Nachtaufnahmen |
+| Birke im Winter | „letzte goldene Blätter“ schwebten als gelbe Plättchen | als Saisonlaub: im Winter unsichtbar, im Herbst golden | Bahnhof, Stadthaus |
+| Hecke im Winter | flache Schneeplatte über den Büschen → weiße Leiste mit Zacken | Kern abgesenkt, Buschkugeln tragen Schneehauben | Winter und Sommer |
+| Hausfenster am Tag | graue Kacheln | Himmel spiegelt oben, unten warmer Raumschimmer (dezent), nachts unverändert | Bauernhaus vorher/nachher |
+| Türen und Trittstufen | – | Ablauf korrekt: Stufe aus → Türen auf → erst aussteigen, dann einsteigen → Türen zu → Stufe ein → Abfahrt | Bildstreifen + `npc_test`/`train_test` |
+| Gehzyklus Spielfigur | – | Beine wechseln sauber, kein sichtbares Gleiten | Bildstreifen |
+| Güterlok, Wagen, Ladung, Häuser, Bahnhof | keine Mängel gefunden | – | Nahaufnahmen |
+
 ## Spielwelt vorher/nachher
 
 | Motiv | Messung vorher | Nachher | Bewertung |
