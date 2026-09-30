@@ -39,6 +39,13 @@ void fragment() {
 	float reflect_amount = clamp(fresnel * 0.6 + upper * 0.3 * (1.0 - screen) + streak * shine, 0.0, 0.85)
 		* (1.0 - clamp(light, 0.0, 1.0) * 0.45) * mix(1.0, 0.4, screen) * (1.0 - vestibule * 0.8);
 	ALBEDO = mix(glass_color, sky_tint, reflect_amount);
+	// Frontscheibe: getöntes Glas mit Tiefe statt einer schwarzen Fläche – oben spiegelt
+	// sich der Himmel stärker, ein breiter weicher Glanz läuft schräg über die Scheibe.
+	float screen_height = smoothstep(1.95, 3.45, local_pos.y);
+	float sheen_band = fract((local_pos.x * 0.7 + local_pos.y * 1.2) * 0.32 + 0.35);
+	float sheen = smoothstep(0.0, 0.18, sheen_band) * (1.0 - smoothstep(0.24, 0.5, sheen_band));
+	float screen_reflect = clamp(0.1 + screen_height * 0.34 + fresnel * 0.3 + sheen * 0.2, 0.0, 0.78);
+	ALBEDO = mix(ALBEDO, mix(glass_color * 0.85, sky_tint, screen_reflect), screen);
 	ROUGHNESS = 0.1;
 	SPECULAR = mix(0.75, 0.3, screen);
 	float ceiling = smoothstep(1.9, 2.9, local_pos.y);
@@ -51,4 +58,7 @@ void fragment() {
 	// Einstiegsraum: unten dunkler Boden, darüber warmes Licht
 	inside *= mix(1.0, mix(0.35, 0.95, smoothstep(1.15, 1.7, local_pos.y)), vestibule);
 	EMISSION = inside * (1.0 - seat * 0.75) * mix(1.0, 0.06, screen);
+	// Führerstand: unten am Scheibenrand glimmt nachts das Pult bernsteinfarben
+	float console = (1.0 - smoothstep(2.02, 2.4, local_pos.y)) * smoothstep(1.9, 1.98, local_pos.y);
+	EMISSION += vec3(1.0, 0.58, 0.26) * console * screen * clamp(glow, 0.0, 1.2) * 0.35;
 }

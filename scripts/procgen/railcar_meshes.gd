@@ -170,6 +170,7 @@ static func _build_cab(livery: Dictionary, rng: RandomNumberGenerator) -> Dictio
 
 	# Scheinwerferband an der Bugspitze, Schürze und Kupplung
 	_front_lamp_band(paint, tip)
+	_wipers(paint, nose_start)
 	_front_apron(paint, livery, nose_start - 1.3, tip)
 	_coupler(paint, tip, -1.0)
 
@@ -539,6 +540,21 @@ static func _coupler(paint: SurfaceTool, tip: float, direction: float) -> void:
 	LowPolyBuilder.add_box(paint, Vector3(0.0, y + 0.06, tip - 0.445), Vector3(0.12, 0.08, 0.02), METAL)
 	LowPolyBuilder.add_cylinder_between(paint, Vector3(0.0, y - 0.07, tip - 0.44), Vector3(0.0, y - 0.07, tip - 0.46), 0.05, 8,
 		METAL.darkened(0.3))
+
+
+## Zwei geparkte Scheibenwischer am unteren Rand der Frontscheibe: Wischerarm mit
+## Gelenk und schmales Wischblatt, leicht schräg aufliegend.
+static func _wipers(paint: SurfaceTool, nose_start: float) -> void:
+	# Die Scheibe ist nach vorn-oben geneigt; leicht nach außen versetzt, damit nichts im Glas steckt
+	var outward := Vector3(0.0, 0.55, -0.83)
+	for side: float in [-1.0, 1.0]:
+		var pivot := _nose_point(Vector2(side * 0.08, ROOF_TOP), 2.1, nose_start) + outward * 0.05
+		var blade_start := _nose_point(Vector2(side * 0.14, ROOF_TOP), 2.03, nose_start) + outward * 0.045
+		var blade_end := _nose_point(Vector2(side * 0.8, ROOF_TOP), 1.97, nose_start) + outward * 0.045
+		var elbow := blade_start.lerp(blade_end, 0.5) + outward * 0.02
+		LowPolyBuilder.add_cylinder_between(paint, pivot, elbow, 0.014, 5, UNDER)
+		LowPolyBuilder.add_cylinder_between(paint, blade_start, blade_end, 0.02, 5, RUBBER)
+		LowPolyBuilder.add_cylinder_between(paint, pivot - outward * 0.02, pivot + outward * 0.03, 0.035, 8, METAL.darkened(0.35))
 
 
 ## Schwarzes Scheinwerferband über die Bugspitze (die Lampen setzt TrainCar davor).

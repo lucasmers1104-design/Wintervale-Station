@@ -105,10 +105,11 @@ static func tree_birch(st: SurfaceTool, rng: RandomNumberGenerator) -> void:
 			var from := start.lerp(tip, 0.55 + k * 0.25)
 			var twig := from + (out.rotated(Vector3.UP, (k - 0.5) * 1.3) * 0.45 + Vector3.UP * 0.35)
 			LowPolyBuilder.add_cylinder_between(st, from, twig, 0.02, 3, BARK.lightened(0.1))
-	# Ein paar letzte goldene Blätter bleiben hängen
+	# Einzelne Blätter an den Zweigspitzen – als Sommerlaub markiert: im Winter wirkten
+	# sie als schwebende gelbe Plättchen, jetzt erscheinen sie nur ohne Schnee (Herbst golden).
 	for i in 6:
 		var p := top + Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.2, 0.2), rng.randf_range(-1.0, 1.0))
-		LowPolyBuilder.add_box(st, p, Vector3(0.1, 0.02, 0.1), Color(0.88, 0.66, 0.28))
+		LowPolyBuilder.add_box(st, p, Vector3(0.1, 0.02, 0.1), BIRCH_LEAF_LIGHT)
 	# Sommerlaub: lockere Büschel an Ästen und Krone. Sie wachsen erst, wo der Schnee
 	# geschmolzen ist (Vertex-Alpha SEASONAL_LEAF, siehe foliage_sway.gdshader) –
 	# im Winter bleibt die Birke kahl, im Herbst färbt sich das Laub golden.
