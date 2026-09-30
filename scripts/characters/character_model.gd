@@ -712,6 +712,17 @@ func _build_hair(look: CharacterAppearance, under_hat: bool) -> void:
 				_part(_head, _sphere(0.085, 10, 5), hair, direction * 0.28 + Vector3(0.0, 0.02, 0.0))
 			if not under_hat:
 				_part(_head, _sphere(0.1, 10, 5), hair, Vector3(0.0, 0.28, 0.02))
+		CharacterAppearance.HairStyle.LONG:
+			# Lange, wellige Haare: fallen hinten bis auf die Schultern und rahmen das
+			# Gesicht mit zwei Strähnen, die unten in einer weichen Welle enden.
+			if not under_hat:
+				var cap := _part(_head, _sphere(0.315, 28, 14, true), hair, Vector3(0.0, 0.03, 0.02))
+				cap.rotation.x = -0.3
+			_part(_head, _sphere(0.27, 20, 10), hair, Vector3(0.0, -0.12, 0.13), Vector3(1.12, 1.3, 0.8))
+			for x: float in [-0.25, 0.25]:
+				_part(_head, _sphere(0.13, 14, 7), hair, Vector3(x, -0.12, 0.02), Vector3(0.62, 1.45, 0.95))
+				_part(_head, _sphere(0.085, 12, 6), hair, Vector3(x * 1.08, -0.31, 0.05), Vector3(1.0, 0.9, 1.0))
+				_part(_head, _sphere(0.08, 12, 6), hair, Vector3(x * 0.75, -0.34, 0.16))
 
 
 func _build_hat(look: CharacterAppearance, hat_style: CharacterAppearance.HatStyle) -> void:

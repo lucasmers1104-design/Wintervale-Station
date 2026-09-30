@@ -9,7 +9,7 @@ class_name CharacterAppearance
 extends Resource
 
 enum HatStyle { NONE, BEANIE, POMPOM_BEANIE, FLAT_CAP }
-enum HairStyle { NONE, SHORT, SIDES, BOB, BUN, PONYTAIL, CURLY }
+enum HairStyle { NONE, SHORT, SIDES, BOB, BUN, PONYTAIL, CURLY, LONG }
 ## Oberteil: Karohemd (Markenzeichen), Strickpulli oder Mantel.
 enum TopStyle { PLAID_SHIRT, SWEATER, COAT }
 ## Kleidung passend zur Jahreszeit (Grundlage – noch ohne Jahreszeiten-System).

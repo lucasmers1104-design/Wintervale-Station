@@ -16,6 +16,14 @@ signal perspective_changed(first_person: bool)
 const SAVE_ID := "player"
 ## Fällt die Figur unter diese Höhe, wird sie zum Startpunkt zurückgesetzt.
 const RESPAWN_DEPTH := -40.0
+## Wählbare Spielfiguren (New-Game-Menü).
+const CHARACTERS := {
+	"male": preload("res://assets/characters/player_appearance.tres"),
+	"female": preload("res://assets/characters/player_appearance_female.tres"),
+}
+
+## Gewählte Spielfigur (siehe [constant CHARACTERS]).
+var character := "male"
 
 @export_group("Bewegung")
 @export var walk_speed := 2.8
@@ -75,6 +83,7 @@ func _ready() -> void:
 	_footsteps = FootstepPlayer.new()
 	add_child(_footsteps)
 	_model.footstep.connect(_footsteps.play_step)
+	set_character(SaveManager.journey_character)
 	_apply_perspective()
 	# Sprechen, Aufheben, Übergeben (Taste E) – Etappe 10
 	var interaction := PlayerInteraction.new()
@@ -196,6 +205,14 @@ func get_save_id() -> String:
 	return SAVE_ID
 
 
+## Wählt die Spielfigur ("male" = ursprüngliche Figur, "female"). Wird beim neuen
+## Spiel aus dem New-Game-Menü übernommen und mit dem Spielstand gespeichert.
+func set_character(id: String) -> void:
+	character = id if CHARACTERS.has(id) else "male"
+	if _model.appearance != CHARACTERS[character]:
+		_model.appearance = CHARACTERS[character]
+
+
 func save_state() -> Dictionary:
 	return {
 		"position": SaveUtils.vec3_to_array(global_position),
@@ -204,6 +221,7 @@ func save_state() -> Dictionary:
 		"camera_pitch": _pitch,
 		"camera_distance": _target_distance,
 		"first_person": first_person,
+		"character": character,
 	}
 
 
@@ -214,6 +232,8 @@ func load_state(data: Dictionary) -> void:
 	_yaw = float(data.get("camera_yaw", _yaw))
 	_camera_yaw.rotation.y = _yaw
 	_target_distance = clampf(float(data.get("camera_distance", _target_distance)), min_distance, max_distance)
+	# Ältere Spielstände kennen keine Figurenwahl: dann die ursprüngliche Spielfigur
+	set_character(String(data.get("character", "male")))
 	set_first_person(bool(data.get("first_person", first_person)))
 	_set_pitch(float(data.get("camera_pitch", _pitch)))
 	snap_camera()

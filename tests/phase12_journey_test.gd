@@ -31,12 +31,16 @@ func _run() -> void:
 	var content: Control = gallery.get_node("LiveContent")
 	var name_input := content.find_child("JourneyName", true, false) as LineEdit
 	name_input.text = journey_name
-	var start: Button = null
-	for button in content.find_children("*", "Button", true, false):
-		if button.text == "Start Your Journey":
-			start = button
-			break
+	var start := content.find_child("StartJourney", true, false) as Button
 	_check(start != null, "New Game start control exists")
+	# Figur und Jahreszeit wählen (echte Auswahl, wird in der Welt übernommen)
+	var female := content.find_child("Character_female", true, false) as Button
+	var autumn := content.find_child("Season_autumn", true, false) as Button
+	_check(female != null and autumn != null, "character and season choices exist")
+	female.pressed.emit()
+	autumn.pressed.emit()
+	var female_state := female.get_node("State") as TextureRect
+	_check(female_state.texture.resource_path.ends_with("character_female_on.png"), "selected character shows the highlighted card")
 	start.pressed.emit()
 	_check(root.get_children().any(func(node: Node) -> bool: return node is MenuLoadingScreen),
 		"illustrated loading screen appears during world loading")
@@ -59,6 +63,12 @@ func _run() -> void:
 	_check(data.get("metadata", {}).get("name", "") == journey_name, "journey name saved in metadata")
 	_check(data.get("objects", {}).has("rail_network") and data.get("objects", {}).has("village"), "world state saved")
 	_check(data.get("objects", {}).has("achievements"), "achievement state saved per journey")
+	_check(String(data.get("objects", {}).get("player", {}).get("character", "")) == "female", "chosen character saved with the journey")
+	_check(String(data.get("metadata", {}).get("season", "")) == "Autumn", "chosen starting season applied (%s)" % data.get("metadata", {}).get("season", ""))
+	var player: Node = world.get_node(^"Player")
+	var model: Node = player.get_node(^"Model")
+	_check(String((model.get("appearance") as Resource).resource_path).ends_with("player_appearance_female.tres"),
+		"player model uses the chosen character")
 	_check(saves.call("make_unique_slot", journey_name) != slot, "new journey name cannot overwrite save")
 	var second_slot := slot + "_second"
 	_check(saves.call("save_game", second_slot), "second save created")

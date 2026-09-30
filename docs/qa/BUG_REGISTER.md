@@ -25,6 +25,7 @@ Status: `FIXED` (behoben und geprüft) · `OPEN` (offen, begründet) · `CD` (En
 | GUI-003 | MEDIUM (visuell) | Achievements | Listenansicht statt Kartenraster der Referenz; gesperrte Siegel dunkel statt silbergrau | FIXED |
 | GUI-004 | LOW (visuell) | Credits | Pergamentfläche verdeckte Symbole, Linien und Skizzen der Referenz | FIXED |
 | GUI-005 | LOW (visuell) | Settings | Aufklappliste der Auswahlfelder im grauen Engine-Standard statt Pergament | FIXED |
+| BUG-012 | MEDIUM (visuell) | Sonderzüge | Lichterketten liefen an den Endwagen über die abfallende Bugnase hinaus und hingen in der Luft (vom CD gemeldet) – jetzt enden sie vor der Nase; Test `qa/festive_lights` | FIXED |
 | UX-001 | COSMETIC | Sprache | Hauptmenü, Einstellungen und Achievements englisch, Spiel-HUD/Notizbuch deutsch | CD |
 
 ---

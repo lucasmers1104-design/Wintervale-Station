@@ -10,7 +10,7 @@ signal action_requested(action: String)
 
 const DESIGN_SIZE := Vector2(1672, 941)
 const PAGE_ART := {
-	"new_game": preload("res://assets/ui/menu_screens/load_save.png"),
+	"new_game": preload("res://assets/ui/menu_screens/new_game.png"),
 	"load_save": preload("res://assets/ui/menu_screens/load_save.png"),
 	"achievements": preload("res://assets/ui/menu_screens/achievements.png"),
 	"settings_graphics": preload("res://assets/ui/menu_screens/settings_graphics.png"),
@@ -158,7 +158,7 @@ func _rebuild_controls() -> void:
 	_add_art_button("LogoBack", Rect2(110, 24, 580, 209), close_page)
 	match _page:
 		"new_game":
-			_add_art_button("Back", Rect2(296, 844, 235, 69), close_page)
+			_add_art_button("Back", Rect2(310, 825, 240, 63), close_page)
 		"load_save":
 			_add_art_button("Back", Rect2(296, 844, 235, 69), close_page)
 		"achievements":

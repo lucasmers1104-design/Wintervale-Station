@@ -437,11 +437,20 @@ func _add_festive_lights(material: Material, colors: PackedColorArray, variant: 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 77 + variant
 	var half := length * 0.5 - 0.6
-	var hooks := maxi(2, int(half * 2.0 / 1.4))
+	# An den Endwagen fällt die Bugnase ab – dort gibt es keine Dachkante, an der die
+	# Kette hängen könnte. Sie endet deshalb kurz vor dem Nasenbeginn (vorne bei
+	# railcar_front, hinten beim gespiegelten railcar_rear).
+	var z_from := -half
+	var z_to := half
+	if kind == "railcar_front":
+		z_from = -length * 0.5 + RailcarMeshes.NOSE_LENGTH + 0.2
+	elif kind == "railcar_rear":
+		z_to = length * 0.5 - RailcarMeshes.NOSE_LENGTH - 0.2
+	var hooks := maxi(2, int((z_to - z_from) / 1.4))
 	for side: float in [-1.0, 1.0]:
 		for k in hooks:
-			var z0 := lerpf(-half, half, float(k) / hooks)
-			var z1 := lerpf(-half, half, float(k + 1) / hooks)
+			var z0 := lerpf(z_from, z_to, float(k) / hooks)
+			var z1 := lerpf(z_from, z_to, float(k + 1) / hooks)
 			var a := Vector3(side * 1.37, 3.1, z0)
 			var b := Vector3(side * 1.37, 3.1, z1)
 			for i in 5:

@@ -19,6 +19,9 @@ const SAVE_VERSION := 2
 const SEASON_NAMES := ["Spring", "Summer", "Autumn", "Winter"]
 var active_slot := DEFAULT_SLOT
 var journey_name := "Wintervale"
+## Spielfigur für die nächste neue Reise ("male" / "female"); geladene Spielstände
+## bringen ihre eigene Wahl mit.
+var journey_character := "male"
 var playtime_seconds := 0.0
 
 

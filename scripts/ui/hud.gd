@@ -30,6 +30,8 @@ const NOTEBOOK_ICON := preload("res://assets/ui/icons/notebook.svg")
 ## Freigegebene Leiste ohne die gemalten Uhrzeiger (tools/generate_hud_clock_face.gd);
 ## das Original liegt unverändert daneben (hud_status_bar.png).
 const STATUS_BAR_ART := preload("res://assets/ui/hud_status_bar_clean.png")
+## Größe der Leiste relativ zur 1672×941-Referenz (1410 px breit → ≈ 35 % der Bildbreite).
+const STATUS_BAR_SCALE := 0.42
 ## Mitte des Zifferblatts in Leistenkoordinaten (Vorlage 1167|196.8 minus Ausschnitt 130|83).
 const CLOCK_CENTER := Vector2(1037.0, 113.8)
 
@@ -307,9 +309,11 @@ func _build_notebook_button() -> Button:
 	book.expand_icon = true
 	book.flat = true
 	book.focus_mode = Control.FOCUS_NONE
-	book.position = Vector2(1413, 82)
-	book.custom_minimum_size = Vector2(43, 43)
-	book.size = Vector2(43, 43)
+	# Größe in Leisteneinheiten: bleibt mit der kleineren Leiste ein gut klickbares
+	# Symbol (≈ 20 px bei 1280×720), mittig zur Zahlenzeile.
+	book.position = Vector2(1416, 78)
+	book.custom_minimum_size = Vector2(64, 64)
+	book.size = Vector2(64, 64)
 	book.tooltip_text = "Notizbuch (Taste %s)" % InputConfig.get_action_label(&"toggle_notebook")
 	book.pressed.connect(Events.notebook_requested.emit.bind(""))
 	return book
@@ -342,9 +346,10 @@ func _layout_status_bar() -> void:
 		return
 	var viewport_size := get_viewport().get_visible_rect().size
 	var viewport_factor := minf(viewport_size.x / 1672.0, viewport_size.y / 941.0)
-	var factor := viewport_factor * 0.62
+	# Etwa ein Drittel der Bildbreite (CD-Wunsch: vorher 52 %, „viel zu groß“)
+	var factor := viewport_factor * STATUS_BAR_SCALE
 	_status_bar.scale = Vector2.ONE * factor
-	_status_bar.position = Vector2((viewport_size.x - 1410.0 * factor) * 0.5, 28.0 * viewport_factor)
+	_status_bar.position = Vector2((viewport_size.x - 1410.0 * factor) * 0.5, 14.0 * viewport_factor)
 	var toast_top := _status_bar.position.y + 213.0 * factor + 12.0 * viewport_factor
 	_toast_label.offset_top = toast_top
 	_toast_label.offset_bottom = toast_top + 36.0 * viewport_factor

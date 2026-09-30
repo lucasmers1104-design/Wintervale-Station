@@ -37,6 +37,13 @@ const SAVE_ICONS := {
 }
 ## Schriftfarben der Jahreszeiten wie in der Load-Save-Vorlage (Sommer ergänzt).
 const SEASON_COLORS := {"Winter": Color("3f78a3"), "Autumn": Color("b8612a"), "Spring": Color("c05a7a"), "Summer": Color("6f8a2a")}
+const NEW_GAME_ART := preload("res://assets/ui/menu_screens/new_game.png")
+## Auswahlfelder der New-Game-Vorlage (inkl. Rand für das Leuchten, siehe Werkzeug).
+const NEW_GAME_CHARACTERS := {"male": Rect2(1016, 400, 205, 226), "female": Rect2(1219, 400, 205, 226)}
+const NEW_GAME_SEASONS := {"winter": Rect2(1016, 678, 105, 101), "spring": Rect2(1119, 678, 105, 101),
+	"summer": Rect2(1221, 678, 105, 101), "autumn": Rect2(1324, 678, 105, 101)}
+const SEASON_INDEX := {"spring": 0, "summer": 1, "autumn": 2, "winter": 3}
+const SEASON_NAMES_BY_INDEX := ["Spring", "Summer", "Autumn", "Winter"]
 ## Credits: [Position der Namen in der Vorlage, Zeilen]. Nur belegte Angaben.
 const CREDITS := [
 	[Vector2(488, 336), ["Luca Warmers"]],
@@ -136,6 +143,11 @@ var _display_confirmation_nonce := 0
 var _modal_shade: ColorRect
 var _modal_dialog: PanelContainer
 var _hover_sound: AudioStreamPlayer
+var _new_game_character := "male"
+var _new_game_season := 3
+var _state_tiles: Array[TextureRect] = []
+var _season_icon_rect: TextureRect
+var _season_label: Label
 
 
 func _ready() -> void:
@@ -150,6 +162,9 @@ func build(next_page: String) -> void:
 	_modal_shade = null
 	_modal_dialog = null
 	_status = null
+	_state_tiles.clear()
+	_season_icon_rect = null
+	_season_label = null
 	for child in get_children():
 		remove_child(child)
 		child.queue_free()
@@ -274,63 +289,170 @@ func _confirm_display(safe_values: Dictionary) -> void:
 		_show_status("Display settings reverted.")
 
 
+## New Game exakt nach der freigegebenen Vorlage (new_game.png): Bild, Rahmen, Texte
+## und Knöpfe kommen aus der Vorlage; live sind Name, Figur, Jahreszeit und die
+## Jahreszeit in der Infozeile. Auswahlzustände: tools/extract_new_game_states.gd.
 func _build_new_game() -> void:
-	var heading := Panel.new()
-	heading.position = Vector2(734, 159)
-	heading.size = Vector2(214, 52)
-	var heading_crop := AtlasTexture.new()
-	heading_crop.atlas = PARCHMENT_TEXTURE
-	heading_crop.region = Rect2(260, 395, 640, 115)
-	var heading_paper := StyleBoxTexture.new()
-	heading_paper.texture = heading_crop
-	heading.add_theme_stylebox_override("panel", heading_paper)
-	_root.add_child(heading)
-	var heading_text := _label("New Game", 33, true)
-	heading_text.size = heading.size
-	heading_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	heading_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	heading.add_child(heading_text)
-	var panel := _panel(Vector2(300, 250), Vector2(1090, 585))
-	var content := _column(panel, 8)
-	content.add_child(_label("Begin a New Journey", 34, true))
-	content.add_child(_label("Choose a name and a starting season for your own Wintervale.", 23))
-	content.add_child(_spacer(18))
-	content.add_child(_label("Journey Name", 25))
+	_new_game_character = SaveManager.journey_character
+	_new_game_season = 3
+	# Namensfeld: gemalten Beispieltext abdecken, echtes Eingabefeld darüber
+	_paper_patch(Rect2(1034, 302, 318, 40), Color("f4d0aa"))
 	var name_input := LineEdit.new()
 	name_input.name = "JourneyName"
-	name_input.text = "My Wintervale"
-	name_input.max_length = 48
+	name_input.text = "Wintervale - Year 1"
+	name_input.max_length = 40
+	name_input.position = Vector2(1030, 297)
+	name_input.size = Vector2(326, 48)
 	name_input.add_theme_font_override("font", _serif())
-	name_input.add_theme_font_size_override("font_size", 24)
-	name_input.add_theme_color_override("font_color", INK)
-	name_input.add_theme_stylebox_override("normal", _button_style(false))
-	name_input.add_theme_stylebox_override("focus", _button_style(true))
-	name_input.custom_minimum_size = Vector2(600, 48)
-	content.add_child(name_input)
-	content.add_child(_spacer(13))
-	content.add_child(_label("Starting Season", 25))
-	var seasons := OptionButton.new()
-	for season_name in ["Spring", "Summer", "Autumn", "Winter"]:
-		seasons.add_item(season_name)
-	seasons.select(3)
-	seasons.custom_minimum_size = Vector2(330, 48)
-	_style_option(seasons)
-	content.add_child(seasons)
-	content.add_child(_spacer(13))
-	content.add_child(_label("Scenario  ·  Wintervale Valley", 25))
-	content.add_child(_label("The available starter world. More destinations will appear when they are playable.", 19))
-	content.add_child(_spacer(20))
-	var start := _button("Start Your Journey", 250)
-	content.add_child(start)
+	name_input.add_theme_font_size_override("font_size", 25)
+	name_input.add_theme_color_override("font_color", Color("2c1b14"))
+	name_input.add_theme_color_override("caret_color", Color("2c1b14"))
+	name_input.add_theme_color_override("selection_color", Color(0.85, 0.58, 0.28, 0.45))
+	var clear := StyleBoxEmpty.new()
+	clear.content_margin_left = 8
+	name_input.add_theme_stylebox_override("normal", clear)
+	var focused := StyleBoxFlat.new()
+	focused.draw_center = false
+	focused.border_color = Color("e0a95c")
+	focused.set_border_width_all(2)
+	focused.set_corner_radius_all(4)
+	focused.content_margin_left = 8
+	name_input.add_theme_stylebox_override("focus", focused)
+	_root.add_child(name_input)
+	# Figur
+	for id: String in NEW_GAME_CHARACTERS:
+		_state_tile("Character_" + id, NEW_GAME_CHARACTERS[id], "res://assets/ui/new_game_art/character_%s_%s.png" % [id, "%s"],
+			func() -> bool: return _new_game_character == id,
+			func() -> void:
+				_new_game_character = id
+				_refresh_new_game())
+	# Jahreszeit (Reihenfolge wie Seasons.Season: Frühling 0 … Winter 3)
+	for season: String in NEW_GAME_SEASONS:
+		var index: int = SEASON_INDEX[season]
+		_state_tile("Season_" + season, NEW_GAME_SEASONS[season], "res://assets/ui/new_game_art/season_%s_%s.png" % [season, "%s"],
+			func() -> bool: return _new_game_season == index,
+			func() -> void:
+				_new_game_season = index
+				_refresh_new_game())
+	# Infozeile: gewählte Jahreszeit mit Symbol und Farbe
+	_paper_patch(Rect2(295, 748, 118, 38), Color("e9c3a0"))
+	_season_icon_rect = TextureRect.new()
+	_season_icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_season_icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_season_icon_rect.position = Vector2(297, 752)
+	_season_icon_rect.size = Vector2(38, 30)
+	_season_icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_season_icon_rect)
+	_season_label = _label("", 21)
+	_season_label.position = Vector2(343, 753)
+	_season_label.size = Vector2(90, 30)
+	_root.add_child(_season_label)
+	# Start Journey (Knopffläche aus der Vorlage)
+	var start := _art_region_button("StartJourney", Rect2(1060, 823, 373, 69))
 	start.pressed.connect(func() -> void:
 		var name_text := name_input.text.strip_edges()
 		if name_text.is_empty():
 			_show_status("Please enter a name for your journey.")
 			return
-		start_requested.emit(name_text, seasons.selected))
-	_status = _label("", 20)
-	content.add_child(_status)
+		SaveManager.journey_character = _new_game_character
+		start_requested.emit(name_text, _new_game_season))
+	_status = _label("", 18)
+	_status.add_theme_color_override("font_color", Color("ffe4b5"))
+	_status.position = Vector2(700, 845)
+	_status.size = Vector2(340, 30)
+	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_root.add_child(_status)
+	_refresh_new_game()
 	name_input.grab_focus()
+
+
+## Auswahlfeld mit zwei Bildzuständen (…_on / …_off) aus der Vorlage.
+func _state_tile(tile_name: String, region: Rect2, path_pattern: String, is_selected: Callable, choose: Callable) -> void:
+	var button := Button.new()
+	button.name = tile_name
+	button.position = region.position
+	button.size = region.size
+	button.focus_mode = Control.FOCUS_ALL
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var empty := StyleBoxEmpty.new()
+	for state: String in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
+		button.add_theme_stylebox_override(state, empty)
+	var picture := TextureRect.new()
+	picture.name = "State"
+	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	picture.stretch_mode = TextureRect.STRETCH_SCALE
+	picture.size = region.size
+	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	picture.set_meta(&"on", load(path_pattern % "on"))
+	picture.set_meta(&"off", load(path_pattern % "off"))
+	picture.set_meta(&"selected", is_selected)
+	button.add_child(picture)
+	var outline := _focus_outline(region.size, 4)
+	button.add_child(outline)
+	button.focus_entered.connect(outline.show)
+	button.focus_exited.connect(outline.hide)
+	button.pressed.connect(choose)
+	button.mouse_entered.connect(func() -> void: SoundLibrary.play(_hover_sound))
+	_root.add_child(button)
+	_state_tiles.append(picture)
+
+
+func _refresh_new_game() -> void:
+	for picture: TextureRect in _state_tiles:
+		if not is_instance_valid(picture):
+			continue
+		var selected: Callable = picture.get_meta(&"selected")
+		picture.texture = picture.get_meta(&"on") if selected.call() else picture.get_meta(&"off")
+	var season_name: String = SEASON_NAMES_BY_INDEX[_new_game_season]
+	if _season_icon_rect:
+		_season_icon_rect.texture = load("res://assets/ui/new_game_art/icon_%s.png" % season_name.to_lower())
+	if _season_label:
+		_season_label.text = season_name
+		_season_label.add_theme_color_override("font_color", SEASON_COLORS.get(season_name, INK))
+
+
+## Knopf, dessen sichtbare Fläche unverändert aus der Vorlage stammt (mit Fokusrahmen).
+func _art_region_button(button_name: String, region: Rect2) -> Button:
+	var button := Button.new()
+	button.name = button_name
+	button.position = region.position
+	button.size = region.size
+	button.focus_mode = Control.FOCUS_ALL
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var empty := StyleBoxEmpty.new()
+	for state: String in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
+		button.add_theme_stylebox_override(state, empty)
+	var crop := AtlasTexture.new()
+	crop.atlas = NEW_GAME_ART
+	crop.region = region
+	var surface := TextureRect.new()
+	surface.texture = crop
+	surface.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	surface.stretch_mode = TextureRect.STRETCH_SCALE
+	surface.size = region.size
+	surface.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(surface)
+	var outline := _focus_outline(region.size, 7)
+	button.add_child(outline)
+	button.focus_entered.connect(outline.show)
+	button.focus_exited.connect(outline.hide)
+	button.mouse_entered.connect(func() -> void: SoundLibrary.play(_hover_sound))
+	_root.add_child(button)
+	return button
+
+
+func _focus_outline(dimensions: Vector2, radius: int) -> Panel:
+	var outline := Panel.new()
+	outline.size = dimensions
+	outline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color.TRANSPARENT
+	style.border_color = Color("fbd78a")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(radius)
+	outline.add_theme_stylebox_override("panel", style)
+	outline.visible = false
+	return outline
 
 
 func _build_saves() -> void:

@@ -61,7 +61,9 @@ func _run() -> void:
 	var book: Button = hud.find_child("NotebookButton", true, false)
 	var rect := book.get_global_rect()
 	var bar: Control = hud.find_child("PremiumStatusBar", true, false)
-	_check(book.visible and rect.size.x * bar.scale.x >= 18.0, "notebook button keeps its designed size (%.0f px)" % (rect.size.x * bar.scale.x))
+	var min_size := hud.get_viewport().get_visible_rect().size.x * 0.015
+	_check(book.visible and book.size.x * bar.scale.x >= min_size,
+		"notebook button large enough to click (%.0f px, min %.0f)" % [book.size.x * bar.scale.x, min_size])
 	var viewport_rect := hud.get_viewport().get_visible_rect()
 	var screen_rect := Rect2(bar.position + book.position * bar.scale, book.size * bar.scale)
 	_check(viewport_rect.encloses(screen_rect), "notebook button inside the screen")
