@@ -51,6 +51,7 @@ func _run() -> void:
 			"station": await _station_shots()
 			"anim": await _animation_strips()
 			"nature": await _nature_shots()
+			"rail": await _rail_shots()
 	quit(0)
 
 
@@ -327,6 +328,34 @@ func _free_direction(from: Vector3, preferred: Vector3, distance: float) -> Vect
 		if space.intersect_ray(query).is_empty():
 			return direction
 	return preferred
+
+
+# --- Gleise, Weichen, Signale, Kran -----------------------------------------------------
+
+func _rail_shots() -> void:
+	_clock.call("set_time", 13.0)
+	var network: Node = _main.get_node(^"World/Railway/RailNetwork")
+	await _shot("rail_track_eye", Vector3(6.5, 1.0, 4.0), Vector3(3.8, 0.2, -6.0))
+	# Weichen: Lage über das Stammgleis (dessen Ende am Weichenknoten)
+	var count := 0
+	for switch: Object in network.call("get_switches"):
+		if count >= 2:
+			break
+		var trunk: Object = network.call("get_segment", int(switch.get("trunk_segment_id")))
+		if trunk == null:
+			continue
+		var node_id := int(switch.get("node_id"))
+		var at: Vector3 = trunk.call("get_start_position") if int(trunk.get("start_node_id")) == node_id \
+			else trunk.call("get_end_position")
+		var away: Vector3 = trunk.call("get_direction_away_from", node_id)
+		var target := at - away * 4.0
+		await _shot("rail_switch_%d" % count, target + Vector3(-away.z, 0, away.x) * 5.0 - away * 5.0 + Vector3.UP * 3.0, target)
+		count += 1
+	await _shot("rail_signal", Vector3(-3.0, 2.2, 22.0), Vector3(0.0, 2.5, 10.0))
+	await _shot("freight_crane", Vector3(14.0, 7.0, 10.0), Vector3(26.0, 5.0, -10.0))
+	_clock.call("set_time", 21.0)
+	await create_timer(6.0).timeout
+	await _shot("rail_track_night", Vector3(6.5, 1.0, 4.0), Vector3(3.8, 0.2, -6.0))
 
 
 # --- Natur ------------------------------------------------------------------------------
