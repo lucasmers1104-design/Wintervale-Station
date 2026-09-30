@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <!-- Hauptmenü: kleines Bahnhofshaus mit Uhr, im Stil der Hauptmenü-Symbole -->
+  <path d="M4 22 L24 7 L44 22 L40.5 25 L24 12.8 L7.5 25Z" fill="#523528" stroke="#523528" stroke-linejoin="round"/>
+  <path d="M10 24 V42 H38 V24 L24 13.6Z" fill="#523528"/>
+  <path d="M20 42 V32 Q20 30 22 30 H26 Q28 30 28 32 V42Z" fill="#b58b6a"/>
+  <circle cx="24" cy="22" r="4.2" fill="#b58b6a"/>
+  <path d="M24 19.6 V22 H26" fill="none" stroke="#39241d" stroke-width="1.1" stroke-linecap="round"/>
+  <path d="M13 29 H17 V34 H13Z M31 29 H35 V34 H31Z" fill="#a77d61"/>
+</svg>

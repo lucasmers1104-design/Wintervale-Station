@@ -95,7 +95,7 @@ func _show_next() -> void:
 		_sound.play()
 	if GameSettings.get_pref("reduced_motion"):
 		_panel.modulate.a = 1.0
-		await get_tree().create_timer(3.0).timeout
+		await get_tree().create_timer(3.0, false).timeout
 		_panel.visible = false
 	else:
 		_panel.offset_left = -396
@@ -107,7 +107,7 @@ func _show_next() -> void:
 		tween.tween_property(_panel, "modulate:a", 1.0, 0.35)
 		tween.tween_property(_badge, "modulate", Color.WHITE, 0.65)
 		await tween.finished
-		await get_tree().create_timer(3.0).timeout
+		await get_tree().create_timer(3.0, false).timeout
 		var outro := create_tween()
 		outro.tween_property(_panel, "modulate:a", 0.0, 0.45)
 		await outro.finished

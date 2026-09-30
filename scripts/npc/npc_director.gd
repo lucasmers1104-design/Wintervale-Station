@@ -168,11 +168,8 @@ func _update_social() -> void:
 			# Ein kurzer Plausch in Bildern: Wetter, Jahreszeit, Züge, Herzliches
 			if _rng.randf() < 0.4:
 				a.show_icon(small_talk_icon(_rng))
-				var reply := small_talk_icon(_rng)
-				var partner := b
-				get_tree().create_timer(1.4).timeout.connect(func() -> void:
-					if is_instance_valid(partner):
-						partner.show_icon(reply))
+				# Gebundene Methode statt Lambda: wird getrennt, falls b vorher verschwindet
+				get_tree().create_timer(1.4, false).timeout.connect(b.show_icon.bind(small_talk_icon(_rng)))
 	for npc in present:
 		if npc.get_behaviour() == "chat" and npc.get_spot() and npc.get_spot().partner \
 				and npc.get_spot().partner.occupant is Npc and _rng.randf() < 0.3:

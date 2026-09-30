@@ -32,6 +32,10 @@ func _ready() -> void:
 	var achievement_toast := AchievementToast.new()
 	achievement_toast.name = "AchievementToast"
 	add_child(achievement_toast)
+	var pause_menu := PauseMenu.new()
+	pause_menu.name = "PauseMenu"
+	add_child(pause_menu)
+	Events.pause_menu_requested.connect(pause_menu.open)
 	Achievements.attach_world(self)
 	Events.notification_requested.emit("Willkommen in Wintervale")
 	GameSettings.apply_gameplay.call_deferred()

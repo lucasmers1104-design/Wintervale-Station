@@ -4,6 +4,8 @@ class_name Rainfall
 extends GPUParticles3D
 
 var intensity := 0.0
+## Partikeldichte aus den Grafikeinstellungen (GameSettings "particle_density").
+var density := 1.0
 var _wind := -1.0
 
 
@@ -47,8 +49,8 @@ func _process(_delta: float) -> void:
 	var camera := get_viewport().get_camera_3d()
 	if camera:
 		global_position = camera.global_position - camera.global_basis.z * 12.0 + Vector3(0.0, 4.0, 0.0)
-	amount_ratio = intensity
-	emitting = intensity > 0.02
+	amount_ratio = intensity * density
+	emitting = amount_ratio > 0.02
 
 
 ## Stärke (0..1) und Wind (0..1): Wind lässt den Regen schräg fallen.

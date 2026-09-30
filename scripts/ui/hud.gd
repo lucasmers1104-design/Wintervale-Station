@@ -298,29 +298,19 @@ func _build_money_display() -> void:
 	_on_money_changed(Economy.money)
 
 
-## Rundes Holz-Medaillon mit Messingrand, das unter dem rechten Leistenende hängt.
+## Notizbuch-Knopf neben der Uhr – Gestaltung wie vom Nutzer angelegt (flaches Symbol).
+## Die Mindestgröße verhindert, dass der Knopf auf wenige Pixel zusammenschrumpft.
 func _build_notebook_button() -> Button:
 	var book := Button.new()
 	book.name = "NotebookButton"
 	book.icon = NOTEBOOK_ICON
 	book.expand_icon = true
-	book.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	book.flat = true
 	book.focus_mode = Control.FOCUS_NONE
-	book.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	book.position = Vector2(1413, 82)
+	book.custom_minimum_size = Vector2(43, 43)
+	book.size = Vector2(43, 43)
 	book.tooltip_text = "Notizbuch (Taste %s)" % InputConfig.get_action_label(&"toggle_notebook")
-	for state in ["normal", "hover", "pressed", "hover_pressed"]:
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color("6a4027") if state == "normal" else Color("7b4c2e")
-		style.border_color = Color("e2b36a") if state.begins_with("hover") else Color("c28a45")
-		style.set_border_width_all(5)
-		style.set_corner_radius_all(40)
-		style.set_content_margin_all(15)
-		style.shadow_color = Color(0.1, 0.04, 0.02, 0.45)
-		style.shadow_size = 6
-		style.shadow_offset = Vector2(0, 3)
-		book.add_theme_stylebox_override(state, style)
-	book.position = Vector2(1318, 188)
-	book.size = Vector2(80, 80)
 	book.pressed.connect(Events.notebook_requested.emit.bind(""))
 	return book
 

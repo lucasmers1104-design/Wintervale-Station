@@ -17,7 +17,16 @@ const PAGE_ART := {
 	"settings_audio": preload("res://assets/ui/menu_screens/settings_audio.png"),
 	"settings_controls": preload("res://assets/ui/menu_screens/settings_controls.png"),
 	"settings_gameplay": preload("res://assets/ui/menu_screens/settings_gameplay.png"),
-	"credits": preload("res://assets/ui/menu_screens/credits.png"),
+	# Vorlage ohne die Beispielnamen (tools/clean_credits_names.gd); echte Namen setzt MenuLiveContent.
+	"credits": preload("res://assets/ui/menu_screens/credits_clean.png"),
+}
+
+## Knopfflächen der Settings-Seiten, an den Kanten der Vorlagen vermessen.
+const SETTINGS_BUTTONS := {
+	"Back": Rect2(497, 801, 239, 66), "Reset": Rect2(801, 801, 287, 66), "Apply": Rect2(1126, 801, 305, 66),
+}
+const SETTINGS_BUTTONS_GAMEPLAY := {
+	"Back": Rect2(504, 842, 233, 57), "Reset": Rect2(802, 842, 282, 57), "Apply": Rect2(1125, 842, 302, 58),
 }
 
 var _art: TextureRect
@@ -168,9 +177,11 @@ func _rebuild_controls() -> void:
 				_add_art_button("Audio", Rect2(178, 337, 279, 70), func() -> void: show_page("settings_audio"))
 				_add_art_button("Controls", Rect2(178, 412, 279, 70), func() -> void: show_page("settings_controls"))
 				_add_art_button("Gameplay", Rect2(178, 489, 279, 70), func() -> void: show_page("settings_gameplay"))
-				_add_art_button("Back", Rect2(497, 801, 239, 66), close_page)
-				_add_art_button("Reset", Rect2(801, 801, 287, 66), _live.reset_settings)
-				_add_art_button("Apply", Rect2(1126, 801, 305, 66), _live.apply_settings)
+				# Auf der Gameplay-Vorlage sitzen die drei Knöpfe 41 px tiefer (gemessen).
+				var buttons := SETTINGS_BUTTONS_GAMEPLAY if _page == "settings_gameplay" else SETTINGS_BUTTONS
+				_add_art_button("Back", buttons["Back"], close_page)
+				_add_art_button("Reset", buttons["Reset"], _live.reset_settings)
+				_add_art_button("Apply", buttons["Apply"], _live.apply_settings)
 
 
 func _add_art_button(label: String, region: Rect2, action: Callable) -> void:
@@ -215,5 +226,5 @@ func _add_art_button(label: String, region: Rect2, action: Callable) -> void:
 	focus_outline.add_theme_stylebox_override("panel", outline_style)
 	button.add_child(focus_outline)
 	focus_outline.visible = false
-	button.focus_entered.connect(func() -> void: focus_outline.visible = true)
-	button.focus_exited.connect(func() -> void: focus_outline.visible = false)
+	button.focus_entered.connect(focus_outline.show)
+	button.focus_exited.connect(focus_outline.hide)

@@ -1231,7 +1231,7 @@ func _pour_stones(at: Vector3) -> void:
 	particles.emitting = true
 	var pour := _make_player("gravel", -8.0, 40.0, particles)
 	SoundLibrary.play(pour)
-	get_tree().create_timer(2.5).timeout.connect(particles.queue_free)
+	get_tree().create_timer(2.5, false).timeout.connect(particles.queue_free)
 
 
 # --- Leben auf dem Hof ------------------------------------------------------------------------

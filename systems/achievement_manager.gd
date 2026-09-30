@@ -162,11 +162,14 @@ func _set_progress(id: String, amount: float) -> void:
 		return
 	progress[id] = next
 	progress_changed.emit()
-	_save_delay = 12.0
 	if next >= float(definition["target"]):
 		unlock_times[id] = Time.get_datetime_string_from_system()
 		unlocked.emit(id)
-		_save_delay = 0.01
+		# Fortschritt gehört zum Spielstand und wird mit ihm gespeichert. Nur wenn
+		# der Spieler Autosave erlaubt, sichert eine Freischaltung die Reise sofort –
+		# sonst würde ein Achievement ungefragt den Spielstand überschreiben.
+		if GameSettings.get_pref("autosave"):
+			_save_delay = 0.5
 
 
 func _save_progress() -> void:

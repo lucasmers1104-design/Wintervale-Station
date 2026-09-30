@@ -148,15 +148,22 @@ func serve(customer: Node3D) -> void:
 	var to_customer := customer.global_position - _keeper.global_position
 	_keeper.rotation.y = atan2(-to_customer.x, -to_customer.z) - global_rotation.y
 	_keeper.play_gesture(CharacterModel.Pose.TALK, 1.6)
-	get_tree().create_timer(1.7).timeout.connect(func() -> void:
-		if is_instance_valid(_keeper):
-			_keeper.play_gesture(CharacterModel.Pose.NOD, 1.0)
-			_keeper.rotation.y = 0.0)
+	# Gebundene Methoden: Wird der Stand vorher entfernt, trennt Godot die Timer.
+	get_tree().create_timer(1.7, false).timeout.connect(_finish_serving)
 	if _steam:
 		_steam.amount_ratio = 1.0
-		get_tree().create_timer(2.0).timeout.connect(func() -> void:
-			if is_instance_valid(_steam):
-				_steam.amount_ratio = 0.55)
+		get_tree().create_timer(2.0, false).timeout.connect(_calm_steam)
+
+
+func _finish_serving() -> void:
+	if is_instance_valid(_keeper):
+		_keeper.play_gesture(CharacterModel.Pose.NOD, 1.0)
+		_keeper.rotation.y = 0.0
+
+
+func _calm_steam() -> void:
+	if is_instance_valid(_steam):
+		_steam.amount_ratio = 0.55
 
 
 func get_sales() -> int:

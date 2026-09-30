@@ -12,6 +12,13 @@ const DEFAULTS := {
 	"invert_camera_y": false, "camera_smoothing": 1.0,
 	"autosave": true, "day_speed": 1.0,
 	"achievement_notifications": true, "reduced_motion": false,
+	"shadow_quality": "High", "bloom": true, "particle_density": 1.0,
+}
+## Schattenqualität: Anteil der Schattenreichweite und Weichzeichnung (echte Renderer-Werte).
+const SHADOW_QUALITY := {
+	"Low": {"distance": 0.55, "filter": RenderingServer.SHADOW_QUALITY_HARD, "atlas": 2048},
+	"Medium": {"distance": 0.78, "filter": RenderingServer.SHADOW_QUALITY_SOFT_VERY_LOW, "atlas": 4096},
+	"High": {"distance": 1.0, "filter": -1, "atlas": 4096},
 }
 const AUDIO_BUSES := {
 	"master_volume": "Master", "music_volume": "WintervaleMusic",
@@ -126,6 +133,35 @@ func apply_gameplay() -> void:
 		camera.pan_speed = float(values["pan_speed"])
 		camera.zoom_factor = 1.0 + 0.15 * float(values["zoom_speed"])
 		camera.smoothing = 8.0 * float(values["camera_smoothing"])
+	_apply_graphics(scene)
+
+
+## Grafikoptionen mit echter Wirkung: Bloom, Schattenreichweite/-weichheit, Niederschlagsdichte.
+func _apply_graphics(scene: Node) -> void:
+	var world_environment := scene.get_node_or_null(^"WorldEnvironment") as WorldEnvironment
+	if world_environment and world_environment.environment:
+		world_environment.environment.glow_enabled = bool(values["bloom"])
+	var quality: Dictionary = SHADOW_QUALITY.get(String(values["shadow_quality"]), SHADOW_QUALITY["High"])
+	for path: NodePath in [^"DayNightCycle/Sun", ^"DayNightCycle/Moon"]:
+		var light := scene.get_node_or_null(path) as DirectionalLight3D
+		if light == null:
+			continue
+		if not light.has_meta(&"base_shadow_distance"):
+			light.set_meta(&"base_shadow_distance", light.directional_shadow_max_distance)
+		light.directional_shadow_max_distance = float(light.get_meta(&"base_shadow_distance")) * float(quality["distance"])
+	var filter := int(quality["filter"])
+	if filter < 0:
+		filter = int(ProjectSettings.get_setting("rendering/lights_and_shadows/directional_shadow/soft_shadow_filter_quality", 2))
+	RenderingServer.directional_soft_shadow_filter_set_quality(filter as RenderingServer.ShadowQuality)
+	RenderingServer.directional_shadow_atlas_set_size(int(quality["atlas"]),
+		bool(ProjectSettings.get_setting("rendering/lights_and_shadows/directional_shadow/16_bits", true)))
+	var density := clampf(float(values["particle_density"]), 0.1, 1.0)
+	var snowfall := scene.get_node_or_null(^"Snowfall") as Snowfall
+	if snowfall:
+		snowfall.max_intensity = density
+	var rainfall := scene.get_node_or_null(^"Rainfall") as Rainfall
+	if rainfall:
+		rainfall.density = density
 
 
 func _ensure_audio_buses() -> void:

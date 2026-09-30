@@ -28,6 +28,12 @@ const SHOTS := {
 	"hud_1200": {"time": 12.0, "season": 3, "weather": 0, "camera": [Vector3(0, 0, -6), 0.0, 52.0, 45.0]},
 	"hud_1600": {"time": 16.0, "season": 3, "weather": 0, "camera": [Vector3(0, 0, -6), 0.0, 52.0, 45.0]},
 	"hud_2327": {"time": 23.0 + 27.0 / 60.0, "season": 3, "weather": 4, "camera": [Vector3(0, 0, -6), 0.0, 52.0, 45.0]},
+	"birch_winter": {"time": 12.5, "season": 3, "weather": 0, "camera": [Vector3(-12.8, 2.5, -6.8), 150.0, 22.0, 13.0]},
+	"birch_spring": {"time": 12.5, "season": 0, "weather": 0, "camera": [Vector3(-12.8, 2.5, -6.8), 150.0, 22.0, 13.0]},
+	"birch_summer": {"time": 12.5, "season": 1, "weather": 0, "camera": [Vector3(-12.8, 2.5, -6.8), 150.0, 22.0, 13.0]},
+	"birch_autumn": {"time": 12.5, "season": 2, "weather": 0, "camera": [Vector3(-12.8, 2.5, -6.8), 150.0, 22.0, 13.0]},
+	"pause_menu": {"time": 17.5, "season": 3, "weather": 4, "camera": [Vector3(0, 0, -6), 20.0, 45.0, 40.0], "pause": "menu"},
+	"pause_confirm": {"time": 17.5, "season": 3, "weather": 4, "camera": [Vector3(0, 0, -6), 20.0, 45.0, 40.0], "pause": "main_menu"},
 }
 
 var _out := "user://qa_sandbox/captures/"
@@ -40,6 +46,13 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var args := OS.get_cmdline_user_args()
+	# "env:<eigenschaft>=<wert>" setzt Environment-Werte nur für diese Aufnahme (Vergleiche).
+	var overrides := {}
+	for arg in args.duplicate():
+		if arg.begins_with("env:"):
+			var pair := arg.trim_prefix("env:").split("=")
+			overrides[pair[0]] = float(pair[1])
+			args.erase(arg)
 	var wanted: Array = SHOTS.keys()
 	if not args.is_empty():
 		_out = args[0].trim_suffix("/") + "/"
@@ -51,6 +64,10 @@ func _run() -> void:
 	settings.get("values")["achievement_notifications"] = false
 	_main = load("res://scenes/main/main.tscn").instantiate()
 	root.add_child(_main)
+	var environment: Environment = (_main.get_node(^"WorldEnvironment") as WorldEnvironment).environment
+	for key: String in overrides:
+		environment.set(key, overrides[key])
+		print("override ", key, " = ", environment.get(key))
 	current_scene = _main
 	for i in 30:
 		await process_frame
@@ -89,17 +106,34 @@ func _capture(shot_name: String, shot: Dictionary) -> void:
 		vmc.call("set_mode", GameDefs.ViewMode.EXPLORE, true)
 	elif camera == "train":
 		var train: Node3D = _dwelling_train()
-		var focus: Vector3 = train.call("get_focus_point")
+		# Kamera auf die Bahnsteigseite (dort liegen die offenen Türen), leicht schräg:
+		# Türen und ausgefahrene Trittstufen im Blick.
+		var doors: Array = train.call("get_door_points")
+		var focus: Vector3 = doors[int(doors.size() / 2.0)] if not doors.is_empty() else train.call("get_focus_point")
+		var center: Vector3 = train.call("get_focus_point")
+		var side := Vector3(focus.x - center.x, 0.0, focus.z - center.z)
+		if doors.size() >= 2:
+			var along: Vector3 = (doors[-1] - doors[0]).normalized()
+			side = (focus - center) - along * (focus - center).dot(along)
+			side.y = 0.0
 		vmc.call("set_mode", GameDefs.ViewMode.BIRD_EYE, true)
-		bird.call("load_state", {"focus": [focus.x, focus.y, focus.z], "yaw": deg_to_rad(70.0),
-			"pitch": deg_to_rad(24.0), "distance": 16.0})
-	hud.visible = shot_name.begins_with("hud_")
+		bird.call("load_state", {"focus": [focus.x, focus.y, focus.z], "yaw": atan2(side.x, side.z) + deg_to_rad(60.0),
+			"pitch": deg_to_rad(32.0), "distance": 9.0})
+	hud.visible = shot_name.begins_with("hud_") or shot.has("pause")
 	clock.set("paused", true)
+	var pause_menu := _main.get_node_or_null(^"PauseMenu")
+	if shot.has("pause") and pause_menu:
+		pause_menu.call("open")
+		if shot["pause"] != "menu":
+			pause_menu.call("get_entry_button", shot["pause"]).pressed.emit()
 	for i in 45:
 		await process_frame
 	var image := root.get_viewport().get_texture().get_image()
 	var path := _out + shot_name + ".png"
 	print(shot_name, ": ", error_string(image.save_png(path)), " -> ", path)
+	if shot.has("pause") and pause_menu:
+		pause_menu.call("close")
+		pause_menu.call("_close_dialog")
 	clock.set("paused", false)
 
 

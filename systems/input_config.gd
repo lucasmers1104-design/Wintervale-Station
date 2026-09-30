@@ -149,6 +149,7 @@ const LEGENDS := {
 		{"actions": [&"quick_save"], "text": "Speichern"},
 		{"actions": [&"quick_load"], "text": "Laden"},
 		{"actions": [&"toggle_help"], "text": "Legende"},
+		{"actions": [&"release_mouse"], "text": "Menü / Pause"},
 	],
 }
 

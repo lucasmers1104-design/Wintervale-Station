@@ -148,7 +148,7 @@ func _build() -> void:
 	_canvas.add_child(motto)
 
 	var version := Label.new()
-	version.text = "v1.0.0"
+	version.text = "v%s" % ProjectSettings.get_setting("application/config/version", "0.1.0")
 	version.position = Vector2(1588, 896)
 	version.size = Vector2(76, 34)
 	version.add_theme_font_override("font", _serif())
@@ -252,8 +252,8 @@ func _add_entry(index: int) -> void:
 	button.add_child(selection)
 	selection.size = button.size
 	selection.visible = false
-	button.focus_entered.connect(func() -> void: selection.visible = true)
-	button.focus_exited.connect(func() -> void: selection.visible = false)
+	button.focus_entered.connect(selection.show)
+	button.focus_exited.connect(selection.hide)
 
 	var icon := TextureRect.new()
 	icon.name = "Icon"
@@ -287,8 +287,8 @@ func _add_entry(index: int) -> void:
 	arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	arrow.visible = false
 	button.add_child(arrow)
-	button.focus_entered.connect(func() -> void: arrow.visible = true)
-	button.focus_exited.connect(func() -> void: arrow.visible = false)
+	button.focus_entered.connect(arrow.show)
+	button.focus_exited.connect(arrow.hide)
 	if index < ENTRIES.size() - 1:
 		var separator := ColorRect.new()
 		separator.color = Color(0.43, 0.28, 0.20, 0.18)
@@ -359,8 +359,10 @@ func _on_start_requested(name: String, season: int) -> void:
 	SaveManager.active_slot = slot
 	SaveManager.playtime_seconds = 0.0
 	Achievements.reset()
-	WorldClock.day = 1
-	WorldClock.set_time(15.0)
+	# Nach "Pausenmenü → Hauptmenü" dürfen Geld, Lager und Zeitraffer der
+	# vorigen Reise nicht in die neue übernommen werden.
+	Economy.reset()
+	WorldClock.load_state({"day": 1, "time_of_day": 15.0, "time_scale_index": 0})
 	Seasons.set_season(season, 0.5)
 	_start_game(false, slot)
 
@@ -383,6 +385,11 @@ func _start_game(load_save: bool, slot: String) -> void:
 		_show_notice("This journey cannot be loaded. Choose another save.")
 		return
 	_starting_game = true
+	WorldClock.paused = false
+	if load_save:
+		# Ältere Spielstände ohne Wirtschaftsdaten starten mit frischen Werten,
+		# nicht mit denen der zuletzt gespielten Reise.
+		Economy.reset()
 	var loading_screen := MenuLoadingScreen.new()
 	get_tree().root.add_child(loading_screen)
 	await loading_screen.reveal()

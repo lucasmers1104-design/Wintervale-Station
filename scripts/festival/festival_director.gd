@@ -1162,10 +1162,8 @@ func _laternenumzug() -> void:
 		walkers[0].add_child(_procession_music)
 		SoundLibrary.stop_on_exit(_procession_music)
 		SoundLibrary.play(_procession_music)
-		var music := _procession_music
-		get_tree().create_timer(120.0).timeout.connect(func() -> void:
-			if is_instance_valid(music):
-				music.queue_free())
+		# Gebundene Methode: getrennt, falls die Musik vorher mit dem Umzug verschwindet
+		get_tree().create_timer(120.0, false).timeout.connect(_procession_music.queue_free)
 	Events.event_banner_requested.emit("Laternenumzug", "Laterne, Laterne … die Kinder ziehen durchs Dorf", "lantern")
 	_stats["processions"] = int(_stats["processions"]) + 1
 	add_chronicle("Laternenumzug mit %d Laternen durchs Dorf." % walkers.size(), "lantern")
@@ -1223,9 +1221,13 @@ func _run_steps(steps: Array[Array]) -> void:
 		if float(step[0]) <= 0.0:
 			callback.call()
 		else:
-			get_tree().create_timer(float(step[0])).timeout.connect(func() -> void:
-				if is_instance_valid(self) and _active != "":
-					callback.call())
+			get_tree().create_timer(float(step[0]), false).timeout.connect(_run_step.bind(callback))
+
+
+## Ein verzögerter Umzugsschritt (gebunden: entfällt, wenn der Festleiter entladen ist).
+func _run_step(callback: Callable) -> void:
+	if _active != "" and callback.is_valid():
+		callback.call()
 
 
 # --- Reigen (Herbstfest) ------------------------------------------------------------------------
