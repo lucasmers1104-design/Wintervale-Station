@@ -14,7 +14,7 @@ Den zwischenzeitlich umgestalteten Notizbuch-Knopf im HUD habe ich auf das urspr
 
 | Seite | Referenz | Vorher (Abweichung) | Nachher |
 | --- | --- | --- | --- |
-| Hauptmenü | `main_menu/*` | entsprach der Referenz | unverändert (nur Versionsnummer zeigt echte Projektversion v0.1.0 statt „v1.0.0“) |
+| Hauptmenü | `main_menu/*`, `loading_screen_reference.png` | Bahnhofsschild, Wegweiser, Zugziel und Tafel waren per Code gezeichnete flache Rechtecke mit dünner Schrift (vom CD gemeldet: „sieht scheiße aus“, im Ladescreen richtig) | die gemalten Schilder aus der Ladescreen-Grafik ausgeschnitten (`tools/extract_menu_signs.gd`) und an denselben Stellen eingesetzt; Versionsnummer zeigt die echte Projektversion |
 | Settings · Graphics | `settings_graphics.png` | schlichte Liste ohne Symbole, Knopf-Schalter „● On“, Hinweis „Renderer effects are unavailable“ | Zeilen mit Symbolen und Trennlinien, Pill-Schalter, Pergament-Auswahlfelder mit Winkel; **Shadow Quality, Bloom, Particle Density** wie in der Referenz – mit echter Wirkung (Test `settings_effects_test`). Nicht übernommen: Texture Quality und View Distance (keine echte Entsprechung im Spiel, daher keine Attrappe) |
 | Settings · Audio | `settings_audio.png` | Liste ohne Symbole | Symbole, Trennlinien, goldene Regler wie Referenz. Voice/Announcements nicht übernommen (gibt es im Spiel nicht) |
 | Settings · Controls | `settings_controls.png` | vier Tasten-Knöpfe in einer Zeile | zwei Spalten „Camera Settings“ / „Key Bindings“ mit Symbolen und hellen Tastenfeldern wie Referenz |

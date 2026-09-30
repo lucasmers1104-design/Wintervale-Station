@@ -8,6 +8,10 @@ const LOGO := preload("res://assets/ui/main_menu/wood_logo.png")
 const PARCHMENT := preload("res://assets/ui/main_menu/parchment_panel.png")
 const GALLERY_SCENE := preload("res://scenes/ui/menu_gallery.tscn")
 const SELECTION := preload("res://assets/ui/main_menu/selection_frame.svg")
+const SIGN_STATION := preload("res://assets/ui/main_menu/signs/station_name.png")
+const SIGN_DIRECTION := preload("res://assets/ui/main_menu/signs/direction.png")
+const SIGN_TRAIN := preload("res://assets/ui/main_menu/signs/train_display.png")
+const SIGN_BOARD := preload("res://assets/ui/main_menu/signs/chalkboard.png")
 const ICONS := [
 	preload("res://assets/ui/main_menu/icons/continue_train.svg"),
 	preload("res://assets/ui/main_menu/icons/new_game_watch.svg"),
@@ -178,51 +182,30 @@ func _add_image(texture: Texture2D, pos: Vector2, dimensions: Vector2, label: St
 	image.size = dimensions
 
 
+## Die Schilder sind die gemalten Originale aus der Ladescreen-Grafik
+## (tools/extract_menu_signs.gd) – dieselben Holzrahmen, Schrift und Schneekanten wie
+## dort. Früher standen hier flache, per Code gezeichnete Nachbauten.
 func _add_station_signs() -> void:
-	var station := _decorative_sign(Vector2(1348, 318), Vector2(213, 61), -0.095, "Wintervale", 28,
-		Color("2b211c"), Color("db9552"), Color("dc9960"))
-	station.name = "StationNameSign"
-	var direction := _decorative_sign(Vector2(1216, 357), Vector2(98, 50), 0.0, "To New\nHorizons  ➜", 14,
-		Color("593519"), Color("a36a35"), Color("e5a766"))
-	direction.name = "DirectionSign"
-	var train := _decorative_sign(Vector2(772, 432), Vector2(77, 25), 0.0, "WINTERVALE", 9,
-		Color("312018"), Color("a6753d"), Color("ffcf86"))
-	train.name = "TrainDestination"
-	var board := _decorative_sign(Vector2(1563, 391), Vector2(95, 214), -0.05,
-		"TRAINS\nBRING\nPEOPLE\nCLOSER\n\n✦", 14,
-		Color("302019"), Color("865831"), Color("a17a5e"))
-	board.name = "Chalkboard"
+	# Hängeschild: gleiche Lage zur Bahnhofsuhr wie im Ladescreen (Uhr dort 1470|242 r62,
+	# hier 1436|262 r53,5 → Maßstab 0,863).
+	_add_painted_sign("StationNameSign", SIGN_STATION, Vector2(1360, 312), 0.863)
+	_add_painted_sign("DirectionSign", SIGN_DIRECTION, Vector2(1216, 358), 0.7)
+	# Zielanzeige genau im leeren Anzeigefeld des Zugs (772–850 × 427–452)
+	_add_painted_sign("TrainDestination", SIGN_TRAIN, Vector2(772, 429), 0.81)
+	_add_painted_sign("Chalkboard", SIGN_BOARD, Vector2(1565, 393), 1.0)
 
 
-func _decorative_sign(pos: Vector2, dimensions: Vector2, angle: float, caption: String,
-		font_size: int, fill: Color, edge: Color, lettering: Color) -> Panel:
-	var sign := Panel.new()
-	sign.position = pos
-	sign.size = dimensions
-	sign.rotation = angle
+func _add_painted_sign(sign_name: String, texture: Texture2D, pos: Vector2, scale_factor: float) -> void:
+	var sign := TextureRect.new()
+	sign.name = sign_name
+	sign.texture = texture
+	sign.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	sign.stretch_mode = TextureRect.STRETCH_SCALE
+	sign.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	sign.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = fill
-	style.border_color = edge
-	style.set_border_width_all(3)
-	style.set_corner_radius_all(4)
-	style.shadow_color = Color(0.03, 0.01, 0.01, 0.52)
-	style.shadow_size = 5
-	sign.add_theme_stylebox_override("panel", style)
 	_canvas.add_child(sign)
-	var writing := Label.new()
-	writing.text = caption
-	writing.position = Vector2(5, 1)
-	writing.size = dimensions - Vector2(10, 2)
-	writing.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	writing.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	writing.clip_text = true
-	writing.add_theme_font_override("font", _serif())
-	writing.add_theme_font_size_override("font_size", font_size)
-	writing.add_theme_color_override("font_color", lettering)
-	writing.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	sign.add_child(writing)
-	return sign
+	sign.position = pos
+	sign.size = texture.get_size() * scale_factor
 
 
 func _add_entry(index: int) -> void:
