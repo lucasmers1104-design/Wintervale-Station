@@ -96,6 +96,8 @@ enum Outfit { WINTER, SUMMER }
 @export var bottom_pattern := Pattern.SOLID
 ## Aufgesetzte Seitentaschen mit Klappe und Hosenschlitz (Cargo-Shorts, sailor).
 @export var cargo_pockets := false
+## Breiter, hochgekrempelter Hosenaufschlag über dem Stiefel (satchel_boy).
+@export var wide_cuff := false
 ## Strumpfhose (Alpha 0 = keine).
 @export var tights_color := Color(0, 0, 0, 0)
 ## Socken/Stulpen über dem Schuh (Alpha 0 = keine).

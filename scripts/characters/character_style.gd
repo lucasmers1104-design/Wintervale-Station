@@ -135,7 +135,12 @@ func _build_legs() -> void:
 				kit.lathe(xf, [Vector2(0.07, -0.3), Vector2(0.075, -0.14)], 10, leg, look.tights_color.a > 0.0)
 			CharacterAppearance.Bottom.TROUSERS:
 				kit.lathe(xf, [Vector2(0.085, -0.2), Vector2(0.095, -0.06), Vector2(0.094, 0.02)], 12, pants)
-				if look.bottom_color2.a > 0.0:
+				if look.wide_cuff:
+					# Breiter Aufschlag (Vorlage satchel_boy: 0,1–0,18 m über dem Boden)
+					kit.lathe(xf, [Vector2(0.096, -0.235), Vector2(0.108, -0.228), Vector2(0.11, -0.165), Vector2(0.1, -0.152),
+						Vector2(0.092, -0.15)], 12, _solid(look.bottom_color2 if look.bottom_color2.a > 0.0 else look.pants_color.lightened(0.1)),
+						true, 1.0, 1.0, 0.0, 1.0, 0.0, true)
+				elif look.bottom_color2.a > 0.0:
 					kit.lathe(xf, [Vector2(0.092, -0.235), Vector2(0.097, -0.2), Vector2(0.092, -0.185)], 12, _solid(look.bottom_color2))
 				else:
 					kit.lathe(xf, [Vector2(0.088, -0.235), Vector2(0.09, -0.2)], 12, pants)
@@ -344,6 +349,8 @@ func _skirt_profile(long: bool, top: float) -> Array:
 
 ## Überkleidung (Latzhose, Westen, Jacken, Schürzen, Kleider …).
 func _build_outer() -> void:
+	if look.bag:
+		_satchel()
 	match look.outer:
 		CharacterAppearance.Outer.OVERALLS:
 			_overalls()
@@ -357,6 +364,8 @@ func _build_outer() -> void:
 			_work_apron()
 		CharacterAppearance.Outer.DRESS_APRON:
 			_dress_apron()
+		CharacterAppearance.Outer.VEST:
+			_vest()
 
 
 ## Latzhose: Hosenteil, Latz mit großer Brusttasche, Träger mit Messingknöpfen,
@@ -595,6 +604,84 @@ func _cargo_pockets(color: Color) -> void:
 			at - 0.055, at + 0.055, 0.03, 0.022, seam)
 		torso.panel(xf, torso_profile(0.4, 0.44, 1), 3, cloth, 1.0, TORSO_DEPTH, at - 0.06, at + 0.06, 0.05, 0.012, seam)
 	torso.panel(xf, torso_profile(0.33, 0.49, 2), 2, cloth, 1.0, TORSO_DEPTH, -0.012, 0.03, 0.016, 0.008, seam)
+
+
+## Weste (satchel_boy): ohne Ärmel bis über die Hüfte (0,36 m), tiefer V-Ausschnitt ab
+## 0,5 m, vorne zwei flache Spitzen am Saum, zwei Messingknöpfe rechts der Mitte, Paspeltasche;
+## hinten glatt mit kurzem Schlitz.
+func _vest() -> void:
+	var cloth := _fabric(look.outer_color, look.outer_pattern, look.outer_color2)
+	var seam := _solid(look.outer_color.darkened(0.3))
+	var xf := Transform3D.IDENTITY
+	var hem := 0.36
+	var v_tip := 0.5
+	torso.lathe(xf, [Vector2(0.255, hem), Vector2(0.258, 0.42)] + torso_profile(0.45, v_tip, 2), 20, cloth, true, 1.0, TORSO_DEPTH,
+		0.0, 1.0, 0.016)
+	var slices := 10
+	for k in slices:
+		var y0 := lerpf(v_tip, NECK_Y - 0.01, float(k) / slices)
+		var y1 := lerpf(v_tip, NECK_Y - 0.01, float(k + 1) / slices)
+		var half := _v_half((y0 + y1) * 0.5, v_tip) * 1.25
+		torso.lathe(xf, torso_profile(y0, y1, 1), 20, cloth, true, 1.0, TORSO_DEPTH, half, 1.0 - half, 0.016)
+	# Flache Spitzen vorne am Saum
+	for side: float in [-1.0, 1.0]:
+		var a := torso_point(side * 0.004, hem + 0.002, 0.017) + Vector3(0, 0, -0.004)
+		var b := torso_point(side * 0.1, hem + 0.002, 0.017) + Vector3(0, 0, -0.004)
+		var tip := torso_point(side * 0.03, hem - 0.035, 0.017) + Vector3(0, 0, -0.004)
+		torso.triangle(a, b, tip, cloth, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO,
+			torso_normal(side * 0.05))
+	torso.panel(xf, torso_profile(0.43, 0.445, 1), 2, seam, 1.0, TORSO_DEPTH, 0.09, 0.17, 0.02, 0.006, seam)
+	# Blende entlang des V (glatte Kante)
+	for side: float in [-1.0, 1.0]:
+		var points: Array = []
+		var outward: Array = []
+		for k in 5:
+			var y := lerpf(v_tip - 0.01, NECK_Y - 0.01, float(k) / 4.0)
+			var angle := side * (_v_half(y, v_tip) * 1.25 + 0.006)
+			points.append(torso_point(angle, y, 0.02))
+			outward.append(torso_normal(angle))
+		torso.strip(points, outward, 0.026, 0.008, cloth, seam)
+	# Rückenschlitz
+	torso.panel(xf, torso_profile(hem, hem + 0.07, 1), 1, seam, 1.0, TORSO_DEPTH, 0.497, 0.503, 0.018, 0.004, seam)
+	for k in 2:
+		var y := 0.41 + k * 0.08
+		torso.ellipsoid(Transform3D(Basis.looking_at(torso_normal(0.035)), torso_point(0.035, y, 0.03)), Vector3(0.021, 0.021, 0.011),
+			8, 4, CharacterKit.paint(look.accent_color, P.GLOSS))
+
+
+## Umhängetasche (satchel_boy): Riemen von der rechten Schulter quer über Brust und Rücken
+## zur Tasche an der linken Hüfte, Schnalle vorne, Tasche mit Klappe und Knopf.
+func _satchel() -> void:
+	var leather := _solid(look.bag_color)
+	var dark := _solid(look.bag_color.darkened(0.25))
+	var bag_angle := -0.17
+	var bag_at := torso_point(bag_angle, 0.4, 0.065)
+	var n := torso_normal(bag_angle)
+	var bag_basis := Basis.looking_at(-n, Vector3.UP)
+	# Taschenkörper mit gerundetem Boden, Klappe darüber
+	torso.box(Transform3D(bag_basis, bag_at + Vector3(0, 0.02, 0)), Vector3(0.17, 0.11, 0.07), leather)
+	torso.ellipsoid(Transform3D(bag_basis, bag_at + Vector3(0, -0.035, 0)), Vector3(0.085, 0.05, 0.035), 10, 5, leather, true, 0.0, 0.5)
+	torso.box(Transform3D(bag_basis, bag_at + n * 0.038 + Vector3(0, 0.03, 0)), Vector3(0.172, 0.09, 0.012), dark)
+	torso.ellipsoid(Transform3D(bag_basis, bag_at + n * 0.045 + Vector3(0, -0.005, 0)), Vector3(0.018, 0.018, 0.009), 8, 4,
+		CharacterKit.paint(look.accent_color, P.GLOSS))
+	# Riemen vorne und hinten
+	for back: bool in [false, true]:
+		var points: Array = []
+		var outward: Array = []
+		var shoulder_angle := 0.5 - 0.1 if back else 0.1
+		var end_angle := 0.5 + 0.22 if back else bag_angle + 0.02
+		points.append(Vector3(0.12, 0.756, 0.04 if back else -0.04))
+		outward.append(Vector3.UP + torso_normal(shoulder_angle))
+		for k in 5:
+			var u := float(k + 1) / 5.0
+			var angle := lerpf(shoulder_angle, end_angle, u)
+			var y := lerpf(0.72, 0.47, u)
+			points.append(torso_point(angle, y, 0.03))
+			outward.append(torso_normal(angle))
+		torso.strip(points, outward, 0.034, 0.01, leather, dark)
+	var buckle_angle := 0.07
+	torso.box(Transform3D(Basis.looking_at(-torso_normal(buckle_angle), Vector3.UP) * Basis(Vector3.FORWARD, 0.5),
+		torso_point(buckle_angle, 0.66, 0.046)), Vector3(0.045, 0.04, 0.008), CharacterKit.paint(look.accent_color, P.GLOSS))
 
 
 ## Halbe Breite des V-Ausschnitts (Winkelanteil) in Höhe [param y].
