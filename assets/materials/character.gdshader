@@ -136,15 +136,19 @@ void fragment() {
 		float rib = abs(fract(uv.x) - 0.5);
 		col = base * (0.94 + rib * 0.12);
 	} else if (pattern < 5.5) {
-		// Norweger-Band: zwei Zickzacklinien mit Kreuzchen dazwischen
-		float v = uv.y;
-		float band = step(abs(v - color3.a), 0.09);
-		float zig = abs(fract(uv.x * 2.0) - 0.5) * 0.08;
-		float line1 = 1.0 - smoothstep(0.008, 0.016, abs(v - (color3.a + 0.07) + zig));
-		float line2 = 1.0 - smoothstep(0.008, 0.016, abs(v - (color3.a - 0.07) - zig));
-		vec2 c = vec2(fract(uv.x * 2.0) - 0.5, (v - color3.a) * 6.0);
-		float cross = step(abs(c.x), 0.12) * step(abs(c.y), 0.32) + step(abs(c.y), 0.1) * step(abs(c.x), 0.3);
-		col = mix(base, color2.rgb, clamp(max(max(line1, line2), cross * band), 0.0, 1.0));
+		// Norweger-Band (grandpa_fairisle): Zickzacklinie oben, Reihe aus Kreuzen in der Mitte,
+		// Punktreihe unten. Höhe in Metern (UV.y, unskaliert), Wiederholung rundherum
+		// = pattern_scale, Bandmitte = color3.a.
+		float v = UV.y - color3.a;
+		float u = UV.x * pattern_scale;
+		float cell = fract(u) - 0.5;
+		float zig = abs(fract(u * 2.0) - 0.5) * 0.03;
+		float line1 = 1.0 - smoothstep(0.004, 0.008, abs(v - 0.045 + zig));
+		vec2 c = vec2(cell * 0.06, v);
+		float cross = step(abs(c.x), 0.008) * step(abs(c.y), 0.022) + step(abs(c.y), 0.008) * step(abs(c.x), 0.022);
+		vec2 d = vec2(fract(u + 0.5) - 0.5, v + 0.045);
+		float dots = step(abs(d.x * 0.06), 0.008) * step(abs(d.y), 0.008);
+		col = mix(base, color2.rgb, clamp(line1 + cross + dots, 0.0, 1.0));
 	} else if (pattern < 6.5) {
 		// Rauten in drei Gruppen auf Brusthöhe
 		vec2 c = vec2(fract(uv.x * 3.0) - 0.5, uv.y - color3.a);

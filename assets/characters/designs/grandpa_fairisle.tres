@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="CharacterAppearance" format=3]
+
+[ext_resource type="Script" path="res://scripts/characters/character_appearance.gd" id="1_look"]
+
+[resource]
+resource_name = "Grandpa Fair Isle"
+script = ExtResource("1_look")
+skin_color = Color(0.95, 0.64, 0.47, 1)
+glasses = true
+glasses_color = Color(0.36, 0.2, 0.12, 1)
+mustache = true
+brow_color = Color(0.52, 0.5, 0.5, 1)
+brow_thickness = 0.6
+hair_style = 6
+hair_color = Color(0.6, 0.58, 0.58, 1)
+hat_style = 2
+hat_color = Color(0.45, 0.42, 0.42, 1)
+top_style = 4
+shirt_color = Color(0.86, 0.79, 0.68, 1)
+sleeves = 0
+accent_color = Color(0.5, 0.3, 0.17, 1)
+outer = 6
+outer_color = Color(0.17, 0.22, 0.4, 1)
+outer_color2 = Color(0.82, 0.73, 0.6, 1)
+outer_pattern = 5
+shawl_collar = true
+bottom = 1
+pants_color = Color(0.45, 0.29, 0.16, 1)
+sock_color = Color(0.78, 0.67, 0.52, 1)
+shoe_color = Color(0.45, 0.26, 0.14, 1)
+hat_tilt = -10.0
+hat_lift = 0.05
+hat_scale = 0.9
+hair_volume = 0.72

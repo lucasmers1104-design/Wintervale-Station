@@ -58,6 +58,8 @@ var _hat_bang := 1.0
 var _hat_rim := Vector2.ZERO
 ## Schuppen weit über der Kante ganz weglassen (Schiebermütze: Krone unter der Kuppel).
 var _hat_skip_crown := false
+## Schuppen bis so weit (Grad) über der schrägen Kante werden unter die Kante geschoben, höhere entfallen.
+var _hat_rim_keep := 25.0
 
 
 func _build(p_look: CharacterAppearance, p_winter: bool) -> Dictionary:
@@ -96,7 +98,7 @@ func _fabric(c: Color, pattern: CharacterAppearance.Pattern, c2: Color, scale :=
 		CharacterAppearance.Pattern.RIBS:
 			return CharacterKit.paint(c, P.RIBS, 26.0 * scale)
 		CharacterAppearance.Pattern.FAIR_ISLE:
-			return CharacterKit.paint(c, P.FAIR_ISLE, 1.0, c2, Color(0, 0, 0, 0.66))
+			return CharacterKit.paint(c, P.FAIR_ISLE, 16.0 * scale, c2, Color(0, 0, 0, c3.a if c3.a != 0.0 else 0.6))
 		CharacterAppearance.Pattern.DIAMONDS:
 			return CharacterKit.paint(c, P.DIAMONDS, 1.0, c2, Color(0, 0, 0, 0.68))
 		CharacterAppearance.Pattern.QUILT:
@@ -794,7 +796,17 @@ func _cardigan() -> void:
 			var angle := side * (_open_half(y) if open else maxf(_v_half(y, v_tip), 0.012))
 			points.append(torso_point(angle, y, 0.022))
 			outward.append(torso_normal(angle))
-		torso.strip(points, outward, 0.032, 0.008, rib)
+		if look.shawl_collar:
+			# Schalkragen: breite, dicke Blende, die hinten um den Hals läuft
+			points.append(Vector3(side * 0.11, NECK_Y + 0.005, -0.02))
+			outward.append(Vector3.UP + torso_normal(side * 0.15))
+			points.append(Vector3(side * 0.09, NECK_Y + 0.01, 0.07))
+			outward.append(Vector3.UP + Vector3.BACK)
+			points.append(Vector3(0.0, NECK_Y + 0.01, 0.1))
+			outward.append(Vector3.UP + Vector3.BACK)
+			torso.strip(points, outward, 0.06, 0.028, rib)
+		else:
+			torso.strip(points, outward, 0.032, 0.008, rib)
 		var pocket_at := torso_profile(hem + 0.05, hem + 0.14, 2)
 		torso.panel(xf, pocket_at, 3, knit, 1.0, TORSO_DEPTH, side * 0.13 - 0.05, side * 0.13 + 0.05, 0.03, 0.012,
 			CharacterKit.paint(look.outer_color.darkened(0.15), P.SOLID))
@@ -823,8 +835,9 @@ func _build_arms() -> void:
 		var sleeve_color := look.shirt_color
 		if look.outer in SLEEVED_OUTER:
 			sleeve_color = look.outer_color
-			sleeve = _fabric(look.outer_color, look.outer_pattern, look.outer_color2, 0.6)
-			if look.outer == CharacterAppearance.Outer.CARDIGAN:
+			# Norwegerband auf den Ärmeln in Brusthöhe (0,6 m = 0,08 m unter der Schulter)
+			sleeve = _fabric(look.outer_color, look.outer_pattern, look.outer_color2, 0.6, Color(0, 0, 0, -0.08))
+			if look.outer == CharacterAppearance.Outer.CARDIGAN and look.outer_pattern == CharacterAppearance.Pattern.SOLID:
 				sleeve = CharacterKit.paint(look.outer_color, P.RIBS, 14.0)
 		var xf := Transform3D.IDENTITY
 		match look.sleeves:
@@ -949,11 +962,12 @@ func _scale(az: float, el: float, width: float, length: float, paint: CharacterK
 		# schauen als Kranz unter der Kante hervor
 		var rim_y := _hat_rim.x + _hat_rim.y * cos(deg_to_rad(az))
 		clip = rad_to_deg(asin(clampf((rim_y - HAIR_LIFT) / HAIR.y, -1.0, 1.0)))
-		if el > clip + 25.0:
+		if el > clip + _hat_rim_keep:
 			return
 		if el > clip - 6.0:
 			el = clip - 6.0
 			length *= 0.75
+			lift = minf(lift, 0.12)
 	elif el > clip:
 		# seitlich, bzw. unter der Schiebermütze auch Kronen-Schuppen: verdeckt
 		if absf(az) > 60.0 or (_hat_skip_crown and el > clip + 20.0):
@@ -1012,7 +1026,7 @@ func _build_hair() -> void:
 			_hat_skip_crown = true
 		elif hat in [CharacterAppearance.HatStyle.BEANIE, CharacterAppearance.HatStyle.POMPOM_BEANIE]:
 			# Umschlag vorne 0,04 m über, hinten 0,14 m unter der Kopfmitte (18° gekippt)
-			_hat_rim = Vector2(-0.05, 0.3 * sin(deg_to_rad(18.0 + look.hat_tilt)))
+			_hat_rim = Vector2(-0.05 + look.hat_lift, 0.3 * look.hat_scale * sin(deg_to_rad(18.0 + look.hat_tilt)))
 		_hat_bang = 0.36 if hat in [CharacterAppearance.HatStyle.BEANIE, CharacterAppearance.HatStyle.POMPOM_BEANIE] else 0.6
 	match look.hair_style:
 		CharacterAppearance.HairStyle.SPIKY, CharacterAppearance.HairStyle.MESSY, CharacterAppearance.HairStyle.CURLY:
@@ -1022,7 +1036,7 @@ func _build_hair() -> void:
 			# Lockenkopf (smith): dieselben Schuppen, aber größer und stärker abstehend, oben
 			# hoch aufgetürmt, kürzerer Pony.
 			var curly := look.hair_style == CharacterAppearance.HairStyle.CURLY
-			var big := 1.0
+			var big := look.hair_volume
 			var puff := -0.08 if curly else 0.0
 			_hair_cap(hair_dark, 16.0, 0.5, 0.94 if not curly else 0.97, 1.0 if not curly else 1.06)
 			# Unter der Schiebermütze (newsboy) enden die Haare höher im Nacken
@@ -1225,7 +1239,8 @@ func _build_hat(hat: CharacterAppearance.HatStyle) -> void:
 			# gekippt; Vorlage: Umschlag vorne 0,04 m über der Kopfmitte, oben 0,36 m.
 			var knit := CharacterKit.paint(look.hat_color, P.PLAID, 9.0, look.hat_color.darkened(0.05), look.hat_color.darkened(0.3))
 			var rib := CharacterKit.paint(look.hat_color.darkened(0.04), P.PLAID, 8.0, look.hat_color.darkened(0.08), look.hat_color.darkened(0.32))
-			var hat_xf := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(18.0 + look.hat_tilt)), Vector3(0, -0.05, 0.03))
+			var hat_xf := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(18.0 + look.hat_tilt)) * Basis.from_scale(Vector3.ONE * look.hat_scale),
+				Vector3(0, -0.05 + look.hat_lift, 0.03))
 			head.lathe(hat_xf, [Vector2(0.295, 0.0), Vector2(0.312, 0.025), Vector2(0.315, 0.11), Vector2(0.3, 0.135)], 20, rib,
 				true, 1.0, 0.97, 0.0, 1.0, 0.0, true)
 			head.lathe(hat_xf, [Vector2(0.285, 0.12), Vector2(0.305, 0.18), Vector2(0.295, 0.24), Vector2(0.25, 0.3), Vector2(0.14, 0.335),

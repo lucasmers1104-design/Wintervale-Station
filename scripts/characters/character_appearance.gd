@@ -67,6 +67,8 @@ enum Outfit { WINTER, SUMMER }
 @export var hat_knot_side := 1.0
 ## Zusätzliche Neigung der Kopfbedeckung in Grad (negativ = vorne tiefer).
 @export var hat_tilt := 0.0
+## Höhenversatz der Kopfbedeckung in Metern (Mütze sitzt höher auf dem Haar).
+@export var hat_lift := 0.0
 ## Größe der Kopfbedeckung (1 = Standard).
 @export_range(0.8, 1.3, 0.01) var hat_scale := 1.0
 
@@ -90,6 +92,8 @@ enum Outfit { WINTER, SUMMER }
 @export var outer_pattern := Pattern.SOLID
 ## Offene Jacke (Strickjacke ohne V: Kanten gerade, vorne offen, granny_gingham).
 @export var outer_open := false
+## Dicker Schalkragen an der Strickjacke (grandpa_fairisle).
+@export var shawl_collar := false
 
 @export_group("Hose & Schuhe")
 @export var bottom := Bottom.SHORTS
