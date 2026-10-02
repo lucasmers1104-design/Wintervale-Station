@@ -91,7 +91,13 @@ func _ready() -> void:
 		panel.name = "RegionPanel"
 		add_child(panel)
 		get_node("HUD").bind_progression(progression)
-		Events.notification_requested.emit("Deine Reise beginnt · B: Gleise bauen · H: Holz-Haltepunkt · P: Reise & Fuhrpark")
+		var tutorial := JourneyTutorial.new()
+		tutorial.name = "JourneyTutorial"
+		tutorial.region = region
+		tutorial.panel = panel
+		tutorial.build_mode = get_node("BuildMode")
+		tutorial.hud = get_node("HUD")
+		add_child(tutorial)
 	else:
 		get_node("HUD")._tool_buttons[&"station"].hide()
 

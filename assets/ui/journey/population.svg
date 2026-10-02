@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Einwohner: Haeuschen mit warmem Fenster und Herz -->
+  <g stroke="#3b2a20" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">
+    <rect x="10" y="30" width="34" height="26" fill="#d8c3a0"/>
+    <path d="M5 32 L27 12 L49 32 Z" fill="#a8321e"/>
+    <rect x="35" y="14" width="6" height="11" fill="#7a5a44"/>
+    <rect x="15" y="36" width="9" height="8" fill="#ffd27a"/>
+    <rect x="29" y="40" width="9" height="16" fill="#6b4a32"/>
+    <path d="M44 22 C44 17 51 16 51 21 C51 16 58 17 58 22 C58 28 51 31 51 33 C51 31 44 28 44 22 Z" fill="#d9534a" stroke-width="2"/>
+    <path d="M4 58 H60"/>
+  </g>
+</svg>

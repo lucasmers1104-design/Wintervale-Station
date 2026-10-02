@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Wagen: drei gekuppelte Wagen -->
+  <g stroke="#3b2a20" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+    <rect x="3" y="24" width="17" height="16" rx="3" fill="#3f6a4c"/>
+    <rect x="23.5" y="24" width="17" height="16" rx="3" fill="#f0e2c4"/>
+    <rect x="44" y="24" width="17" height="16" rx="3" fill="#a8321e"/>
+    <path d="M20 34 H23.5 M40.5 34 H44"/>
+    <rect x="6" y="27" width="11" height="5" fill="#ffd27a"/>
+    <rect x="26.5" y="27" width="11" height="5" fill="#ffd27a"/>
+    <rect x="47" y="27" width="11" height="5" fill="#ffd27a"/>
+    <circle cx="8" cy="43" r="3" fill="#5a4a3c"/><circle cx="15" cy="43" r="3" fill="#5a4a3c"/>
+    <circle cx="28.5" cy="43" r="3" fill="#5a4a3c"/><circle cx="35.5" cy="43" r="3" fill="#5a4a3c"/>
+    <circle cx="49" cy="43" r="3" fill="#5a4a3c"/><circle cx="56" cy="43" r="3" fill="#5a4a3c"/>
+    <path d="M2 49 H62"/>
+  </g>
+</svg>

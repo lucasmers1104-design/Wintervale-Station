@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Geschwindigkeit: Tachometer -->
+  <g stroke="#3b2a20" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M6 44 A26 26 0 0 1 58 44 Z" fill="#f0e2c4"/>
+    <path d="M12 44 A20 20 0 0 1 20 28" fill="none" stroke="#5d8a5a" stroke-width="5"/>
+    <path d="M24 25 A20 20 0 0 1 40 25" fill="none" stroke="#d9a441" stroke-width="5"/>
+    <path d="M44 28 A20 20 0 0 1 52 44" fill="none" stroke="#c9443a" stroke-width="5"/>
+    <path d="M32 44 L45 30" stroke-width="3.4"/>
+    <circle cx="32" cy="44" r="4" fill="#3b2a20"/>
+    <path d="M4 50 H60"/>
+  </g>
+</svg>

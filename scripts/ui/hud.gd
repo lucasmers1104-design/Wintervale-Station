@@ -189,6 +189,10 @@ func show_toast(text: String) -> void:
 func get_legend() -> KeyLegend:
 	return _legend
 
+## Werkzeug-Knopf im Baumenü (z.B. für Tutorial-Hinweise); null = gibt es nicht.
+func get_tool_button(id: StringName) -> Button:
+	return _tool_buttons.get(id)
+
 func bind_progression(progress: RegionProgression) -> void:
 	progress.changed.connect(_refresh_progression_tools.bind(progress))
 	_refresh_progression_tools(progress)

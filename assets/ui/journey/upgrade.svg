@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Ausbauen: Hammer mit Funkeln -->
+  <g stroke="#3b2a20" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M30 26 L12 52 L18 56 L36 30 Z" fill="#c98a3d"/>
+    <path d="M22 18 L40 8 L52 22 L46 26 L40 20 L34 30 Z" fill="#8b9097"/>
+    <path d="M50 38 L52 44 L58 46 L52 48 L50 54 L48 48 L42 46 L48 44 Z" fill="#ffd27a" stroke-width="2"/>
+  </g>
+</svg>

@@ -26,6 +26,10 @@ const BLACK := Color(0.06,0.07,0.08)
 const METAL := Color(0.36,0.38,0.40)
 const RUBBER := Color(0.10,0.105,0.11)
 const WARM := Color(1.0,0.84,0.48)
+## Puffer, Kupplungen und Dachgeräte: dunkles Anthrazit wie in den Vorlagen.
+const DARK := Color(0.17,0.17,0.19)
+## Orange Begrenzungsleuchten an den Wagenecken.
+const MARKER := Color(1.0,0.52,0.12)
 
 static func build(kind: String, l: Dictionary, variant: int) -> Dictionary:
 	var result: Dictionary
@@ -90,7 +94,8 @@ static func _band_color(y: float, l: Dictionary, style: String) -> Color:
 		return l["primary"] if y<1.60 or y>3.05 else l["secondary"]
 	if style == "intercity":
 		return l["accent"] if (y>1.53 and y<1.77) or y>3.30 else l["secondary"]
-	return l["accent"] if (y>1.60 and y<1.82) or (y>2.96 and y<3.10) else (BLACK if y<1.20 else l["secondary"])
+	# Hochgeschwindigkeit: breites blaues Band unter, feine Linie über den Fenstern.
+	return l["accent"] if (y>1.53 and y<1.82) or (y>2.96 and y<3.05) else (BLACK if y<1.20 else l["secondary"])
 
 static func _body(s: Dictionary, start: float, end: float, windows: Array[Vector2], door_zs: Array, l: Dictionary, style: String, seat: Color) -> void:
 	var cuts: Array[float] = [start,end]
@@ -139,12 +144,18 @@ static func _body(s: Dictionary, start: float, end: float, windows: Array[Vector
 			for z in door_zs:
 				_side_poly(s["p"],side,[Vector2(z+0.85,1.5),Vector2(z+1.3,1.72),Vector2(end,1.72),Vector2(end,1.5)],l["primary"])
 			_side_quad(s["p"],side,start,start+1.0,1.76,1.83,l["accent"],1.355)
-	# Faceted roof, independent floor and visible cabin furniture.
-	var roof_profile: Array[Vector2] = [Vector2(-1.34,3.38),Vector2(-1.18,3.52),Vector2(-0.75,3.58),Vector2(0.75,3.58),Vector2(1.18,3.52),Vector2(1.34,3.38)]
+	# Faceted roof, independent floor and visible cabin furniture. Old coaches
+	# carry the tall barrel roof of the reference, closed by end caps.
+	var roof_profile := _roof_profile(style)
 	for j in roof_profile.size()-1:
 		var a := roof_profile[j]
 		var b := roof_profile[j+1]
 		LowPolyBuilder.add_quad_facing(s["p"],Vector3(a.x,a.y,start),Vector3(b.x,b.y,start),Vector3(b.x,b.y,end),Vector3(a.x,a.y,end),l["roof"],Vector3.UP)
+	if style == "heritage":
+		for edge: float in [start,end]:
+			for j in roof_profile.size()-1:
+				LowPolyBuilder.add_triangle_facing(s["p"],Vector3(0,3.38,edge),Vector3(roof_profile[j].x,roof_profile[j].y,edge),Vector3(roof_profile[j+1].x,roof_profile[j+1].y,edge),l["roof"].darkened(0.1),Vector3(0,0,signf(edge)))
+	_roof_equipment(s["p"],start,end,l,style)
 	LowPolyBuilder.add_box(s["i"],Vector3(0,1.03,(start+end)/2),Vector3(2.60,0.1,end-start),Color(0.31,0.29,0.25))
 	LowPolyBuilder.add_box(s["i"],Vector3(0,3.34,(start+end)/2),Vector3(2.58,0.08,end-start),Color(0.83,0.74,0.59))
 	var row := start+0.5
@@ -158,14 +169,43 @@ static func _body(s: Dictionary, start: float, end: float, windows: Array[Vector
 					_seat(s["i"],Vector3(side*x,1.12,row),seat)
 			LowPolyBuilder.add_box(s["i"],Vector3(0,3.28,row),Vector3(0.64,0.045,0.12),Color(1,0.85,0.47,0.5))
 		row += 1.16 if style in ["diesel","heritage"] else 1.05
-	for z in range(int(start)+2,int(end),3):
-		LowPolyBuilder.add_box(s["p"],Vector3(0,3.68,z),Vector3(1.50,0.18,1.0),l["roof"].lightened(0.12))
-		for i in 5:
-			LowPolyBuilder.add_box(s["p"],Vector3(-0.5+i*0.25,3.782,z),Vector3(0.075,0.016,0.7),BLACK)
 	for z in range(int(start)+1,int(end),2):
 		LowPolyBuilder.add_box(s["p"],Vector3(0,0.67,z),Vector3(1.45,0.46,1.2),BLACK)
 		for side: float in [-1,1]:
 			LowPolyBuilder.add_box(s["p"],Vector3(side*0.78,0.72,z),Vector3(0.06,0.32,0.88),METAL)
+
+static func _roof_profile(style: String) -> Array[Vector2]:
+	if style == "heritage":
+		return [Vector2(-1.37,3.38),Vector2(-1.29,3.57),Vector2(-1.08,3.73),Vector2(-0.64,3.84),Vector2(0.64,3.84),Vector2(1.08,3.73),Vector2(1.29,3.57),Vector2(1.37,3.38)]
+	return [Vector2(-1.34,3.38),Vector2(-1.18,3.52),Vector2(-0.75,3.58),Vector2(0.75,3.58),Vector2(1.18,3.52),Vector2(1.34,3.38)]
+
+
+## Dachaufbauten je Fahrzeugfamilie, wie auf den Vorlagen.
+static func _roof_equipment(st: SurfaceTool, start: float, end: float, l: Dictionary, style: String) -> void:
+	match style:
+		"heritage":
+			# Pilzlüfter in einer Reihe auf dem Tonnendach.
+			var z := start+1.3
+			while z < end-1.0:
+				LowPolyBuilder.add_cylinder(st,Vector3(0,3.82,z),0.09,0.09,0.13,8,DARK)
+				LowPolyBuilder.add_cylinder(st,Vector3(0,3.93,z),0.21,0.16,0.08,10,l["roof"].lightened(0.1))
+				z += 2.3
+		"diesel":
+			# Lange flache Kühl-/Lüftungskiste und ein kleiner Kasten.
+			ReferenceRailcarMeshes._bevel_box(st,Vector3(0,3.69,1.1),Vector3(1.55,0.22,4.6),0.05,l["roof"].lightened(0.07))
+			for i in 9:
+				LowPolyBuilder.add_box(st,Vector3(0,3.805,-0.7+i*0.45),Vector3(1.2,0.015,0.08),BLACK)
+			ReferenceRailcarMeshes._bevel_box(st,Vector3(0,3.66,-3.2),Vector3(0.95,0.16,1.0),0.04,l["roof"].lightened(0.05))
+		_:
+			# Moderne Klimageräte: flache dunkle Kästen mit Lüftergittern.
+			var z := start+2.2
+			while z < end-1.4:
+				ReferenceRailcarMeshes._bevel_box(st,Vector3(0,3.72,z),Vector3(1.7,0.28,2.3),0.06,DARK.lightened(0.07))
+				for i in 4:
+					LowPolyBuilder.add_box(st,Vector3(-0.45+i*0.3,3.865,z),Vector3(0.16,0.012,1.7),BLACK)
+				LowPolyBuilder.add_cylinder(st,Vector3(0.45,3.88,z+0.7),0.22,0.22,0.03,10,BLACK)
+				z += 5.2
+
 
 static func _seat(st: SurfaceTool, at: Vector3, color: Color) -> void:
 	LowPolyBuilder.add_box(st,at+Vector3(0,0.12,0),Vector3(0.12,0.25,0.35),METAL)
@@ -194,12 +234,18 @@ static func _end(st: SurfaceTool, z: float, color: Color, gangway := true) -> vo
 			LowPolyBuilder.add_box(st,Vector3(0,2.17,z+signf(z)*(0.06+i*0.052)),Vector3(1.18,2.15,0.04),BLACK.lightened((i%2)*0.035))
 	_coupler(st,z,signf(z))
 
-static func _coupler(st: SurfaceTool, z: float, facing: float, buffers := false) -> void:
-	ReferenceRailcarMeshes._bevel_box(st,Vector3(0,1.05,z+facing*0.2),Vector3(0.48,0.45,0.4),0.06,METAL)
+static func _coupler(st: SurfaceTool, z: float, facing: float, buffers := false, round_buffers := false) -> void:
+	# Dunkle Kupplung und Puffer wie in den Vorlagen (nicht hellgrau).
+	ReferenceRailcarMeshes._bevel_box(st,Vector3(0,1.05,z+facing*0.2),Vector3(0.48,0.45,0.4),0.06,DARK)
 	LowPolyBuilder.add_box(st,Vector3(0,0.84,z+facing*0.27),Vector3(0.13,0.24,0.16),BLACK)
 	if buffers:
 		for side: float in [-1,1]:
-			ReferenceRailcarMeshes._bevel_box(st,Vector3(side*0.91,1.1,z+facing*0.18),Vector3(0.58,0.44,0.28),0.06,METAL)
+			if round_buffers:
+				# Alte Bauart: Hülse und runder Puffer­teller.
+				LowPolyBuilder.add_cylinder_between(st,Vector3(side*0.88,1.12,z),Vector3(side*0.88,1.12,z+facing*0.28),0.15,12,DARK)
+				LowPolyBuilder.add_cylinder_between(st,Vector3(side*0.88,1.12,z+facing*0.28),Vector3(side*0.88,1.12,z+facing*0.36),0.27,14,DARK.lightened(0.08))
+			else:
+				ReferenceRailcarMeshes._bevel_box(st,Vector3(side*0.91,1.1,z+facing*0.18),Vector3(0.58,0.44,0.28),0.06,DARK)
 
 static func _diesel(l: Dictionary) -> Dictionary:
 	var s := _streams()
@@ -216,22 +262,37 @@ static func _diesel(l: Dictionary) -> Dictionary:
 		LowPolyBuilder.add_box(s["p"],Vector3(0,3.18,end*8.06),Vector3(0.52,0.3,0.15),METAL)
 		LowPolyBuilder.add_box(s["h"] if end<0 else s["t"],Vector3(0,3.18,end*8.155),Vector3(0.39,0.20,0.035),WARM)
 	for z: float in [-5.2,5.1]:
-		LowPolyBuilder.add_cylinder(s["p"],Vector3(0,3.56,z),0.18,0.17,0.33,10,METAL)
+		LowPolyBuilder.add_cylinder(s["p"],Vector3(0,3.56,z),0.18,0.17,0.33,10,DARK)
 		LowPolyBuilder.add_cylinder(s["p"],Vector3(0,3.89,z),0.26,0.26,0.05,10,BLACK)
+	# Orange Begrenzungsleuchten an allen vier unteren Ecken und Trittlampe.
+	for end: float in [-1,1]:
+		for side: float in [-1,1]:
+			LowPolyBuilder.add_box(s["p"],Vector3(side*1.22,1.16,end*8.07),Vector3(0.16,0.12,0.04),MARKER)
+			LowPolyBuilder.add_box(s["p"],Vector3(side*1.355,1.2,end*7.6),Vector3(0.03,0.1,0.16),MARKER)
+	for side: float in [-1,1]:
+		LowPolyBuilder.add_box(s["h"],Vector3(side*1.36,3.18,-1.7),Vector3(0.05,0.08,0.34),WARM)
 	var result := _finish(s)
 	return result
 
-static func _old_cab(s: Dictionary, z: float, facing: float, l: Dictionary, loco: bool) -> void:
+static func _old_cab(s: Dictionary, z: float, facing: float, l: Dictionary, loco: bool, cream_top := true) -> void:
 	var back := z-facing*1.2
+	# Triebwagen: cremefarbene Oberkante. Güterlok: rote Stirn mit Cremerahmen.
+	var top: Color = l["secondary"] if cream_top else l["primary"]
 	for side: float in [-1,1]:
 		_side_quad(s["p"],side,minf(back,z),maxf(back,z),1.05,1.98,l["primary"])
-		_side_quad(s["p"],side,minf(back,z),maxf(back,z),2.96,3.38,l["secondary"])
+		_side_quad(s["p"],side,minf(back,z),maxf(back,z),2.96,3.38,top)
 		_side_quad(s["g"],side,minf(back,z)+0.15,maxf(back,z)-0.15,2.07,2.88,Color(0.14,0.19,0.18))
 		LowPolyBuilder.add_box(s["p"],Vector3(side*1.49,2.48,z-facing*0.35),Vector3(0.16,0.44,0.20),BLACK)
 	LowPolyBuilder.add_box(s["p"],Vector3(0,1.47,z),Vector3(2.67,0.86,0.12),l["primary"])
 	LowPolyBuilder.add_box(s["p"],Vector3(0,1.93,z),Vector3(2.67,0.07,0.12),l["primary"])
 	LowPolyBuilder.add_box(s["p"],Vector3(0,1.84,z+facing*0.012),Vector3(2.67,0.045,0.12),l["secondary"])
-	LowPolyBuilder.add_box(s["p"],Vector3(0,3.20,z-facing*0.08),Vector3(2.66,0.35,0.18),l["secondary"])
+	LowPolyBuilder.add_box(s["p"],Vector3(0,3.20,z-facing*0.08),Vector3(2.66,0.35,0.18),top)
+	if not cream_top:
+		# Cremefarbener Rahmen um die Frontscheiben (Vorlage Güterzug).
+		for y: float in [1.955,3.015]:
+			LowPolyBuilder.add_box(s["p"],Vector3(0,y,z+facing*0.03),Vector3(2.62,0.07,0.08),l["secondary"])
+		for x: float in [-1.3,1.3]:
+			LowPolyBuilder.add_box(s["p"],Vector3(x,2.485,z+facing*0.03),Vector3(0.07,1.13,0.08),l["secondary"])
 	ReferenceRailcarMeshes._bevel_box(s["p"],Vector3(0,3.43,z-facing*0.55),Vector3(2.68,0.26,1.25),0.12,l["roof"])
 	for x: float in [-1.24,0,1.24]:
 		LowPolyBuilder.add_box(s["p"],Vector3(x,2.47,z),Vector3(0.11,1.09,0.09),BLACK)
@@ -270,17 +331,23 @@ static func _nostalgic_loco(l: Dictionary) -> Dictionary:
 	for side: float in [-1,1]:
 		LowPolyBuilder.add_box(s["p"],Vector3(side*1.29,1.31,0),Vector3(0.08,0.06,9.9),l["accent"])
 	ReferenceRailcarMeshes._bevel_box(s["p"],Vector3(0,1.98,-2.25),Vector3(1.8,1.45,5.25),0.15,l["primary"])
-	ReferenceRailcarMeshes._bevel_box(s["p"],Vector3(0,1.78,3.4),Vector3(1.9,1.03,2.9),0.13,l["primary"])
-	LowPolyBuilder.add_box(s["p"],Vector3(0,1.51,1.2),Vector3(2.65,0.52,3.5),l["primary"])
-	LowPolyBuilder.add_box(s["i"],Vector3(0,1.28,1.2),Vector3(2.50,0.1,3.5),Color(0.35,0.31,0.25))
-	LowPolyBuilder.add_box(s["i"],Vector3(0,3.3,1.2),Vector3(2.5,0.10,3.5),l["secondary"])
-	for end: float in [-0.55,2.95]:
-		LowPolyBuilder.add_box(s["p"],Vector3(0,1.93,end),Vector3(2.65,0.33,0.1),l["secondary"])
-		LowPolyBuilder.add_box(s["p"],Vector3(0,3.2,end),Vector3(2.65,0.3,0.1),l["secondary"])
-		for x: float in [-1.25,0,1.25]:
-			LowPolyBuilder.add_box(s["p"],Vector3(x,2.64,end),Vector3(0.12,1.1,0.1),l["secondary"])
+	# Hinterer Vorbau so hoch wie der vordere (Vorlage: beide Vorbauten gleich).
+	ReferenceRailcarMeshes._bevel_box(s["p"],Vector3(0,1.98,3.4),Vector3(1.9,1.45,2.9),0.13,l["primary"])
+	# Geschlossenes Führerhaus: unten grün, oben creme mit echten Fensteröffnungen.
+	LowPolyBuilder.add_box(s["p"],Vector3(0,1.69,1.2),Vector3(2.65,0.82,3.5),l["primary"])
+	LowPolyBuilder.add_box(s["p"],Vector3(0,2.115,1.2),Vector3(2.67,0.05,3.52),l["secondary"].darkened(0.08))
+	var side_holes: Array[Rect2] = [Rect2(-0.30,2.2,0.95,0.85),Rect2(0.94,2.2,1.58,0.85)]
+	var end_holes: Array[Rect2] = [Rect2(-1.12,2.2,1.04,0.85),Rect2(0.08,2.2,1.04,0.85)]
 	for side: float in [-1,1]:
-		_side_quad(s["p"],side,-0.55,2.95,1.33,1.88,l["primary"])
+		_holed_wall(s["p"],true,side*1.325,Vector3(side,0,0),-0.55,2.95,2.10,3.36,side_holes,l["secondary"])
+	for end: float in [-0.55,2.95]:
+		var facing := -1.0 if end < 0 else 1.0
+		_holed_wall(s["p"],false,end,Vector3(0,0,facing),-1.325,1.325,2.10,3.36,end_holes,l["secondary"])
+		for hole in end_holes:
+			LowPolyBuilder.add_quad_facing(s["g"],Vector3(hole.position.x,2.2,end+facing*0.005),Vector3(hole.end.x,2.2,end+facing*0.005),Vector3(hole.end.x,3.05,end+facing*0.005),Vector3(hole.position.x,3.05,end+facing*0.005),Color(0.12,0.18,0.17),Vector3(0,0,facing))
+	LowPolyBuilder.add_box(s["i"],Vector3(0,2.11,1.2),Vector3(2.50,0.1,3.4),Color(0.35,0.31,0.25))
+	LowPolyBuilder.add_box(s["i"],Vector3(0,3.3,1.2),Vector3(2.5,0.10,3.4),l["secondary"])
+	for side: float in [-1,1]:
 		for window in [Vector2(-0.30,0.65),Vector2(0.94,2.52)]:
 			for edge in [window.x-0.04,window.y+0.04]:
 				LowPolyBuilder.add_box(s["p"],Vector3(side*1.355,2.64,edge),Vector3(0.07,1.03,0.07),BLACK)
@@ -308,9 +375,42 @@ static func _nostalgic_loco(l: Dictionary) -> Dictionary:
 		LowPolyBuilder.add_cylinder_between(s["h"],Vector3(side*0.84,1.67,-4.99),Vector3(side*0.84,1.67,-5.015),0.12,12,WARM)
 	LowPolyBuilder.add_cylinder_between(s["h"],Vector3(0,3.39,-0.68),Vector3(0,3.39,-0.76),0.14,12,WARM)
 	for end: float in [-1,1]:
-		_coupler(s["p"],end*5,end,true)
-	_seat(s["i"],Vector3(0,1.35,0.5),Color(0.28,0.3,0.24))
+		_coupler(s["p"],end*5,end,true,true)
+	_seat(s["i"],Vector3(0,2.18,0.5),Color(0.28,0.3,0.24))
 	return _finish(s)
+
+
+## Wand mit rechteckigen Fensteröffnungen. [param along_z]: Seitenwand bei
+## x = [param fixed] (u = z), sonst Stirnwand bei z = [param fixed] (u = x).
+## Löcher als Rect2(u, v, Breite, Höhe).
+static func _holed_wall(st: SurfaceTool, along_z: bool, fixed: float, facing: Vector3, u0: float, u1: float, v0: float, v1: float, holes: Array[Rect2], color: Color) -> void:
+	var us: Array[float] = [u0,u1]
+	var vs: Array[float] = [v0,v1]
+	for hole in holes:
+		us.append(clampf(hole.position.x,u0,u1))
+		us.append(clampf(hole.end.x,u0,u1))
+		vs.append(clampf(hole.position.y,v0,v1))
+		vs.append(clampf(hole.end.y,v0,v1))
+	us.sort()
+	vs.sort()
+	for i in us.size()-1:
+		for j in vs.size()-1:
+			var a := us[i]
+			var b := us[i+1]
+			var c := vs[j]
+			var d := vs[j+1]
+			if b-a < 0.001 or d-c < 0.001:
+				continue
+			var middle := Vector2((a+b)*0.5,(c+d)*0.5)
+			var open := false
+			for hole in holes:
+				open = open or hole.has_point(middle)
+			if open:
+				continue
+			if along_z:
+				LowPolyBuilder.add_quad_facing(st,Vector3(fixed,c,a),Vector3(fixed,d,a),Vector3(fixed,d,b),Vector3(fixed,c,b),color,facing)
+			else:
+				LowPolyBuilder.add_quad_facing(st,Vector3(a,c,fixed),Vector3(a,d,fixed),Vector3(b,d,fixed),Vector3(b,c,fixed),color,facing)
 
 static func _local(kind: String, l: Dictionary) -> Dictionary:
 	var s := _streams()
@@ -499,7 +599,7 @@ static func _freight_loco(l: Dictionary) -> Dictionary:
 	# Full-width red end cab and long engine room, unlike the green center-cab loco.
 	LowPolyBuilder.add_box(s["p"],Vector3(0,1.17,0),Vector3(2.68,0.30,13),BLACK)
 	ReferenceRailcarMeshes._bevel_box(s["p"],Vector3(0,2.14,1.05),Vector3(2.39,1.85,10.75),0.16,l["primary"])
-	_old_cab(s,-6.5,-1,l,true)
+	_old_cab(s,-6.5,-1,l,true,false)
 	for side: float in [-1,1]:
 		_side_quad(s["p"],side,-5.25,6.2,1.88,2.08,l["secondary"],1.21)
 		for z: float in [-1.8,1.2,4.5]:
@@ -514,7 +614,9 @@ static func _freight_loco(l: Dictionary) -> Dictionary:
 	_cab_polygon(s["p"],[Vector3(1.34,1.01,-6.57),Vector3(1.34,3.5,-6.57)],[Vector2(-1.3,1.99),Vector2(0,1.70),Vector2(1.3,1.99),Vector2(1.3,2.14),Vector2(0,1.92),Vector2(-1.3,2.14)],l["secondary"])
 	for z: float in [-0.5,2.6,4.7]:
 		LowPolyBuilder.add_cylinder(s["p"],Vector3(0,3.15,z),0.42,0.42,0.15,12,BLACK)
-		LowPolyBuilder.add_box(s["p"],Vector3(0,3.34,z),Vector3(1.08,0.12,0.96),METAL)
+		LowPolyBuilder.add_box(s["p"],Vector3(0,3.34,z),Vector3(1.08,0.12,0.96),DARK.lightened(0.12))
+	# Dunkles Dach auf dem Maschinenraum, wie auf der Vorlage.
+	ReferenceRailcarMeshes._bevel_box(s["p"],Vector3(0,3.1,1.05),Vector3(2.3,0.1,10.6),0.04,l["roof"])
 	LowPolyBuilder.add_box(s["p"],Vector3(0,0.69,0.2),Vector3(1.9,0.7,3.6),BLACK)
 	for end: float in [-1,1]:
 		_coupler(s["p"],end*6.5,end,true)

@@ -17,7 +17,7 @@ void fragment() {
 	}
 	// Bright cream/orange panels keep headroom under the game's strong winter sun.
 	float peak = max(max(color.r, color.g), color.b);
-	float pigment = mix(0.86, 0.62, smoothstep(0.48, 0.82, peak));
+	float pigment = mix(0.9, 0.79, smoothstep(0.5, 0.92, peak));
 	ALBEDO = color * mix(pigment, 1.0, snow) * (1.0 - wetness * (1.0 - snow) * 0.10);
 	float saturation = peak - min(min(color.r, color.g), color.b);
 	float matte = (1.0 - smoothstep(0.04, 0.12, saturation)) * (1.0 - smoothstep(0.22, 0.45, peak));
