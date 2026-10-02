@@ -391,6 +391,8 @@ func _build_outer() -> void:
 			_duffle_coat()
 		CharacterAppearance.Outer.LONG_COAT:
 			_long_coat()
+		CharacterAppearance.Outer.PARKA:
+			_parka()
 
 
 ## Latzhose: Hosenteil, Latz mit großer Brusttasche, Träger mit Messingknöpfen,
@@ -853,6 +855,30 @@ func _long_coat() -> void:
 		torso.panel(xf, [Vector2(0.315, 0.33), Vector2(0.29, 0.38)], 3, cloth, 1.0, TORSO_DEPTH, p - 0.055, p + 0.055, 0.05, 0.012, seam)
 
 
+## Parka (trapper): bis 0,28 m, dicker Pelzkragen (outer_color2) rund um den Hals,
+## Knopfleiste mit Holzknöpfen, große Klappentaschen; Ärmel mit Pelzmanschette.
+func _parka() -> void:
+	var cloth := _solid(look.outer_color)
+	var seam := _solid(look.outer_color.darkened(0.25))
+	var fur := _solid(look.outer_color2 if look.outer_color2.a > 0.0 else Color(0.86, 0.8, 0.68))
+	var xf := Transform3D.IDENTITY
+	var hem := 0.28
+	var profile: Array = [Vector2(0.32, hem), Vector2(0.3, 0.34), Vector2(0.275, 0.42)] + torso_profile(0.46, NECK_Y - 0.02, 4)
+	torso.lathe(xf, profile, 22, cloth, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.035)
+	torso.panel(xf, profile, 1, seam, 1.0, TORSO_DEPTH, 0.03, 0.036, 0.037, 0.006, seam)
+	torso.torus(Transform3D(Basis(Vector3.RIGHT, 0.15), Vector3(0, NECK_Y - 0.06, 0.0)), 0.18, 0.055, 18, 6, fur, 1.0, 0.84)
+	var wood := _solid(look.accent_color)
+	for y: float in [0.6, 0.5, 0.4]:
+		torso.ellipsoid(Transform3D(Basis.looking_at(torso_normal(0.0)), torso_point(0.0, y, 0.048)), Vector3(0.021, 0.021, 0.011),
+			8, 4, wood)
+	for side: float in [-1.0, 1.0]:
+		var p := side * 0.15
+		torso.panel(xf, [Vector2(0.31, 0.31), Vector2(0.29, 0.37), Vector2(0.276, 0.42)], 3, cloth, 1.0, TORSO_DEPTH,
+			p - 0.06, p + 0.06, 0.05, 0.012, seam)
+		torso.panel(xf, [Vector2(0.282, 0.4), Vector2(0.272, 0.44)], 3, cloth, 1.0, TORSO_DEPTH, p - 0.065, p + 0.065, 0.066, 0.012, seam)
+		torso.ellipsoid(Transform3D(Basis.looking_at(torso_normal(p)), torso_point(p, 0.415, 0.08)), Vector3(0.012, 0.012, 0.007), 6, 3, wood)
+
+
 ## Halbe Breite des V-Ausschnitts (Winkelanteil) in Höhe [param y].
 func _v_half(y: float, tip: float) -> float:
 	return 0.075 * clampf((y - tip) / (NECK_Y - tip), 0.0, 1.0)
@@ -958,7 +984,7 @@ func _build_arms() -> void:
 			_:
 				kit.lathe(xf, [Vector2(0.062, -0.2), Vector2(0.07, -0.08), Vector2(0.078, 0.0), Vector2(0.06, 0.05), Vector2(0.0, 0.07)],
 					10, sleeve)
-				if look.outer in [CharacterAppearance.Outer.DUFFLE_COAT, CharacterAppearance.Outer.LONG_COAT]:
+				if look.outer in [CharacterAppearance.Outer.DUFFLE_COAT, CharacterAppearance.Outer.LONG_COAT, CharacterAppearance.Outer.PARKA]:
 					# Umgeschlagene Mantelmanschette (duffle_girl), beim Mantel mit Pelz in outer_color2 (elf_girl)
 					kit.lathe(xf, [Vector2(0.074, -0.2), Vector2(0.094, -0.195), Vector2(0.098, -0.125), Vector2(0.082, -0.115)], 10,
 						_solid(look.outer_color2 if look.outer_color2.a > 0.0 else look.outer_color.lightened(0.04)), true, 1.0, 1.0, 0.0, 1.0, 0.0, true)
@@ -1193,7 +1219,8 @@ func _build_hair() -> void:
 				_scale(f[0], f[1], f[2], f[3] * look.fringe_length, hair_dark if int(f[0]) == 14 else hair, -0.15, 0.97, 0.34, 0.45)
 			# Seitliches Volumen unter dem Tuch: rahmt das Gesicht bis über die Ohren
 			# (unter einem Hut mit Krempe würde es durch die Krempe stechen)
-			for side: float in ([] if hat in [CharacterAppearance.HatStyle.STRAW_HAT, CharacterAppearance.HatStyle.BUCKET_HAT, CharacterAppearance.HatStyle.ELF_HAT] else [-1.0, 1.0]):
+			for side: float in ([] if hat in [CharacterAppearance.HatStyle.STRAW_HAT, CharacterAppearance.HatStyle.BUCKET_HAT, CharacterAppearance.HatStyle.ELF_HAT,
+					CharacterAppearance.HatStyle.TRAPPER_HAT] else [-1.0, 1.0]):
 				for k in 3:
 					_scale(side * (78.0 + k * 26.0), 6.0 - k * 4.0, 0.22 * look.hair_volume, 0.24 * look.hair_volume, hair if k % 2 == 0 else hair_dark, 0.04 if hat == CharacterAppearance.HatStyle.HEADSCARF else -0.05,
 						1.03 if hat == CharacterAppearance.HatStyle.HEADSCARF else 1.0, 0.6)
@@ -1428,6 +1455,23 @@ func _build_hat(hat: CharacterAppearance.HatStyle) -> void:
 			var radii: Array[float] = [0.27, 0.26, 0.215, 0.15, 0.085, 0.035]
 			_bent_cone(head, hat_xf, spine, radii, 12, felt)
 			head.ellipsoid(hat_xf * Transform3D(Basis.IDENTITY, Vector3(-0.37, 0.01, 0.19)), Vector3(0.09, 0.09, 0.09), 9, 6, fur)
+		CharacterAppearance.HatStyle.TRAPPER_HAT:
+			# Fliegermütze (trapper): runde Lederkuppel (hat_color), vorne hochgeklappter
+			# Pelzschirm, seitlich lange Pelzklappen bis zur Wange (hat_color2), hinten bis in
+			# den Nacken. Vorlage: Kuppel 0,33 m über der Kopfmitte, 0,62 m breit.
+			var leather := _solid(look.hat_color)
+			var fur := _solid(look.hat_color2 if look.hat_color2.a > 0.0 else Color(0.86, 0.8, 0.68))
+			var hat_xf := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(8.0 + look.hat_tilt)) * Basis.from_scale(Vector3.ONE * look.hat_scale),
+				Vector3(0, look.hat_lift, 0.02))
+			head.lathe(hat_xf, [Vector2(0.29, 0.0), Vector2(0.305, 0.1), Vector2(0.285, 0.2), Vector2(0.225, 0.28), Vector2(0.12, 0.325),
+				Vector2(0.0, 0.335)], 14, leather, true)
+			head.lathe(hat_xf, [Vector2(0.27, -0.17), Vector2(0.3, -0.06), Vector2(0.29, 0.005)], 14, leather, true, 1.0, 1.0, 0.3, 0.7)
+			# Pelzschirm vorne, hochgeklappt
+			head.lathe(hat_xf * Transform3D(Basis(Vector3.RIGHT, deg_to_rad(10.0)), Vector3.ZERO), [Vector2(0.28, 0.06), Vector2(0.33, 0.085),
+				Vector2(0.35, 0.16), Vector2(0.335, 0.235), Vector2(0.29, 0.25)], 14, fur, true, 1.0, 1.0, -0.21, 0.21)
+			for side: float in [-1.0, 1.0]:
+				head.ellipsoid(hat_xf * Transform3D(Basis(Vector3.FORWARD, side * 0.12), Vector3(side * 0.3, -0.08, 0.02)),
+					Vector3(0.07, 0.18, 0.13), 10, 6, fur)
 		CharacterAppearance.HatStyle.STRAW_HAT:
 			# Strohhut (gardener): runde Kuppel, breite leicht hängende Krempe, farbiges Band
 			# Maße aus der Vorlage: Krempe 0,1 m über der Kopfmitte, Krone 0,22 m hoch,
