@@ -56,3 +56,34 @@ godot --path . --resolution 1672x941 -s res://tests/qa/visual_capture.gd -- <ord
 - Klang (Lautstärken, Loops, Übergänge) – hier nicht hörbar.
 - Forward+-Optik (SSAO, Schatten) auf dem Spiel-PC.
 - Vollbild-/Auflösungswechsel mit echtem Monitor (10-Sekunden-Rückfrage).
+
+## Figuren aus den Charakterblättern (Stand 82018bc)
+
+Lauf auf einem sauberen Checkout des Commits (ohne die parallele, noch nicht eingecheckte
+Zug-Umbauarbeit), Godot 4.7.2, headless, `--fixed-fps 60`:
+
+| Suite | Bestanden | Fehlgeschlagen |
+| --- | --- | --- |
+| smoke | 66 | 0 |
+| railway | 94 | 0 |
+| train | 138 | 0 |
+| npc | 113 | 0 |
+| village | 94 | 0 |
+| economy | 116 | 0 |
+| world | 63 | 0 |
+| festival | 73 | 0 |
+| phase12_menu | 29 | 0 |
+| phase12_journey | 28 | 0 |
+| qa/hud | 28 | 0 |
+| qa/pause_menu | 21 | 0 |
+| qa/settings_effects | 19 | 0 |
+| qa/festive_lights | 18 | 0 |
+
+Neu bzw. angepasst in `npc_test`: alle 22 Figuren bauen sich (je ≥ 6 Gelenk-Meshes,
+> 3000 Eckpunkte), genau 20 NPC-Figuren zur Auswahl, Sommer-Outfit entfernt Mütze/Schal/
+Fäustlinge (weniger Eckpunkte), Kinder kürzere Beine. `phase12_journey`: die gewählte
+Spielfigur ist `player_female.tres`.
+
+Hinweis: Im Arbeitsordner mit der unfertigen Zugarbeit schlagen in `qa/festive_lights` drei
+Prüfungen fehl („SZ railcar_* has fairy lights“) – das betrifft die neuen Triebwagen-Meshes
+der parallelen Arbeit, nicht die Figuren; auf dem eingecheckten Stand sind alle 18 grün.

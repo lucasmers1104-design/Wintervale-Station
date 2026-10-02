@@ -54,3 +54,48 @@ Werkzeug: `tests/qa/model_review.gd` – freie Kamera nimmt Züge (Front, ¾, Se
 | Abend / Nacht | 0,1–0,2 % | ≈ 5–8 % dunkler | warme Lichtinseln unverändert |
 | Birke im Sommer/Frühling | kahl („toter Baum“) | Laub | Winter unverändert kahl, Herbst golden |
 | HUD 09:41 / 16:00 / 23:27 / 00:00 | Uhr zeigt immer 4:00 | Zeiger = Digitalzeit | geprüft im Test und im Bild |
+
+## Figuren nach den Charakterblättern
+
+Vorlagen: 22 Charakterblätter des Creative Directors (`docs/character_references/`, je vorne,
+nach links, hinten, nach rechts). Werkzeug: `tests/qa/character_sheet.gd` rendert die Figur mit
+gleicher Kamera und gleichem Maßstab (483 px/m, Fußlinie 866 px) und legt Vorlage und Spiel
+übereinander; Detailausschnitte mit Messlinien alle 50 px. Jede Figur wurde erst nach der
+Sichtprüfung aller vier Ansichten abgeschlossen.
+
+| Figur | Wichtigste Merkmale, die nachgebaut und geprüft wurden |
+| --- | --- |
+| player_male | Tannenzapfen-Haar mit Spitze, Rollkragen, Latzhose mit Messingknöpfen, Gesäßtaschen |
+| player_female | Kopftuch mit Knoten, Dutt, Seitenscheitel-Pony, lange Strähnen vor den Ohren |
+| gardener | Strohhut mit grünem Band, tiefer Zopf mit Haargummi, Halstuch, Latzhose |
+| grandpa_cardigan | Haarkranz-Wolken, runde Brille, Strickjacke mit V, Holzknöpfe, Hose mit Aufschlag |
+| newsboy | Schiebermütze mit schräger Kante und Schirm, Sommersprossen, kariertes Hemd, Hosenträger-Shorts |
+| bow_girl | Bob, Dutt mit großer Schleife, Bubikragen mit Bögen, Faltenrock-Trägerkleid, Strumpfhose |
+| smith | Locken, Vollbart, buschige Brauen, Lederschürze mit Werkzeugtasche, Stulpenhandschuhe |
+| baker | Kochmütze mit Streifen, Kleid mit Rundkragen und Puffärmeln, Schürze mit Blattmotiv und Schleife |
+| sailor | Bommelmütze mit Strickgitter, Ringel-Rollkragen, Cargo-Shorts, Lederhosenträger, Bart |
+| granny_gingham | Vichy-Kopftuch, Mittelscheitel, offene Vichy-Strickjacke, Faltenrock, Brille |
+| satchel_boy | Weste mit Spitzen und Blende, Umhängetasche mit Schnalle, breite Hosenaufschläge |
+| scout | Wanderhut mit Feder und Knopf, Halstuch hinten geknotet, geschnürte Tunika mit Gürtel |
+| winter_girl | Daunenweste, Strickpulli mit langem Bund, Karo-Schal mit Fransen, Jeans, Fäustlinge |
+| grandpa_fairisle | Norwegerband auf Rumpf und Ärmeln, Schalkragen, graue Mütze, Schnurrbart |
+| earmuff_boy | Ohrenschützer, Daunenjacke mit Zipper und Klappentaschen, Schnürstiefel mit Strickrand |
+| duffle_girl | Dufflecoat mit Knebeln, zweifarbige Bommelmütze, Blockstreifen-Schal, tiefe Zwillingsdutts |
+| lumberjack | Büffelkaro-Hemd, grüne Daunenweste, rote Mütze, Vollbart |
+| beret_girl | Barett, langer Pony, Strickkleid, schlichte Latzschürze mit Rückenschleife |
+| elf_girl | Wichtelmütze mit Pelzband und umgeknickter Spitze, Mantel mit Pelzmanschetten und Gürtel |
+| granny_diamond | Kopftuch mit Nackenknoten, Rauten-Strickjacke über Rollkragen, Karorock, Kniestrümpfe |
+| sailor_satchel | Navy-Bommelmütze, Ringelpulli, Cargo-Latzshorts, roter Schal, Tasche |
+| trapper | Fliegermütze mit Pelzklappen, Parka mit Pelzkragen, Karo-Schal, Schnurrbart |
+
+Bekannte Restabweichungen (bewusst klein gehalten): Muster werden im Shader gezeichnet und
+sind gröber als in den Vorlagen (Karo, Norweger, Rauten); Stoffe sind facettiert statt
+weich modelliert; die Rauten der granny_diamond-Strickjacke sitzen etwas weiter außen.
+
+Im Spiel geprüft: beide Spielfiguren am Bahnhof (`tests/qa/character_capture.gd`) und alle
+20 NPC-Figuren nebeneinander in der Welt (Aufstellung im Schnee, Tageslicht).
+
+**Gefundener Fehler dabei:** Bei vielen Figuren gleichzeitig meldete der Renderer „Too many
+instances using shader instance variables“ (Kompatibilitäts-Renderer: höchstens 4096).
+Ursache: Jedes der sechs Figurenteile trug den Blinzel-Parameter. Behoben: nur der Kopf nutzt
+ihn (eigener Kopf-Shader über eine gemeinsame Include-Datei); danach keine Meldung mehr.
