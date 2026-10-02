@@ -1185,7 +1185,7 @@ func _build_hair() -> void:
 			var fringe := [[-48.0, 16.0, 0.22, 0.22], [-18.0, 20.0, 0.21, 0.24], [14.0, 20.0, 0.26, 0.3], [46.0, 16.0, 0.22, 0.22]]
 			if look.middle_part:
 				# Mittelscheitel (granny_gingham): zwei große Strähnen links und rechts der Mitte
-				fringe = [[-54.0, 16.0, 0.22, 0.18], [-20.0, 24.0, 0.26, 0.19], [20.0, 24.0, 0.26, 0.19], [54.0, 16.0, 0.22, 0.18]]
+				fringe = [[-54.0, 12.0, 0.22, 0.18], [-20.0, 18.0, 0.26, 0.19], [20.0, 18.0, 0.26, 0.19], [54.0, 12.0, 0.22, 0.18]]
 			for f: Array in fringe:
 				_scale(f[0], f[1], f[2], f[3] * look.fringe_length, hair_dark if int(f[0]) == 14 else hair, -0.15, 0.97, 0.34, 0.45)
 			# Seitliches Volumen unter dem Tuch: rahmt das Gesicht bis über die Ohren
@@ -1283,19 +1283,27 @@ func _build_hat(hat: CharacterAppearance.HatStyle) -> void:
 			var shell := HAIR * Vector3(1.1, 1.06, 1.12) * look.hat_scale
 			# 26°: Vorderrand über der Stirn (y ≈ 0,1), hinten unter der Ohroberkante
 			var band := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(26.0 + look.hat_tilt)), Vector3(0, HAIR_LIFT + 0.03, 0.02))
-			head.ellipsoid(band, shell, 18, 10, cloth, true, 0.43, 0.94)
+			head.ellipsoid(band, shell, 18, 10, cloth, true, 0.43, 1.0)
 			# Gerollter Saum am Tuchrand
 			var rim_y := -cos(PI * 0.43)
 			var rim_r := sin(PI * 0.43)
 			head.torus(band * Transform3D(Basis.IDENTITY, Vector3(0, shell.y * rim_y, 0)), shell.x * rim_r * 0.99, 0.017, 24, 6, cloth,
 				1.0, shell.z / shell.x)
 			var ks := look.hat_knot_side
-			var knot_at := Vector3(0.13 * ks, -0.03, 0.26)
-			head.ellipsoid(Transform3D(Basis.IDENTITY, knot_at), Vector3(0.058, 0.052, 0.045), 8, 6, cloth)
-			head.scale_tuft(Transform3D(Basis(Vector3.FORWARD, 1.2 * ks) * Basis(Vector3.RIGHT, -0.3), knot_at + Vector3(-0.1 * ks, -0.04, 0.02)),
-				0.12, 0.22, 0.045, cloth)
-			head.scale_tuft(Transform3D(Basis(Vector3.FORWARD, -2.0 * ks) * Basis(Vector3.RIGHT, -0.3), knot_at + Vector3(0.08 * ks, -0.03, 0.01)),
-				0.09, 0.16, 0.04, cloth)
+			if is_zero_approx(ks):
+				# Knoten mittig im Nacken (granny_diamond): zwei Zipfel wie eine Schleife zur Seite
+				var center := Vector3(0.0, -0.07, 0.33)
+				head.ellipsoid(Transform3D(Basis.IDENTITY, center), Vector3(0.065, 0.058, 0.05), 8, 6, cloth)
+				for side: float in [-1.0, 1.0]:
+					head.scale_tuft(Transform3D(Basis(Vector3.FORWARD, side * 1.9) * Basis(Vector3.RIGHT, -0.2), center + Vector3(side * 0.1, -0.02, 0.01)),
+						0.12, 0.2, 0.05, cloth)
+			else:
+				var knot_at := Vector3(0.13 * ks, -0.03, 0.26)
+				head.ellipsoid(Transform3D(Basis.IDENTITY, knot_at), Vector3(0.058, 0.052, 0.045), 8, 6, cloth)
+				head.scale_tuft(Transform3D(Basis(Vector3.FORWARD, 1.2 * ks) * Basis(Vector3.RIGHT, -0.3), knot_at + Vector3(-0.1 * ks, -0.04, 0.02)),
+					0.12, 0.22, 0.045, cloth)
+				head.scale_tuft(Transform3D(Basis(Vector3.FORWARD, -2.0 * ks) * Basis(Vector3.RIGHT, -0.3), knot_at + Vector3(0.08 * ks, -0.03, 0.01)),
+					0.09, 0.16, 0.04, cloth)
 		CharacterAppearance.HatStyle.FLAT_CAP:
 			# Schiebermütze (newsboy): weiche, bauschige Kuppel aus Segmenten, die seitlich
 			# übersteht und hinten tief über den Hinterkopf fällt. Maße aus der Vorlage
