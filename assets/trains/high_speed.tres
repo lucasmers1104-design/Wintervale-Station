@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="TrainType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trains/train_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+type_code = "HS"
+display_name = "Hochgeschwindigkeitszug"
+category = 0
+consist = PackedStringArray("speed_front", "speed_middle", "speed_middle", "speed_middle", "speed_rear")
+max_speed_kmh = 200.0
+acceleration = 0.85
+min_dwell_seconds = 8.0
+primary_color = Color(0.95, 0.92, 0.82, 1)
+secondary_color = Color(0.95, 0.92, 0.82, 1)
+accent_color = Color(0.09, 0.32, 0.68, 1)
+roof_color = Color(0.25, 0.26, 0.28, 1)
+required_epoch = 6
+required_station_level = 6
+passenger_capacity = 220
+rolling_pitch = 1.35
+cargo_capacity = 0
+purchase_price = 1400
+comfort = 1.9
+service_role = "Schnelle Regionalachse"
+horn_pitch = 0.8300000000000001
+

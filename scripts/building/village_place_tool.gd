@@ -36,6 +36,7 @@ var _marker: MeshInstance3D
 
 func _on_setup() -> void:
 	_items = VillageCatalog.get_items(category)
+	_refresh_unlocked_items.call_deferred()
 	_marker = MeshInstance3D.new()
 	_marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_marker.material_override = marker_material
@@ -45,6 +46,7 @@ func _on_setup() -> void:
 
 func activate() -> void:
 	super()
+	_refresh_unlocked_items()
 	_announce_items()
 
 
@@ -81,6 +83,8 @@ func select_item(item_id: String) -> void:
 
 
 func handle_input(event: InputEvent) -> bool:
+	if _items.is_empty():
+		return false
 	if event.is_action_pressed(&"build_rotate"):
 		_angle = fposmod(_angle - deg_to_rad(rotate_step), TAU)
 		_auto_orient = false
@@ -319,3 +323,11 @@ func _announce_items() -> void:
 func _on_item_requested(item_id: String) -> void:
 	if visible and _items.has(item_id):
 		select_item(item_id)
+
+func _refresh_unlocked_items() -> void:
+	var progress := RegionProgression.find(get_tree())
+	_items = VillageCatalog.get_items(category)
+	if progress:
+		_items.assign(_items.filter(func(id: String) -> bool: return progress.epoch>=EpochCatalog.item_epoch(id)))
+	_index = clampi(_index,0,maxi(0,_items.size()-1))
+	_announce_items()

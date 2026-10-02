@@ -28,6 +28,7 @@ func frames(n: int) -> void:
 
 func _ready() -> void:
 	main = load("res://scenes/main/main.tscn").instantiate()
+	main.legacy_world = true
 	add_child(main)
 	_use_empty_map(main)
 	terrain = main.get_node("World/Terrain")

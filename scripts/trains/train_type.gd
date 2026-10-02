@@ -36,6 +36,18 @@ enum Category { PASSENGER, FREIGHT }
 ## Türen, Zierstreifen, Warnfarbe an der Front
 @export var accent_color := Color(0.95, 0.72, 0.22)
 @export var roof_color := Color(0.42, 0.43, 0.45)
+## Eigene Weihnachtsgestaltung: rotes Fensterband, grüne Türen, Kränze und Schnee.
+@export var winter_special := false
+
+@export_group("Progression")
+@export var required_epoch := 1
+@export var required_station_level := 1
+@export var passenger_capacity := 24
+@export var cargo_capacity := 0
+@export var purchase_price := 0
+@export var comfort := 1.0
+@export var service_role := "Nebenstrecke"
+@export var special := false
 
 ## Lichterketten entlang der Dachkanten (festliche Sonderzüge).
 @export var festive_lights := false
@@ -45,6 +57,7 @@ enum Category { PASSENGER, FREIGHT }
 @export_group("Klang")
 ## Tonhöhe des Signalhorns (1 = normal, kleiner = tiefer).
 @export var horn_pitch := 1.0
+@export var rolling_pitch := 1.0
 
 
 ## Höchstgeschwindigkeit in m/s.
@@ -53,4 +66,5 @@ func get_max_speed() -> float:
 
 
 func get_livery() -> Dictionary:
-	return {"primary": primary_color, "secondary": secondary_color, "accent": accent_color, "roof": roof_color}
+	return {"primary": primary_color, "secondary": secondary_color, "accent": accent_color,
+		"roof": roof_color, "winter_special": winter_special}

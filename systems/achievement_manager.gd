@@ -72,6 +72,9 @@ func attach_world(world: Node) -> void:
 	var yards := get_tree().get_nodes_in_group(&"freight_yard")
 	for yard in yards:
 		yard.train_serviced.connect(_on_freight_serviced)
+	var region := world.get_node_or_null(^"RegionRailway") as RegionRailway
+	if region:
+		region.freight_delivered.connect(_on_freight_serviced)
 	if _weather:
 		_weather.weather_changed.connect(_on_weather_changed)
 		_on_weather_changed(_weather.current)
@@ -226,6 +229,8 @@ func _connect_trains() -> void:
 
 
 func _on_train_arrived(_train: Train) -> void:
+	if _train.has_meta("region_line") and bool(_train.get_meta("origin_dwell",false)):
+		return
 	_set_progress("all_aboard", 1)
 	_set_progress("full_schedule", float(progress.get("full_schedule", 0.0)) + 1)
 	if Seasons.get_season() == Seasons.Season.WINTER and WorldClock.is_dark() \

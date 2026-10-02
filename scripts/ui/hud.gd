@@ -189,6 +189,14 @@ func show_toast(text: String) -> void:
 func get_legend() -> KeyLegend:
 	return _legend
 
+func bind_progression(progress: RegionProgression) -> void:
+	progress.changed.connect(_refresh_progression_tools.bind(progress))
+	_refresh_progression_tools(progress)
+
+func _refresh_progression_tools(progress: RegionProgression) -> void:
+	for id: StringName in _tool_buttons:
+		_tool_buttons[id].visible = progress.tool_unlocked(id)
+
 
 ## Legende passend zum aktuellen Modus (Erkunden, Vogelperspektive, Werkzeug).
 func _update_legend() -> void:

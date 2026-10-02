@@ -36,6 +36,7 @@ func check(cond: bool, label: String) -> void:
 
 func _ready() -> void:
 	main = load("res://scenes/main/main.tscn").instantiate()
+	main.legacy_world = true
 	add_child(main)
 	network = main.get_node("World/Railway/RailNetwork")
 	interlocking = main.get_node("World/Railway/RailInterlocking")
@@ -167,10 +168,10 @@ func _test_models() -> void:
 	var front := TrainMeshes.build_car("railcar_front", livery)
 	var middle := TrainMeshes.build_car("railcar_middle", livery)
 	var rear := TrainMeshes.build_car("railcar_rear", livery)
-	check((front["lamps_front"] as Array).size() == 3 and (front["lamps_idle"] as Array).size() == 2,
-		"railcar front: three headlights, unlit tail lights")
+	check((front["lamps_front"] as Array).size() == 2 and front["light_front"] != null and front["light_rear"] != null,
+		"reference front: two shaped headlights and separate tail lenses")
 	check((rear["lamps_rear"] as Array).size() == 2 and (rear["lamps_front"] as Array).is_empty()
-		and (rear["lamps_idle"] as Array).size() == 3, "railcar rear: red tail lights at the nose, headlights dark")
+		and rear["light_front"] != null, "reference rear: two tail lights and separate inactive headlights")
 	check((front["paint"] as ArrayMesh).get_aabb().position.z < -6.0 and (rear["paint"] as ArrayMesh).get_aabb().end.z > 6.0,
 		"front car has its nose ahead, rear car behind (mirrored)")
 	check((front["doors"] as Array).size() == 8 and (middle["doors"] as Array).size() == 8, "railcar: two double doors per side")

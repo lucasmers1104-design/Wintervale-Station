@@ -80,7 +80,8 @@ func _process(delta: float) -> void:
 		any = true
 		var progress := house.build_progress
 		if working:
-			progress += hours / maxf(VillageCatalog.get_build_hours(house.item_id), 0.1)
+			var duration := 1.0 if house.organic_growth else VillageCatalog.get_build_hours(house.item_id)
+			progress += hours / maxf(duration, 0.1)
 		advance_project(house, progress, working)
 	if any:
 		_project_timer -= delta
@@ -197,6 +198,14 @@ func prepare(item_id: String, position: Vector3, angle: float, variant := 0, end
 	if kind == "house":
 		data["seed"] = randi()
 		data["home"] = _new_home_name(int(data["seed"]))
+		var progress := RegionProgression.find(get_tree())
+		if progress:
+			var best := 65.0
+			for station in progress.region.stations:
+				var distance := RailGeometry.flat(pos-station.global_position).length()
+				if distance<best:
+					best = distance
+					data["region_station"] = station.station_id
 	return data
 
 
@@ -234,6 +243,11 @@ func place(data: Dictionary):
 		_rebuild_paths_near(obj as VillagePath)
 	if obj is VillageHouse:
 		var house := obj as VillageHouse
+		var progress := RegionProgression.find(get_tree())
+		if progress and house.region_station_id>0:
+			var station := progress.region.station_by_id(house.region_station_id)
+			if station and not station.house_ids.has(id):
+				station.house_ids.append(id)
 		house.finished.connect(_on_house_finished)
 		if house.is_finished():
 			_move_in(house, false)
@@ -351,7 +365,10 @@ func pick(point: Vector3):
 # --- Platzierung prüfen ------------------------------------------------------------------
 
 ## Leerer Text = darf gebaut werden, sonst der Grund.
-func check_placement(item_id: String, position: Vector3, angle: float, variant := 0, end := Vector3.INF) -> String:
+func check_placement(item_id: String, position: Vector3, angle: float, variant := 0, end := Vector3.INF, organic := false) -> String:
+	var progress := RegionProgression.find(get_tree()) if is_inside_tree() else null
+	if progress and not organic and progress.epoch < EpochCatalog.item_epoch(item_id):
+		return "Freigeschaltet ab Epoche %d" % EpochCatalog.item_epoch(item_id)
 	var kind := VillageCatalog.get_kind(item_id)
 	var fp := VillageFootprint.for_item(item_id, position, angle, variant, end)
 	if VillageCatalog.is_line(item_id):
@@ -371,6 +388,10 @@ func check_placement(item_id: String, position: Vector3, angle: float, variant :
 		for yard: FreightYard in yards:
 			if yard.covers(p.x, p.y):
 				return "Gehört zum Güterbahnhof"
+		if progress:
+			for station in progress.region.stations:
+				if station.clears(p.x,p.y):
+					return "Platz für den Bahnhof freihalten"
 		if terrain and terrain.is_in_lake(p.x, p.y):
 			return "Im zugefrorenen See"
 		if rail_network and rail_network.find_segment_near(Vector3(p.x, 0, p.y), 3.0 if kind == "house" else 2.2):
@@ -660,6 +681,22 @@ static func join_day(house: VillageHouse, index: int) -> int:
 ## neue Familie. [param arriving] = sie kommen gerade mit dem Zug an (sonst sind
 ## sie schon da, z.B. nach dem Laden).
 func _move_in(house: VillageHouse, arriving: bool) -> void:
+	if house.region_station_id>0:
+		var progress := RegionProgression.find(get_tree())
+		var station := progress.region.station_by_id(house.region_station_id) if progress else null
+		if station==null or station.director==null:
+			return
+		var household := get_household(house)
+		var present: Array = _residents.get(house.object_id,[])
+		# Town census includes every household; only a bounded sample becomes NPCs.
+		for profile: NpcProfile in household:
+			if not present.has(profile) and station.director.get_npcs().size()<6:
+				profile.came_from = station.station_name
+				station.director.add_resident(profile,"")
+				present.append(profile)
+		_residents[house.object_id] = present
+		progress.region.refresh()
+		return
 	if npc_director == null:
 		return
 	if npc_director.has_family(house.home_name):
@@ -687,6 +724,17 @@ func _move_in(house: VillageHouse, arriving: bool) -> void:
 
 
 func _move_out(house: VillageHouse) -> void:
+	if house.region_station_id>0:
+		var progress := RegionProgression.find(get_tree())
+		var station := progress.region.station_by_id(house.region_station_id) if progress else null
+		if station and station.director:
+			for profile in _residents.get(house.object_id,[]):
+				station.director.remove_resident(profile)
+		_residents.erase(house.object_id)
+		_households.erase(house.object_id)
+		if progress:
+			progress.region.refresh.call_deferred()
+		return
 	if npc_director == null:
 		return
 	for profile in _residents.get(house.object_id, []):
@@ -704,6 +752,9 @@ func _on_day_changed(_day: int) -> void:
 
 ## Einwohner insgesamt (bekannte Familien und Zugezogene) und Haushalte.
 func get_population() -> int:
+	var progress := RegionProgression.find(get_tree())
+	if progress:
+		return int(progress.metrics()["population"])
 	return (npc_director.get_npcs().size() if npc_director else 0)
 
 

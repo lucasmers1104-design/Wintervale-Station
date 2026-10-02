@@ -29,6 +29,8 @@ const KEY_BINDINGS := {
 	&"toggle_fullscreen": [KEY_F11],
 	&"release_mouse": [KEY_ESCAPE],
 	&"build_mode": [KEY_B],
+	&"build_tool_station": [KEY_H],
+	&"region_overview": [KEY_P],
 	&"toggle_notebook": [KEY_N],
 	&"next_season": [KEY_J],
 	&"next_weather": [KEY_K],
@@ -68,6 +70,7 @@ const MOUSE_BINDINGS := {
 ## Werkzeuge im Build-Mode. Die Reihenfolge bestimmt Buttons und Zifferntasten.
 const BUILD_TOOLS: Array[Dictionary] = [
 	{"id": &"rail", "action": &"build_tool_rail", "label": "Schiene"},
+	{"id": &"station", "action": &"build_tool_station", "label": "Haltepunkt"},
 	{"id": &"switch", "action": &"build_tool_switch", "label": "Weiche"},
 	{"id": &"signal", "action": &"build_tool_signal", "label": "Signal"},
 	{"id": &"remove", "action": &"build_tool_remove", "label": "Entfernen"},

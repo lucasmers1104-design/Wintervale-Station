@@ -104,6 +104,10 @@ func set_active(value: bool) -> void:
 
 
 func select_tool(tool_id: StringName) -> void:
+	var progress := RegionProgression.find(get_tree())
+	if progress and not progress.tool_unlocked(tool_id):
+		Events.notification_requested.emit("Dieses Werkzeug kommt in einer späteren Epoche")
+		return
 	var tool: BuildTool = _tools.get(tool_id)
 	if tool == null:
 		return
@@ -153,6 +157,13 @@ func _try_toggle_switch_outside_build(event: InputEvent) -> bool:
 	var point := context.get_mouse_ground_point()
 	if point == Vector3.INF:
 		return false
+	var progress := RegionProgression.find(get_tree())
+	if progress:
+		for station in progress.region.stations:
+			var local := station.to_local(point)
+			if local.x>1.5 and local.x<20 and absf(local.z)<float(EpochCatalog.epoch(station.level)["length"])/2:
+				Events.region_station_requested.emit(station.station_id)
+				return true
 	var switch := rail_network.find_switch_near(point, switch_pick_radius)
 	if switch == null:
 		return false

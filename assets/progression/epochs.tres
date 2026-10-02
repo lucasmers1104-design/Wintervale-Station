@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+[ext_resource type="Script" path="res://scripts/progression/epoch_definitions.gd" id="1"]
+[resource]
+script = ExtResource("1")
+definitions = Array[Dictionary]([
+  {"id":1,"name":"Der erste Funke","station":"Holz-Haltepunkt","design":"timber","length":22,"width":3.0,"platforms":1,"cost":180,"upgrade_services":0,"trains":["diesel_heritage"],"features":["Gleise","Holz-Haltepunkte","Erste Pendellinie"],"requirements":{},"growth":["house_aframe","house_cottage"],"house_limit":3},
+  {"id":2,"name":"Land und Leute","station":"Kleiner Landbahnhof","design":"country","length":42,"width":3.5,"platforms":1,"cost":350,"upgrade_services":3,"trains":["nostalgic_regional"],"features":["Landbahnhof","Weichen und Signale","Wohnhäuser und Kieswege"],"requirements":{"passengers":12,"services":3,"connected":2,"rail_length":70},"growth":["house_cottage","house_chalet","house_farmhouse"],"house_limit":6},
+  {"id":3,"name":"Ein Dorf entsteht","station":"Dorfbahnhof","design":"village","length":58,"width":4.0,"platforms":2,"cost":650,"upgrade_services":8,"trains":["reference_freight"],"features":["Güterumschlag","Baustofflieferungen","Dorfplatz und Beleuchtung"],"requirements":{"passengers":40,"services":8,"connected":3,"population":12},"growth":["house_chalet","house_barn","house_townhouse"],"house_limit":10},
+  {"id":4,"name":"Neue Nachbarschaften","station":"Kleinstadtbahnhof","design":"town","length":62,"width":4.2,"platforms":2,"cost":1000,"upgrade_services":14,"trains":["modern_local"],"features":["Moderner Nahverkehr","Straßen und Stadtviertel","Mehr Linien"],"requirements":{"passengers":100,"goods":24,"connected":3,"lines":2,"population":24},"growth":["house_townhouse","house_tower","house_villa"],"house_limit":15},
+  {"id":5,"name":"Die Region verbindet sich","station":"Stadtbahnhof","design":"city","length":78,"width":5.0,"platforms":3,"cost":1500,"upgrade_services":22,"trains":["intercity"],"features":["Intercity","Stadtbahnhof","Regionale Knotenpunkte"],"requirements":{"passengers":220,"goods":60,"connected":4,"lines":3,"rail_length":240,"population":40},"growth":["house_townhouse","house_tower","house_villa"],"house_limit":22},
+  {"id":6,"name":"Wintervale blüht auf","station":"Hauptbahnhof","design":"central","length":98,"width":5.5,"platforms":4,"cost":2200,"upgrade_services":32,"trains":["high_speed"],"features":["Hochgeschwindigkeitsverkehr","Große Bahnhofshalle","Ein lebendiges Eisenbahnnetz"],"requirements":{"passengers":450,"goods":120,"connected":5,"lines":4,"population":64,"services":50},"growth":["house_tower","house_villa","house_townhouse"],"house_limit":30}
+]
+)

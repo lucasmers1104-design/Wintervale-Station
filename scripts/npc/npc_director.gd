@@ -24,6 +24,7 @@ signal passenger_alighted(npc: Npc, train: Train)
 ## Ordner mit den Steckbriefen (.tres). Leer lassen = nur [member profiles].
 @export_dir var profiles_dir := "res://assets/npcs"
 @export var profiles: Array[NpcProfile] = []
+@export var auto_load_profiles := true
 ## Wegpunkt, an dem Reisende das Dorf verlassen bzw. betreten.
 @export var exit_point := "Dorfausgang"
 @export var enabled := true
@@ -64,7 +65,8 @@ func _ready() -> void:
 	Events.view_mode_changed.connect(func(mode: GameDefs.ViewMode) -> void:
 		_exploring = mode == GameDefs.ViewMode.EXPLORE)
 	Events.game_loaded.connect(func(_slot: String) -> void: resume_all())
-	_load_profiles()
+	if auto_load_profiles:
+		_load_profiles()
 	# Erst wenn Gleise, Häuser und Bahnsteig stehen
 	_setup.call_deferred()
 

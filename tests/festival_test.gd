@@ -46,6 +46,7 @@ func _ready() -> void:
 	WorldClock.set_time(12.0)
 	WorldClock.paused = true
 	main = load("res://scenes/main/main.tscn").instantiate()
+	main.legacy_world = true
 	add_child(main)
 	festivals = main.get_node("Festivals")
 	events = main.get_node("TrainEvents")

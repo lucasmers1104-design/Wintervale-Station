@@ -14,6 +14,51 @@ extends Node3D
 ## Startpunkt der Spielfigur (Höhe wird automatisch auf das Terrain gesetzt).
 @export var player_spawn := Vector3(0.0, 0.0, 6.0)
 
+## Legacy journeys retain their built world; all new journeys start undeveloped.
+@export var legacy_world := false
+var progression: RegionProgression
+var region: RegionRailway
+
+func _enter_tree() -> void:
+	if legacy_world:
+		return
+	for path in ["World/TestArea","World/Railway/NordtalPortal","World/Railway/SuedtalPortal","World/Railway/Platform1Stop","World/Railway/Platform2Stop","World/Railway/FreightStop"]:
+		var old := get_node_or_null(path)
+		if old:
+			old.get_parent().remove_child(old)
+			old.free()
+	var graph := get_node("World/WalkGraph") as WalkGraph
+	graph.links = PackedStringArray()
+	for child in graph.get_children():
+		graph.remove_child(child)
+		child.free()
+	var director := get_node("NpcDirector") as NpcDirector
+	director.auto_load_profiles = false
+	director.enabled = false
+	var yard := get_node("World/FreightYard") as FreightYard
+	yard.enabled = false
+	yard.progressive_dormant = true
+	get_node("Festivals").set("enabled",false)
+	get_node("TrainEvents").set("enabled",false)
+	var dispatch := get_node("World/Railway/TrainDispatcher") as TrainDispatcher
+	dispatch.timetable = Timetable.new()
+	progression = RegionProgression.new()
+	progression.name = "Progression"
+	add_child(progression)
+	region = RegionRailway.new()
+	region.name = "RegionRailway"
+	region.network = get_node("World/Railway/RailNetwork")
+	region.dispatcher = dispatch
+	region.terrain = get_node("World/Terrain")
+	region.village = get_node("World/Village")
+	region.progression = progression
+	progression.region = region
+	add_child(region)
+	var tool := StationBuildTool.new()
+	tool.tool_id = &"station"
+	tool.region = region
+	get_node("BuildMode").add_child(tool)
+
 
 func _ready() -> void:
 	var spawn := Vector3(player_spawn.x, terrain.get_height(player_spawn.x, player_spawn.z) + 0.2, player_spawn.z)
@@ -21,9 +66,9 @@ func _ready() -> void:
 	player.set_spawn_point(spawn)
 	player.snap_camera()
 
-	if starter_railway:
+	if legacy_world and starter_railway:
 		starter_railway.build_if_empty()
-	if village:
+	if legacy_world and village:
 		StarterVillage.build_if_empty(village)
 	network.topology_changed.connect(_align_portals)
 	_align_portals()
@@ -40,6 +85,15 @@ func _ready() -> void:
 	Events.notification_requested.emit("Willkommen in Wintervale")
 	GameSettings.apply_gameplay.call_deferred()
 	WorldClock.day_changed.connect(_on_autosave_day)
+	if region:
+		var panel := RegionPanel.new()
+		panel.region = region
+		panel.name = "RegionPanel"
+		add_child(panel)
+		get_node("HUD").bind_progression(progression)
+		Events.notification_requested.emit("Deine Reise beginnt · B: Gleise bauen · H: Holz-Haltepunkt · P: Reise & Fuhrpark")
+	else:
+		get_node("HUD")._tool_buttons[&"station"].hide()
 
 
 func _on_autosave_day(_day: int) -> void:

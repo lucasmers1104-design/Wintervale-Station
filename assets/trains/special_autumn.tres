@@ -20,3 +20,7 @@ roof_color = Color(0.36, 0.3, 0.22, 1)
 festive_lights = true
 festive_colors = PackedColorArray(1, 0.62, 0.22, 1, 1, 0.82, 0.4, 1, 0.95, 0.4, 0.2, 1)
 horn_pitch = 1.05
+special = true
+required_station_level = 2
+passenger_capacity = 80
+service_role = "Herbstlicher Sonderverkehr"

@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="TrainType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trains/train_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+type_code = "IC"
+display_name = "Intercity"
+category = 0
+consist = PackedStringArray("intercity_front", "intercity_middle", "intercity_middle", "intercity_rear")
+max_speed_kmh = 140.0
+acceleration = 0.62
+min_dwell_seconds = 8.0
+primary_color = Color(0.97, 0.9, 0.76, 1)
+secondary_color = Color(0.97, 0.9, 0.76, 1)
+accent_color = Color(0.43, 0.055, 0.1, 1)
+roof_color = Color(0.25, 0.26, 0.28, 1)
+required_epoch = 5
+required_station_level = 5
+passenger_capacity = 160
+rolling_pitch = 1.22
+cargo_capacity = 0
+purchase_price = 950
+comfort = 1.75
+service_role = "Städteverbindung"
+horn_pitch = 0.8750000000000001
+

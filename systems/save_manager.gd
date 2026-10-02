@@ -15,7 +15,7 @@ const SAVE_DIR := "user://saves/"
 var save_dir := QaSandbox.redirect(SAVE_DIR)
 const DEFAULT_SLOT := "quicksave"
 ## Wird erhöht, sobald sich das Format ändert (siehe _migrate()).
-const SAVE_VERSION := 2
+const SAVE_VERSION := 3
 const SEASON_NAMES := ["Spring", "Summer", "Autumn", "Winter"]
 var active_slot := DEFAULT_SLOT
 var journey_name := "Wintervale"
@@ -45,6 +45,9 @@ func _process(delta: float) -> void:
 func save_game(slot: String = DEFAULT_SLOT) -> bool:
 	if not _valid_slot(slot):
 		return false
+	var progress := RegionProgression.find(get_tree())
+	if progress:
+		progress.region.settle_deliveries()
 	var objects := {}
 	for node in get_tree().get_nodes_in_group(GameDefs.GROUP_SAVEABLE):
 		if not _is_saveable(node):
@@ -99,16 +102,39 @@ func load_game(slot: String = DEFAULT_SLOT) -> bool:
 	if not _is_restorable(data):
 		return false
 	var objects: Dictionary = data.get("objects", {})
+	var current := get_tree().current_scene
+	if current and current.scene_file_path=="res://scenes/main/main.tscn":
+		var legacy := not objects.has("progression")
+		if bool(current.get("legacy_world"))!=legacy:
+			# Loading a different generation of journey rebuilds the matching world
+			# before restoring state, including portals, NPCs and legacy scenery.
+			_replace_world.call_deferred(slot,legacy)
+			return true
 	Achievements.suspend(true)
+	# Stations must exist before village households are restored. Suppress unlocks
+	# until every system has consumed its own saved state.
+	var progress := RegionProgression.find(get_tree())
+	if progress:
+		progress.region.cancel_deliveries()
+		progress.loading = true
+		if objects.has("progression"):
+			progress.load_state(objects["progression"])
+		progress.loading = true
+		if objects.has("region_railway"):
+			progress.region.load_state(objects["region_railway"])
 	if not objects.has(Achievements.SAVE_ID):
 		Achievements.reset()
 	for node in get_tree().get_nodes_in_group(GameDefs.GROUP_SAVEABLE):
 		if not _is_saveable(node):
 			continue
 		var id: String = node.get_save_id()
+		if id in ["progression","region_railway"]:
+			continue
 		if objects.has(id):
 			node.load_state(objects[id])
 	Achievements.suspend(false)
+	if progress:
+		progress.loading = false
 	Achievements.refresh_after_load()
 
 	var metadata: Dictionary = data.get("metadata", {})
@@ -117,6 +143,19 @@ func load_game(slot: String = DEFAULT_SLOT) -> bool:
 	active_slot = slot
 	Events.game_loaded.emit(slot)
 	return true
+
+func _replace_world(slot: String, legacy: bool) -> void:
+	var current := get_tree().current_scene
+	if current:
+		get_tree().root.remove_child(current)
+		current.queue_free()
+	# Old directors must be freed before game_loaded is broadcast to the new world.
+	await get_tree().process_frame
+	var world: Node = load("res://scenes/main/main.tscn").instantiate()
+	world.set("legacy_world",legacy)
+	get_tree().root.add_child(world)
+	get_tree().current_scene = world
+	load_game(slot)
 
 
 func has_save(slot: String = DEFAULT_SLOT) -> bool:

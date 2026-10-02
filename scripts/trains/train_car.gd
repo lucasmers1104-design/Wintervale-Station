@@ -21,6 +21,8 @@ var length := 12.0
 var bogie_offset := 4.3
 ## Abstand von der Zugspitze bis zur Vorderkante dieses Wagens.
 var offset_from_head := 0.0
+## Push-pull services reverse their direction without turning the models around.
+var travel_reversed := false
 
 var _bogies: Array[Node3D] = []
 var _wheelsets: Array[Node3D] = []
@@ -50,6 +52,9 @@ var _pitch := 0.0
 var _travel := 0.0
 var _display: Label3D
 var _beacons: Array[Dictionary] = []
+var _front_lens: MeshInstance3D
+var _rear_lens: MeshInstance3D
+var _end_materials: Dictionary
 
 ## Größte Neigung des Wagenkastens in Kurven und beim Bremsen (Bogenmaß).
 const MAX_ROLL := 0.035
@@ -66,27 +71,36 @@ func build(p_kind: String, train_type: TrainType, is_first: bool, is_last: bool,
 	var parts := TrainMeshes.build_car(kind, train_type.get_livery(), variant)
 	length = parts["length"]
 	bogie_offset = parts["bogie"]
+	var reference: bool = parts.get("reference_railcar", false)
+	_end_materials = materials
+	var paint_material: Material = preload("res://assets/materials/railcar_paint.tres") if reference else materials["paint"]
+	var glass_material: Material = preload("res://assets/materials/railcar_glass.tres") if reference else materials["glass"]
 
 	# Wagenkasten auf der Federung: alles, was mitschwingt, hängt an _body
 	_body = Node3D.new()
 	_body.name = "Body"
 	add_child(_body)
-	_add_mesh(parts["paint"], materials["paint"], _body)
+	_add_mesh(parts["paint"], paint_material, _body)
 	if parts["glass"]:
-		var glass := _add_mesh(parts["glass"], materials["glass"], _body)
+		var glass := _add_mesh(parts["glass"], glass_material, _body)
 		# Die Scheiben liegen auf dem Wagenkasten – dessen Schatten genügt
 		glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_glass_nodes.append(glass)
+	if parts.get("interior"):
+		var interior := _add_mesh(parts["interior"], preload("res://assets/materials/railcar_interior.tres"), _body)
+		interior.name = "CabinInterior"
+		interior.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_glass_nodes.append(interior)
 	for door: Dictionary in parts["doors"]:
 		var leaf := MeshInstance3D.new()
 		leaf.mesh = door["mesh"]
 		if leaf.mesh.get_surface_count() > 1:
 			# Türblatt aus Lack, Türfenster aus Glas (leuchtet mit dem Innenlicht)
-			leaf.set_surface_override_material(0, materials["paint"])
-			leaf.set_surface_override_material(1, materials["glass"])
+			leaf.set_surface_override_material(0, paint_material)
+			leaf.set_surface_override_material(1, glass_material)
 			_glass_nodes.append(leaf)
 		else:
-			leaf.material_override = materials["paint"]
+			leaf.material_override = paint_material
 		leaf.position = door["position"]
 		# Kleine Teile unter bzw. im Schatten des Wagenkastens werfen keinen eigenen Schatten (Leistung)
 		leaf.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -94,29 +108,36 @@ func build(p_kind: String, train_type: TrainType, is_first: bool, is_last: bool,
 			leaf.rotation.y = PI
 		_body.add_child(leaf)
 		_doors.append({"node": leaf, "closed": door["position"], "open_offset": door["open_offset"], "side": door["side"]})
-	_build_steps(materials["paint"])
+	_build_steps(paint_material)
 	for beacon: Vector3 in parts.get("beacons", []):
 		_add_beacon(beacon)
-	if train_type.festive_lights and materials.has("festive"):
+	if parts.get("glow"):
+		var festive := _add_mesh(parts["glow"], preload("res://assets/materials/railcar_winter_lights.tres"), _body)
+		festive.name = "WinterLights"
+		festive.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	elif train_type.festive_lights and materials.has("festive"):
 		_add_festive_lights(materials["festive"], train_type.festive_colors, variant)
 	_cargo_material = materials.get("cargo", materials["paint"])
 	_build_cargo(variant)
-	if kind == "loco_freight":
+	if kind in ["loco_freight","reference_freight_loco","heritage_diesel","heritage_loco"]:
 		_exhaust = _make_exhaust(materials.get("steam", materials["snow"]))
 		add_child(_exhaust)
 
 	var bogie_mesh := TrainMeshes.create_bogie(parts["wheel_base"])
 	var wheel_mesh := TrainMeshes.create_wheelset()
+	var wheel_faces: Mesh = ReferenceRailcarMeshes.wheel_faces(train_type.winter_special) if reference else null
 	for z in [-bogie_offset, bogie_offset]:
 		var bogie := Node3D.new()
 		bogie.position = Vector3(0.0, 0.0, z)
 		add_child(bogie)
-		_add_mesh(bogie_mesh, materials["paint"], bogie).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_add_mesh(bogie_mesh, paint_material, bogie).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		for axle: float in [-0.5, 0.5]:
 			var wheelset := Node3D.new()
 			wheelset.position = Vector3(0.0, TrainMeshes.WHEEL_RADIUS, axle * float(parts["wheel_base"]))
 			bogie.add_child(wheelset)
-			_add_mesh(wheel_mesh, materials["paint"], wheelset).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			_add_mesh(wheel_mesh, paint_material, wheelset).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			if wheel_faces:
+				_add_mesh(wheel_faces, paint_material, wheelset).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_wheelsets.append(wheelset)
 		_bogies.append(bogie)
 
@@ -124,11 +145,28 @@ func build(p_kind: String, train_type: TrainType, is_first: bool, is_last: bool,
 	for idle: Dictionary in parts.get("lamps_idle", []):
 		var idle_material: Material = materials.get("lamp_idle_%s" % idle["color"], materials["paint"])
 		_add_lamp(idle["position"], float(idle["facing"]), idle_material)
+	if parts.get("light_front"):
+		var front_lens: Material = materials["lamp_white"] if is_first else materials["lamp_idle_white"]
+		if train_type.winter_special and is_first:
+			var warm_lens := StandardMaterial3D.new()
+			warm_lens.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			warm_lens.albedo_color = Color(0.90, 0.85, 0.67)
+			warm_lens.emission_enabled = true
+			warm_lens.emission = Color(1.0, 0.91, 0.68)
+			warm_lens.emission_energy_multiplier = 0.25
+			front_lens = warm_lens
+		_front_lens = _add_mesh(parts["light_front"], front_lens, _body)
+		_front_lens.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if parts.get("light_rear"):
+		var rear_lens: Material = materials["lamp_red"] if is_last else materials["lamp_idle_red"]
+		_rear_lens = _add_mesh(parts["light_rear"], rear_lens, _body)
+		_rear_lens.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if parts.has("display"):
 		_add_display(parts["display"])
 	if is_first:
-		for lamp_position: Vector3 in parts["lamps_front"]:
-			_add_lamp(lamp_position, -1.0, materials["lamp_white"])
+		if not reference:
+			for lamp_position: Vector3 in parts["lamps_front"]:
+				_add_lamp(lamp_position, -1.0, materials["lamp_white"])
 		_headlight = SpotLight3D.new()
 		_headlight.position = Vector3(0.0, 1.7, -length * 0.5 - 0.2)
 		_headlight.light_color = Color(1.0, 0.9, 0.72)
@@ -143,8 +181,9 @@ func build(p_kind: String, train_type: TrainType, is_first: bool, is_last: bool,
 		if kind == "loco_plough":
 			_make_plough_spray()
 	if is_last:
-		for lamp_position: Vector3 in parts["lamps_rear"]:
-			_add_lamp(lamp_position, 1.0, materials["lamp_red"])
+		if not reference:
+			for lamp_position: Vector3 in parts["lamps_rear"]:
+				_add_lamp(lamp_position, 1.0, materials["lamp_red"])
 		_tail_glow = OmniLight3D.new()
 		_tail_glow.position = Vector3(0.0, 1.45, length * 0.5 + 0.4)
 		_tail_glow.light_color = Color(1.0, 0.15, 0.1)
@@ -172,6 +211,13 @@ func build(p_kind: String, train_type: TrainType, is_first: bool, is_last: bool,
 
 ## Positioniert Wagenkasten und Drehgestelle anhand der Drehgestell-Punkte auf dem Gleis.
 func place(front: Vector3, front_direction: Vector3, rear: Vector3, rear_direction: Vector3) -> void:
+	if travel_reversed:
+		var swap := front
+		front = rear
+		rear = swap
+		var swap_direction := front_direction
+		front_direction = -rear_direction
+		rear_direction = -swap_direction
 	var lift := Vector3.UP * RAIL_TOP
 	var axis := front - rear
 	var forward := axis.normalized() if axis.length() > 0.01 else front_direction
@@ -189,6 +235,8 @@ func roll(distance: float) -> void:
 
 ## Türen auf der Seite [param side] (±1) öffnen: 0 = zu, 1 = offen (weich animiert).
 func set_doors(amount: float, side: float) -> void:
+	if travel_reversed:
+		side = -side
 	_door_amount = clampf(amount, 0.0, 1.0)
 	var eased := ease(_door_amount, -1.8)
 	for door in _doors:
@@ -203,9 +251,11 @@ func set_doors(amount: float, side: float) -> void:
 ## Mitten der Türöffnungen auf Seite [param side] (±1) in Weltkoordinaten,
 ## auf Höhe des Wagenbodens. Zwei Türflügel bilden eine Öffnung.
 func get_door_centers(side: float) -> Array[Vector3]:
+	if travel_reversed:
+		side = -side
 	var result: Array[Vector3] = []
 	for opening in _door_openings(side):
-		result.append(global_transform * opening)
+		result.append(_body.global_transform * opening)
 	return result
 
 
@@ -213,19 +263,22 @@ func get_door_centers(side: float) -> Array[Vector3]:
 ## {"inside", "door", "upper", "lower", "platform"} – "platform" liegt auf Stufenhöhe über
 ## der Bahnsteigkante; die Bodenhöhe dort bestimmt der Fahrgast selbst.
 func get_boarding_paths(side: float) -> Array[Dictionary]:
+	if travel_reversed:
+		side = -side
 	var paths: Array[Dictionary] = []
 	var floor_y := TrainMeshes.FLOOR_HEIGHT
 	var hinge_x := TrainMeshes.STEP_EXTENDED_X + TrainMeshes.STEP_DEPTH * 0.5
 	var lower_x := hinge_x + TrainMeshes.STEP_LOWER_OFFSET.x
 	var lower_y := TrainMeshes.STEP_UPPER_Y - 0.02 + TrainMeshes.STEP_LOWER_OFFSET.y
+	var boarding_transform := _body.global_transform
 	for opening in _door_openings(side):
 		var z := opening.z
 		paths.append({
-			"inside": global_transform * Vector3(side * 0.85, floor_y, z),
-			"door": global_transform * Vector3(side * 1.3, floor_y, z),
-			"upper": global_transform * Vector3(side * TrainMeshes.STEP_EXTENDED_X, TrainMeshes.STEP_UPPER_Y, z),
-			"lower": global_transform * Vector3(side * lower_x, lower_y, z),
-			"platform": global_transform * Vector3(side * (lower_x + 0.5), lower_y, z),
+			"inside": boarding_transform * Vector3(side * 0.85, floor_y, z),
+			"door": boarding_transform * Vector3(side * 1.3, floor_y, z),
+			"upper": boarding_transform * Vector3(side * TrainMeshes.STEP_EXTENDED_X, TrainMeshes.STEP_UPPER_Y, z),
+			"lower": boarding_transform * Vector3(side * lower_x, lower_y, z),
+			"platform": boarding_transform * Vector3(side * (lower_x + 0.5), lower_y, z),
 		})
 	return paths
 
@@ -250,6 +303,8 @@ func _door_openings(side: float) -> Array[Vector3]:
 ## Trittstufen auf Seite [param side] ausfahren: 0 = eingefahren, 1 = ausgefahren.
 ## Erst gleitet die Stufe heraus, dann klappt die untere Stufe herunter.
 func set_steps(amount: float, side: float) -> void:
+	if travel_reversed:
+		side = -side
 	_step_amount = clampf(amount, 0.0, 1.0)
 	var slide := smoothstep(0.0, 1.0, clampf(_step_amount / 0.55, 0.0, 1.0))
 	var unfold := smoothstep(0.0, 1.0, clampf((_step_amount - 0.55) / 0.45, 0.0, 1.0))
@@ -282,6 +337,26 @@ func set_light_level(dark: bool) -> void:
 		_headlight.light_energy = (3.0 if dark else 0.6) * (0.35 if _standing else 1.0)
 	if _tail_glow:
 		_tail_glow.light_energy = 0.6 if dark else 0.15
+
+## Physical end lenses and headlamp beam follow push-pull direction.
+func set_service_ends(leading: bool, trailing: bool) -> void:
+	if _front_lens:
+		_front_lens.material_override = _end_materials["lamp_white"] if (leading and not travel_reversed) else (_end_materials["lamp_red"] if trailing and travel_reversed else _end_materials["lamp_idle_white"])
+	if _rear_lens:
+		_rear_lens.material_override = _end_materials["lamp_white"] if (leading and travel_reversed) else (_end_materials["lamp_red"] if trailing and not travel_reversed else _end_materials["lamp_idle_red"])
+	if leading and _headlight==null:
+		_headlight = SpotLight3D.new()
+		_headlight.light_color = Color(1.0,0.9,0.72)
+		_headlight.spot_range = 45
+		_headlight.spot_angle = 26
+		add_child(_headlight)
+	if _headlight:
+		_headlight.visible = leading
+		_headlight.position = Vector3(0,1.7,(1 if travel_reversed else -1)*(length/2+0.2))
+		_headlight.rotation.y = PI if travel_reversed else 0.0
+	if _tail_glow:
+		_tail_glow.visible = trailing
+	set_light_level(_dark)
 
 
 ## Warmes Innenlicht (0..1): scheint durch alle Fenster und Türfenster.
@@ -335,6 +410,9 @@ func get_body_tilt() -> Vector2:
 func set_destination(text: String) -> void:
 	if _display:
 		_display.text = text
+		# Die Zielanzeige bleibt auch bei langen Orts- und Zugnamen in ihrer Blende.
+		var text_width := _display.font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, _display.font_size).x
+		_display.pixel_size = minf(0.0036, 1.20 / maxf(text_width, 1.0))
 
 
 func get_destination() -> String:
@@ -447,12 +525,13 @@ func _add_festive_lights(material: Material, colors: PackedColorArray, variant: 
 	elif kind == "railcar_rear":
 		z_to = length * 0.5 - RailcarMeshes.NOSE_LENGTH - 0.2
 	var hooks := maxi(2, int((z_to - z_from) / 1.4))
+	var light_y := ReferenceRailcarMeshes._height(3.30) if RailcarMeshes.SPECS.has(kind) else 3.1
 	for side: float in [-1.0, 1.0]:
 		for k in hooks:
 			var z0 := lerpf(z_from, z_to, float(k) / hooks)
 			var z1 := lerpf(z_from, z_to, float(k + 1) / hooks)
-			var a := Vector3(side * 1.37, 3.1, z0)
-			var b := Vector3(side * 1.37, 3.1, z1)
+			var a := Vector3(side * 1.37, light_y, z0)
+			var b := Vector3(side * 1.37, light_y, z1)
 			for i in 5:
 				var t := (i + 0.5) / 5.0
 				var p := a.lerp(b, t) - Vector3(0, sin(t * PI) * 0.13, 0) + Vector3(side * 0.02, 0, 0)
@@ -468,6 +547,7 @@ func _add_festive_lights(material: Material, colors: PackedColorArray, variant: 
 func _add_display(xform: Transform3D) -> void:
 	_display = Label3D.new()
 	_display.name = "Display"
+	_display.font = ThemeDB.fallback_font
 	_display.text = ""
 	_display.font_size = 40
 	_display.pixel_size = 0.0036
@@ -559,6 +639,16 @@ func has_cargo_slots() -> bool:
 func get_cargo() -> Array[Dictionary]:
 	return _cargo
 
+func refill_region_cargo() -> void:
+	var spec: Dictionary = TrainMeshes.CARGO.get(kind,{})
+	for i in _cargo.size():
+		if _cargo[i]["state"] == "full":
+			continue
+		var piece := MeshInstance3D.new()
+		piece.mesh = TrainMeshes.create_cargo(String(spec["piece"]),i)
+		_cargo[i]["portions"] = int(spec.get("bulk",0))
+		attach_cargo(i,piece,String(spec["piece"]),String(spec["goods"]),int(spec["amount"]),"full")
+
 
 ## Schüttgut (Trichterwagen): wird portionsweise mit dem Greifer entladen.
 func is_bulk() -> bool:
@@ -607,6 +697,8 @@ func attach_cargo(index: int, node: Node3D, piece: String, goods: String, amount
 	entry["state"] = state
 	if int(entry["portions"]) > 0:
 		_update_bulk(index, false)
+	if bool(TrainMeshes.CARGO.get(kind,{}).get("enclosed",false)):
+		node.hide()
 
 
 ## Oberkante der Schüttgut-Ladung (Welt) – hier greift der Kran zu.
@@ -719,7 +811,7 @@ func _build_steps(material: Material) -> void:
 			unit.position = Vector3(side * TrainMeshes.STEP_RETRACTED_X, 0.0, opening.z)
 			if side < 0.0:
 				unit.rotation.y = PI
-			add_child(unit)
+			_body.add_child(unit)
 			unit.visible = false
 			_add_mesh(upper, material, unit).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			var hinge := Node3D.new()

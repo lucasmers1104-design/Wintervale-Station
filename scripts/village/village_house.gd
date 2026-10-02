@@ -24,6 +24,8 @@ var resident_seed := 0
 var build_progress := 1.0
 ## Tag, an dem das Haus fertig wurde (für den schrittweisen Zuzug).
 var finished_day := 0
+var region_station_id := 0
+var organic_growth := false
 
 var _parts := {}
 var _footprint := {}
@@ -45,6 +47,8 @@ func configure(data: Dictionary, body_material: Material) -> void:
 	resident_seed = int(data.get("seed", object_id * 7919))
 	build_progress = clampf(float(data.get("build", 1.0)), 0.0, 1.0)
 	finished_day = int(data.get("since", 0))
+	region_station_id = int(data.get("region_station",0))
+	organic_growth = bool(data.get("organic",region_station_id>0 and not bool(data.get("paid",false))))
 	home_name = String(data.get("home", "Haus %d" % object_id))
 	material = body_material
 	position = SaveUtils.array_to_vec3(data.get("pos"), Vector3.ZERO)
@@ -58,6 +62,9 @@ func get_data() -> Dictionary:
 		"variant": variant, "seed": resident_seed, "home": home_name, "since": finished_day}
 	if build_progress < 1.0:
 		data["build"] = build_progress
+	if region_station_id>0:
+		data["region_station"] = region_station_id
+		data["organic"] = organic_growth
 	return data
 
 

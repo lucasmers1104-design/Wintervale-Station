@@ -390,6 +390,8 @@ func _start_game(load_save: bool, slot: String) -> void:
 	if load_save:
 		Achievements.suspend(true)
 	var world := scene.instantiate()
+	if load_save:
+		world.set("legacy_world", not SaveManager.read_save_data(slot).get("objects",{}).has("progression"))
 	get_tree().root.add_child(world)
 	loading_screen.set_progress(0.88)
 	if load_save and not SaveManager.load_game(slot):

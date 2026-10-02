@@ -32,6 +32,7 @@ func _ready() -> void:
 	WorldClock.set_time(15.0)
 	WorldClock.paused = true
 	main = load("res://scenes/main/main.tscn").instantiate()
+	main.legacy_world = true
 	add_child(main)
 	director = main.get_node("NpcDirector")
 	dispatcher = main.get_node("World/Railway/TrainDispatcher")

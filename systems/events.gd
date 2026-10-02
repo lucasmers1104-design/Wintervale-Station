@@ -34,6 +34,7 @@ signal build_cost_changed(cost: Dictionary)
 signal pause_menu_requested
 ## Das Notizbuch soll auf- oder zugehen (z.B. per Button im HUD); page "" = zuletzt offene Seite.
 signal notebook_requested(page: String)
+signal region_station_requested(station_id: int)
 
 ## Die Kamera folgt jetzt diesem Zug (null = keinem).
 signal followed_train_changed(train: Node)
