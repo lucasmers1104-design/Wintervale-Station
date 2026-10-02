@@ -48,6 +48,8 @@ enum Outfit { WINTER, SUMMER }
 @export_range(0.4, 1.2, 0.05) var hair_volume := 1.0
 ## Pony mittig gescheitelt statt Seitenscheitel (FRINGE).
 @export var middle_part := false
+## Länge des Ponys (1 = Standard; beret_girl länger bis zu den Augen).
+@export_range(0.6, 1.6, 0.05) var fringe_length := 1.0
 ## Lange Strähnen vor den Ohren bis unters Kinn (FRINGE, BOB).
 @export var face_strands := true
 ## Reihen von Haarschuppen am Hinterkopf unter einem Hut (FRINGE, scout).
@@ -100,6 +102,8 @@ enum Outfit { WINTER, SUMMER }
 @export var pants_color := Color(0.4, 0.5, 0.25)
 @export var bottom_color2 := Color(0, 0, 0, 0)
 @export var bottom_pattern := Pattern.SOLID
+## Saumhöhe des kurzen Rocks über dem Boden in Metern (baker 0,14; beret_girl 0,22).
+@export_range(0.08, 0.3, 0.01) var skirt_hem := 0.14
 ## Aufgesetzte Seitentaschen mit Klappe und Hosenschlitz (Cargo-Shorts, sailor).
 @export var cargo_pockets := false
 ## Breiter, hochgekrempelter Hosenaufschlag über dem Stiefel (satchel_boy).

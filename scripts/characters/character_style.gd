@@ -356,7 +356,7 @@ func _skirt(long: bool, paint: CharacterKit.Paint, top: float) -> void:
 ## Rockprofil (Radius, Höhe) vom Saum bis zur Taille; Rock bis übers Knie (Vorlage baker:
 ## Saum bei 0,14 m) bzw. lang.
 func _skirt_profile(long: bool, top: float) -> Array:
-	var hem := 0.09 if long else 0.14
+	var hem := 0.09 if long else look.skirt_hem
 	var flare := 0.36 if long else 0.33
 	return [Vector2(flare, hem), Vector2(flare - 0.025, hem + 0.06), Vector2(0.27, 0.3), Vector2(torso_radius(top) + 0.012, top)]
 
@@ -577,18 +577,24 @@ func _dress_apron() -> void:
 	var top := 0.7
 	torso.panel(xf, torso_profile(WAIST_Y, top, 3), 6, cloth, 1.0, TORSO_DEPTH, -0.115, 0.115, 0.016, 0.012, edge)
 	torso.lathe(xf, torso_profile(WAIST_Y - 0.012, WAIST_Y + 0.03, 1), 20, cloth, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.02)
-	var skirt: Array = [Vector2(0.324, 0.175), Vector2(0.306, 0.235), Vector2(0.272, 0.3), Vector2(torso_radius(WAIST_Y) + 0.014, WAIST_Y)]
+	var apron_hem := look.skirt_hem + 0.035
+	var skirt: Array = [Vector2(0.324 - (apron_hem - 0.175) * 0.3, apron_hem), Vector2(0.306, maxf(0.235, apron_hem + 0.04)), Vector2(0.272, 0.3),
+		Vector2(torso_radius(WAIST_Y) + 0.014, WAIST_Y)]
 	torso.panel(xf, skirt, 10, cloth, 1.0, 0.86, -0.17, 0.17, 0.016, 0.012, edge)
-	torso.panel(xf, [Vector2(0.322, 0.2), Vector2(0.318, 0.222)], 10, stripe, 1.0, 0.86, -0.17, 0.17, 0.03, 0.004, stripe)
+	if look.outer_color2.a > 0.0:
+		torso.panel(xf, [Vector2(0.322, 0.2), Vector2(0.318, 0.222)], 10, stripe, 1.0, 0.86, -0.17, 0.17, 0.03, 0.004, stripe)
 	# Tasche mit Streifen und Blattmotiv
-	var pocket_profile: Array = [Vector2(0.304, 0.235), Vector2(0.282, 0.3), Vector2(0.27, 0.36)]
+	var dy := apron_hem - 0.175
+	var pocket_profile: Array = [Vector2(0.304 - dy * 0.3, 0.235 + dy), Vector2(0.282 - dy * 0.15, 0.3 + dy), Vector2(0.27, 0.36 + dy * 0.5)]
 	torso.panel(xf, pocket_profile, 4, cloth, 1.0, 0.86, -0.1, 0.1, 0.036, 0.014, _solid(look.outer_color.darkened(0.2)))
-	torso.panel(xf, [Vector2(0.276, 0.335), Vector2(0.272, 0.35)], 4, stripe, 1.0, 0.86, -0.1, 0.1, 0.05, 0.003, stripe)
-	var leaf_at := Vector3(0.0, 0.29, -0.86 * 0.3 - 0.052)
-	for k in 3:
-		var tilt := (float(k) - 1.0) * 0.7
-		torso.scale_tuft(Transform3D(Basis(Vector3.FORWARD, PI + tilt), leaf_at + Vector3(sin(tilt) * 0.012, 0.0, 0.0)),
-			0.022, 0.05, 0.006, stripe)
+	# Zierstreifen und Blattmotiv nur mit Zweitfarbe (baker; beret_girl: schlicht)
+	if look.outer_color2.a > 0.0:
+		torso.panel(xf, [Vector2(0.276, 0.335), Vector2(0.272, 0.35)], 4, stripe, 1.0, 0.86, -0.1, 0.1, 0.05, 0.003, stripe)
+		var leaf_at := Vector3(0.0, 0.29, -0.86 * 0.3 - 0.052)
+		for k in 3:
+			var tilt := (float(k) - 1.0) * 0.7
+			torso.scale_tuft(Transform3D(Basis(Vector3.FORWARD, PI + tilt), leaf_at + Vector3(sin(tilt) * 0.012, 0.0, 0.0)),
+				0.022, 0.05, 0.006, stripe)
 	# Träger: vorne von den Latzecken über die Schulter, hinten gekreuzt zur Gegenseite
 	for side: float in [-1.0, 1.0]:
 		var points: Array = []
@@ -1153,7 +1159,7 @@ func _build_hair() -> void:
 				# Mittelscheitel (granny_gingham): zwei große Strähnen links und rechts der Mitte
 				fringe = [[-54.0, 16.0, 0.22, 0.18], [-20.0, 24.0, 0.26, 0.19], [20.0, 24.0, 0.26, 0.19], [54.0, 16.0, 0.22, 0.18]]
 			for f: Array in fringe:
-				_scale(f[0], f[1], f[2], f[3], hair_dark if int(f[0]) == 14 else hair, -0.15, 0.97, 0.34, 0.45)
+				_scale(f[0], f[1], f[2], f[3] * look.fringe_length, hair_dark if int(f[0]) == 14 else hair, -0.15, 0.97, 0.34, 0.45)
 			# Seitliches Volumen unter dem Tuch: rahmt das Gesicht bis über die Ohren
 			# (unter einem Hut mit Krempe würde es durch die Krempe stechen)
 			for side: float in ([] if hat in [CharacterAppearance.HatStyle.STRAW_HAT, CharacterAppearance.HatStyle.BUCKET_HAT] else [-1.0, 1.0]):
@@ -1216,7 +1222,8 @@ func _build_hair_extra(hair: CharacterKit.Paint, _hair_dark: CharacterKit.Paint)
 				# Große Schleife vorne links am Dutt (Vorlage: 0,38 m breit, leicht schräg)
 				_bow(head, Vector3(-0.11, 0.29, 0.0), 0.7, -0.22, _solid(look.bow_color))
 		CharacterAppearance.HairExtra.BUN_BACK:
-			head.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(0.0, 0.12, 0.27)), Vector3(0.1, 0.095, 0.085), 10, 7, hair)
+			# Knoten tief am Hinterkopf (beret_girl)
+			head.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(0.0, -0.1, 0.25)), Vector3(0.11, 0.105, 0.095), 10, 7, hair)
 		CharacterAppearance.HairExtra.TWIN_BUNS:
 			for side: float in [-1.0, 1.0]:
 				head.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(side * 0.22, 0.2, 0.1)), Vector3(0.085, 0.085, 0.08), 10, 6, hair)
@@ -1354,6 +1361,17 @@ func _build_hat(hat: CharacterAppearance.HatStyle) -> void:
 				head.ellipsoid(Transform3D(Basis(Vector3.FORWARD, PI * 0.5), Vector3(side * 0.335, -0.1, 0.04)), Vector3(0.06, 0.03, 0.06),
 					10, 4, band)
 				head.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(side * 0.3, -0.095, 0.04)), Vector3(0.078, 0.115, 0.115), 10, 7, pad)
+		CharacterAppearance.HatStyle.BERET:
+			# Barett (beret_girl): Band über der Stirn, darauf eine große, runde, facettierte
+			# Haube, die nach hinten und zur linken Seite überhängt. Vorlage: Band vorne knapp
+			# über dem Pony, Haube 0,66 m breit, oben 0,47 m über der Kopfmitte.
+			var wool := _solid(look.hat_color)
+			var hat_xf := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(24.0 + look.hat_tilt)) * Basis(Vector3.FORWARD, deg_to_rad(-5.0))
+				* Basis.from_scale(Vector3.ONE * look.hat_scale), Vector3(0, 0.06 + look.hat_lift, 0.03))
+			head.lathe(hat_xf, [Vector2(0.27, 0.0), Vector2(0.282, 0.025), Vector2(0.282, 0.06), Vector2(0.27, 0.075)], 18,
+				_solid(look.hat_color2 if look.hat_color2.a > 0.0 else look.hat_color.darkened(0.04)), true, 1.0, 0.98, 0.0, 1.0, 0.0, true)
+			head.ellipsoid(hat_xf * Transform3D(Basis.IDENTITY, Vector3(0.02, 0.15, 0.03)), Vector3(0.345, 0.17, 0.33), 14, 9, wool, true, 0.2, 1.0)
+			head.ellipsoid(hat_xf * Transform3D(Basis.IDENTITY, Vector3(0.02, 0.32, 0.03)), Vector3(0.02, 0.018, 0.02), 6, 3, wool)
 		CharacterAppearance.HatStyle.STRAW_HAT:
 			# Strohhut (gardener): runde Kuppel, breite leicht hängende Krempe, farbiges Band
 			# Maße aus der Vorlage: Krempe 0,1 m über der Kopfmitte, Krone 0,22 m hoch,
