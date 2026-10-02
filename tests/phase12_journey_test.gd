@@ -67,7 +67,7 @@ func _run() -> void:
 	_check(String(data.get("metadata", {}).get("season", "")) == "Autumn", "chosen starting season applied (%s)" % data.get("metadata", {}).get("season", ""))
 	var player: Node = world.get_node(^"Player")
 	var model: Node = player.get_node(^"Model")
-	_check(String((model.get("appearance") as Resource).resource_path).ends_with("player_appearance_female.tres"),
+	_check(String((model.get("appearance") as Resource).resource_path).ends_with("player_female.tres"),
 		"player model uses the chosen character")
 	_check(saves.call("make_unique_slot", journey_name) != slot, "new journey name cannot overwrite save")
 	var second_slot := slot + "_second"

@@ -59,27 +59,30 @@ func _ready() -> void:
 
 func _test_characters() -> void:
 	print("--- Characters")
-	var dir := DirAccess.open("res://assets/characters")
+	var dir := DirAccess.open("res://assets/characters/designs")
 	var count := 0
 	for file in dir.get_files():
 		if not file.ends_with(".tres"):
 			continue
 		var model := CharacterModel.new()
-		model.appearance = load("res://assets/characters/" + file)
+		model.appearance = load("res://assets/characters/designs/" + file)
 		add_child(model)
-		check(model.get_mesh_count() >= 18, "%s builds (%d parts)" % [file, model.get_mesh_count()])
+		# Ein Mesh je Gelenk (Kopf, Rumpf, Hüften, Schultern), reich an Details
+		check(model.get_mesh_count() >= 6 and model.get_vertex_count() > 3000,
+			"%s builds (%d parts, %d vertices)" % [file, model.get_mesh_count(), model.get_vertex_count()])
 		model.queue_free()
 		count += 1
-	check(count >= 7, "player and six villager presets (%d)" % count)
+	check(count == 22, "two players and twenty villagers from the character sheets (%d)" % count)
+	check(CharacterDesigns.NPC.size() == 20, "twenty NPC designs to pick from")
 
 	var model := CharacterModel.new()
-	model.appearance = load("res://assets/characters/player_appearance.tres")
+	model.appearance = load("res://assets/characters/designs/winter_girl.tres")
 	add_child(model)
-	var winter_parts := model.get_mesh_count()
+	var winter_parts := model.get_vertex_count()
 	model.outfit = CharacterAppearance.Outfit.SUMMER
-	check(model.get_mesh_count() < winter_parts, "summer outfit drops beanie and scarf (%d → %d)" % [winter_parts, model.get_mesh_count()])
+	check(model.get_vertex_count() < winter_parts, "summer outfit drops beanie, scarf and mittens (%d → %d)" % [winter_parts, model.get_vertex_count()])
 	model.outfit = CharacterAppearance.Outfit.WINTER
-	check(model.get_mesh_count() == winter_parts, "winter outfit restored")
+	check(model.get_vertex_count() == winter_parts, "winter outfit restored")
 
 	model.set_pose(CharacterModel.Pose.SIT)
 	await get_tree().create_timer(0.6).timeout
@@ -97,13 +100,15 @@ func _test_characters() -> void:
 	model.queue_free()
 
 	var kid := CharacterModel.new()
-	kid.appearance = load("res://assets/characters/mats.tres")
+	var kid_look := CharacterDesigns.random_child(RandomNumberGenerator.new())
+	kid.appearance = kid_look
 	add_child(kid)
-	check(is_equal_approx(kid.get_hip_height(), CharacterModel.HIP_HEIGHT * 0.74), "child has shorter legs")
+	check(is_equal_approx(kid.get_hip_height(), CharacterModel.HIP_HEIGHT * kid_look.height_scale) and kid_look.height_scale < 0.9,
+		"child has shorter legs")
 	kid.queue_free()
 
 	var traveller_model := CharacterModel.new()
-	traveller_model.appearance = load("res://assets/characters/lotte.tres")
+	traveller_model.appearance = load("res://assets/characters/designs/duffle_girl.tres")
 	traveller_model.carry = CharacterModel.Carry.SUITCASE
 	add_child(traveller_model)
 	check(traveller_model.find_child("Suitcase", true, false) != null, "travellers can carry a suitcase")

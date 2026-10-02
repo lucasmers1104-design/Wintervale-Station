@@ -30,6 +30,8 @@ enum Carry { NONE, SUITCASE, BACKPACK, SHOPPING_BAG, MUG, LANTERN }
 
 ## Gemeinsamer Shader aller Figurenteile (Farbe, Muster und Gesicht aus den Vertexdaten).
 const CHARACTER_SHADER := preload("res://assets/materials/character.gdshader")
+## Kopf mit Instanzparameter eye_open (nur dort, siehe character.gdshaderinc).
+const CHARACTER_HEAD_SHADER := preload("res://assets/materials/character_head.gdshader")
 ## Augenhöhe über den Füßen (für die Ich-Perspektive).
 const EYE_HEIGHT := 0.99
 ## Hüfthöhe einer Erwachsenen-Figur (Sitzhöhe = Sitzfläche minus diese Höhe).
@@ -149,7 +151,7 @@ func rebuild() -> void:
 	for key: String in pivots:
 		if meshes.get(key) == null:
 			continue
-		var instance := _part(pivots[key], meshes[key], _character_material(), Vector3.ZERO)
+		var instance := _part(pivots[key], meshes[key], _character_material(key == "head"), Vector3.ZERO)
 		instance.name = key.to_pascal_case() + "Mesh"
 		if key == "head":
 			_head_mesh = instance
@@ -256,6 +258,16 @@ func set_fade(alpha: float) -> void:
 
 func get_mesh_count() -> int:
 	return _meshes.size()
+
+
+## Anzahl der Eckpunkte aller Figurenteile (für Tests: Mütze/Schal weg = weniger).
+func get_vertex_count() -> int:
+	var total := 0
+	for instance in _meshes:
+		if instance.mesh:
+			for s in instance.mesh.get_surface_count():
+				total += (instance.mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+	return total
 
 
 ## Materialien werden zwischen allen Figuren geteilt (spart Speicher und Draw-Setup).
@@ -651,10 +663,17 @@ func _detail(mesh: MeshInstance3D) -> MeshInstance3D:
 
 
 static var _shared_material: ShaderMaterial
+static var _shared_head_material: ShaderMaterial
 
 
-## Ein Material für alle Figurenteile aller Figuren (Farben stehen in den Vertexdaten).
-static func _character_material() -> ShaderMaterial:
+## Ein Material für alle Figurenteile aller Figuren (Farben stehen in den Vertexdaten);
+## der Kopf hat ein eigenes mit Blinzel-Parameter.
+static func _character_material(head := false) -> ShaderMaterial:
+	if head:
+		if _shared_head_material == null:
+			_shared_head_material = ShaderMaterial.new()
+			_shared_head_material.shader = CHARACTER_HEAD_SHADER
+		return _shared_head_material
 	if _shared_material == null:
 		_shared_material = ShaderMaterial.new()
 		_shared_material.shader = CHARACTER_SHADER

@@ -53,7 +53,7 @@ Die sechs Bewohner (Stand Etappe 4):
 | Mats Hofer (Kind) | Hofer | 14:30–16:30 am Bahnhof (Uhr, spazieren) |
 | Ida Sommer | Sommer | 08:30 nach Nordtal, zurück ab 12:30; 17:30–19:00 am Bahnhof |
 
-Dazu kommen **Reisende** ohne Steckbrief (zufälliges, aber stimmiges Aussehen): vor
+Dazu kommen **Reisende** ohne Steckbrief (eine zufällige der 20 Figuren aus den Charakterblättern): vor
 jeder Abfahrt 0–2 aus dem Dorf, bei jeder Ankunft 0–2 Aussteiger. Höchstens 8 gleichzeitig.
 
 ## Verhalten am Bahnsteig
@@ -114,10 +114,9 @@ steht dort; wer verreist ist, ist unterwegs; alle anderen sind zu Hause.
 
 ## Einen neuen Bewohner erstellen (ohne Programmieren)
 
-1. **Aussehen:** In Godot `assets/characters/lotte.tres` duplizieren (z.B. `paul.tres`)
-   und im Inspector anpassen: Hautfarbe, Oberteil (Karohemd / Pulli / Mantel) und Farben,
-   Mütze (keine / Mütze / Bommelmütze / Schiebermütze), Frisur (kurz, Seiten, Bob,
-   Dutt, Zopf, Locken), Bart, Brille, Schal, Fäustlinge, Größe (0,74 = Kind), Breite, Kopfgröße.
+1. **Aussehen:** eine der Figuren aus `assets/characters/designs/` wählen (siehe „Figuren aus
+   den Charakterblättern“). Für eine neue Figur eine davon duplizieren und im Inspector
+   anpassen – danach mit `tests/qa/character_sheet.gd` gegen die Vorlage prüfen.
 2. **Steckbrief:** `assets/npcs/lotte.tres` duplizieren (z.B. `paul.tres`) und anpassen:
    - `display_name`: „Paul Brenner“
    - `appearance`: die neue Aussehen-Datei
@@ -140,11 +139,40 @@ Fertig – beim nächsten Start lädt der `NpcDirector` den Steckbrief automatis
   Höhe 0,55 = Bahnsteig), Art wählen und so drehen, dass -Z in die Blickrichtung zeigt.
 - **Bank:** ein `StaticBody3D` mit `station_prop.gd`, Art `BENCH` – die Sitzplätze entstehen von selbst.
 
+## Figuren aus den Charakterblättern
+
+Alle Figuren im Spiel sind den 22 freigegebenen Charakterblättern des Creative Directors
+(`docs/character_references/*.png`, je vorne/links/hinten/rechts) nachgebaut und Ansicht für
+Ansicht damit verglichen worden:
+
+| Datei (`assets/characters/designs/`) | Verwendung |
+|---|---|
+| `player_male`, `player_female` | wählbare Spielfiguren (New-Game-Menü) |
+| `grandpa_fairisle` | Emil Hofer |
+| `granny_gingham` | Greta Berger |
+| `winter_girl` | Ida Sommer |
+| `lumberjack` | Jonas Kellner |
+| `duffle_girl` | Lotte Winter |
+| `earmuff_boy` | Mats Hofer |
+| alle 20 NPC-Figuren | Reisende, Festgäste, Marktstände, Güterbahnhof, Baustelle, Fundsachen, Dorfbewohner |
+| `newsboy`, `bow_girl`, `satchel_boy`, `scout`, `winter_girl`, `earmuff_boy`, `duffle_girl`, `elf_girl` | Kinder beim Fest (etwas kleiner) |
+| `sailor` | Musikant auf der Festbühne |
+
+`scripts/characters/character_designs.gd` (`CharacterDesigns`) listet sie: `random(rng)`,
+`random_child(rng)`, `by_name("baker")`, `PLAYER_MALE`/`PLAYER_FEMALE`.
+
+**Vergleich mit der Vorlage:**
+`godot --path . --resolution 1448x1086 -s res://tests/qa/character_sheet.gd -- <ordner> baker smith …`
+schreibt `<name>_render.png` und `<name>_compare.png` (Vorlage oben, Spiel unten).
+
 ## Figuren (CharacterModel)
 
-- Großer runder Kopf (~40 % der Höhe), kleiner rundlicher Körper, kurze Beinchen,
-  runde Hände (im Winter Fäustlinge), kleine Schuhe, nur Knopfaugen, Näschen und rosige Wangen.
-- Weiche, glatt schattierte Formen mit leichtem Randlicht (Spielzeug-/Vinyl-Look).
+- Großer runder Kopf, kleiner rundlicher Körper, kurze Beinchen, gemaltes Gesicht
+  (Augen, Brauen, Wangen, Sommersprossen) im Shader, facettierte Low-Poly-Kleidung und -Haare.
+- Je Gelenk ein Mesh (Kopf, Rumpf, zwei Hüften, zwei Schultern) aus `CharacterStyle`
+  (gebaut mit dem Baukasten `CharacterKit`); Farben und Muster stehen in den Vertexdaten,
+  ein gemeinsamer Shader `assets/materials/character.gdshader` (Kopf: `character_head.gdshader`
+  mit Blinzel-Parameter). Gleiche Figuren teilen ihre Meshes.
 - **Outfit:** `outfit = WINTER` (Mütze, Schal, Fäustlinge) oder `SUMMER` (ohne, Pulli und
   Mantel werden zum T-Shirt). Grundlage für das spätere Jahreszeiten-System.
 - **Fortbewegung:** `move(tempo, delta, sprint, beschleunigung, drehrate)` – die Figur
@@ -160,7 +188,11 @@ Fertig – beim nächsten Start lädt der `NpcDirector` den Steckbrief automatis
 
 ```
 scripts/characters/character_model.gd     Figur: Aufbau, Gang, Gesten, Blinzeln, Gepäck, Schritte, Ausblenden
-scripts/characters/character_appearance.gd Aussehen (Resource): Oberteil, Frisur, Mütze, Winter, Statur
+scripts/characters/character_appearance.gd Aussehen (Resource): Frisur, Kopfbedeckung, Oberteil, Überkleidung, Rock/Hose, Schuhe, Schal, Statur
+scripts/characters/character_style.gd     Baut die Figur aus dem Aussehen (Meshes je Gelenk, Cache)
+scripts/characters/character_kit.gd       Baukasten: Drehkörper, Schuppen, Bänder, Kegel … (facettiert)
+scripts/characters/character_designs.gd   Die 22 Figuren der Charakterblätter, Zufallsauswahl
+assets/materials/character.gdshader(inc)   Figuren-Shader: Muster (Karo, Streifen, Norweger, Rauten, Stepp …), Gesicht
 scripts/characters/footstep_player.gd     Schrittgeräusche je nach Untergrund
 scripts/npc/npc_profile.gd                Steckbrief (Resource)
 scripts/npc/npc_routine.gd                Routine im Tagesablauf (Resource)
@@ -173,7 +205,9 @@ scripts/props/station_prop.gd             Bank, Mülleimer, Blumenkasten, Wegwei
                                           Gepäck, Fahrrad, Schneebank, Sitzgruppe
 scripts/audio/ambient_soundscape.gd       Wind, Bahnsteig-Gemurmel, ferne Vögel
 scripts/procgen/station_prop_meshes.gd    Meshes dieser Details
-assets/characters/*.tres                  Aussehen: Spieler + 6 Bewohner
+assets/characters/designs/*.tres          Aussehen: 2 Spielfiguren + 20 NPC-Figuren (Charakterblätter)
+docs/character_references/*.png            die freigegebenen Charakterblätter (Vorlagen)
+tests/qa/character_sheet.gd               Vergleichsbilder Vorlage / Spiel
 assets/npcs/*.tres                        Steckbriefe der 6 Bewohner
 tests/npc_test.*                          98 Prüfungen (Figuren, Animationen, Wege, Tagesablauf, Halt mit
                                           Trittstufe, Warteschlangen, Klänge, Kameras)

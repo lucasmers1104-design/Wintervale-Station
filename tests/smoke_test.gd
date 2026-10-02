@@ -35,7 +35,7 @@ func _ready() -> void:
 	check(vmc.mode == GameDefs.ViewMode.BIRD_EYE, "game starts in bird eye view")
 	check(get_viewport().get_camera_3d() == bird.camera, "bird camera current at start")
 	var model: CharacterModel = player.get_node("Model")
-	check(model.get_mesh_count() >= 15, "character model built (%d parts)" % model.get_mesh_count())
+	check(model.get_mesh_count() >= 6 and model.get_vertex_count() > 3000, "character model built (%d parts)" % model.get_mesh_count())
 
 	vmc.set_mode(GameDefs.ViewMode.EXPLORE, true)
 	await frames(120)

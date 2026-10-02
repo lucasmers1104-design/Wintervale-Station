@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/npc/npc_profile.gd" id="1_profile"]
 [ext_resource type="Script" path="res://scripts/npc/npc_routine.gd" id="2_routine"]
-[ext_resource type="Resource" path="res://assets/characters/lotte.tres" id="3_look"]
+[ext_resource type="Resource" path="res://assets/characters/designs/duffle_girl.tres" id="3_look"]
 
 [sub_resource type="Resource" id="Routine_1"]
 script = ExtResource("2_routine")

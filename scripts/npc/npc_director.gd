@@ -572,33 +572,9 @@ func _relay_signals(npc: Npc) -> void:
 	npc.alighted.connect(func(who: Npc, train: Train) -> void: passenger_alighted.emit(who, train))
 
 
-## Zufälliges, aber stimmiges Aussehen für Reisende (warme Winterpalette).
+## Aussehen für Reisende: eine der freigegebenen Figuren (CharacterDesigns).
 static func random_appearance(rng: RandomNumberGenerator) -> CharacterAppearance:
-	var look := CharacterAppearance.new()
-	var skins := [Color(0.97, 0.82, 0.72), Color(0.93, 0.76, 0.63), Color(0.86, 0.65, 0.5),
-		Color(0.72, 0.5, 0.36), Color(0.56, 0.38, 0.28), Color(0.4, 0.27, 0.2)]
-	var warm := [Color(0.72, 0.3, 0.2), Color(0.82, 0.62, 0.3), Color(0.3, 0.44, 0.36), Color(0.72, 0.42, 0.42),
-		Color(0.66, 0.5, 0.33), Color(0.92, 0.85, 0.72), Color(0.28, 0.34, 0.5), Color(0.55, 0.36, 0.5)]
-	var hair := [Color(0.16, 0.11, 0.08), Color(0.36, 0.22, 0.13), Color(0.58, 0.27, 0.16),
-		Color(0.86, 0.68, 0.4), Color(0.72, 0.7, 0.73)]
-	look.skin_color = skins[rng.randi() % skins.size()]
-	look.top_style = rng.randi_range(0, 2) as CharacterAppearance.TopStyle
-	look.shirt_color = warm[rng.randi() % warm.size()]
-	look.shirt_stripe_color = Color(0.1, 0.08, 0.09)
-	look.accent_color = Color(0.92, 0.86, 0.72)
-	look.pants_color = [Color(0.22, 0.24, 0.3), Color(0.32, 0.27, 0.24), Color(0.28, 0.34, 0.48)][rng.randi() % 3]
-	look.shoe_color = Color(0.26, 0.18, 0.13)
-	look.hat_style = rng.randi_range(0, 3) as CharacterAppearance.HatStyle
-	look.hat_color = warm[rng.randi() % warm.size()]
-	look.hair_style = rng.randi_range(1, 6) as CharacterAppearance.HairStyle
-	look.hair_color = hair[rng.randi() % hair.size()]
-	look.glasses = rng.randf() < 0.25
-	look.beard = rng.randf() < 0.15
-	look.scarf = rng.randf() < 0.8
-	look.scarf_color = warm[rng.randi() % warm.size()]
-	look.height_scale = rng.randf_range(0.94, 1.06)
-	look.width_scale = rng.randf_range(0.95, 1.12)
-	return look
+	return CharacterDesigns.random(rng)
 
 
 # --- Plätze, Wege, Häuser --------------------------------------------------------------

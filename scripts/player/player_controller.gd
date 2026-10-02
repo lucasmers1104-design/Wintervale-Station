@@ -18,8 +18,8 @@ const SAVE_ID := "player"
 const RESPAWN_DEPTH := -40.0
 ## Wählbare Spielfiguren (New-Game-Menü).
 const CHARACTERS := {
-	"male": preload("res://assets/characters/player_appearance.tres"),
-	"female": preload("res://assets/characters/player_appearance_female.tres"),
+	"male": CharacterDesigns.PLAYER_MALE,
+	"female": CharacterDesigns.PLAYER_FEMALE,
 }
 
 ## Gewählte Spielfigur (siehe [constant CHARACTERS]).
