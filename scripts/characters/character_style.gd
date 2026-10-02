@@ -388,6 +388,8 @@ func _build_outer() -> void:
 			_puffer_jacket()
 		CharacterAppearance.Outer.DUFFLE_COAT:
 			_duffle_coat()
+		CharacterAppearance.Outer.LONG_COAT:
+			_long_coat()
 
 
 ## Latzhose: Hosenteil, Latz mit großer Brusttasche, Träger mit Messingknöpfen,
@@ -822,6 +824,32 @@ func _duffle_coat() -> void:
 		torso.panel(xf, [Vector2(0.29, 0.375), Vector2(0.28, 0.41)], 3, cloth, 1.0, TORSO_DEPTH, p - 0.06, p + 0.06, 0.058, 0.012, seam)
 
 
+## Langer Mantel (elf_girl): A-Linie bis 0,3 m, Knopfleiste mit Messingknöpfen links
+## der Mitte, Ledergürtel mit Schnalle, Klappentaschen; Ärmel mit Pelzmanschette.
+func _long_coat() -> void:
+	var cloth := _solid(look.outer_color)
+	var seam := _solid(look.outer_color.darkened(0.25))
+	var xf := Transform3D.IDENTITY
+	var hem := 0.3
+	var profile: Array = [Vector2(0.33, hem), Vector2(0.3, 0.36), Vector2(0.27, 0.42)] + torso_profile(0.46, NECK_Y - 0.02, 4)
+	torso.lathe(xf, profile, 22, cloth, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.03)
+	torso.panel(xf, profile, 1, seam, 1.0, TORSO_DEPTH, 0.03, 0.036, 0.032, 0.006, seam)
+	torso.torus(Transform3D(Basis(Vector3.RIGHT, 0.2), Vector3(0, NECK_Y - 0.02, 0.0)), 0.13, 0.026, 18, 5, cloth, 1.0, 0.86)
+	var brass := CharacterKit.paint(look.accent_color, P.GLOSS)
+	for y: float in [0.66, 0.59, 0.4, 0.34]:
+		torso.ellipsoid(Transform3D(Basis.looking_at(torso_normal(0.0)), torso_point(0.0, y, 0.044)), Vector3(0.02, 0.02, 0.01),
+			8, 4, brass)
+	var belt := _solid(look.bag_color if look.bag else look.accent_color.darkened(0.4))
+	torso.lathe(xf, torso_profile(WAIST_Y + 0.04, WAIST_Y + 0.08, 1), 22, belt, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.045)
+	var at := torso_point(-0.06, WAIST_Y + 0.06, 0.058)
+	var nb := Basis.looking_at(-torso_normal(-0.06), Vector3.UP)
+	torso.box(Transform3D(nb, at), Vector3(0.065, 0.055, 0.008), brass)
+	torso.box(Transform3D(nb, at + nb * Vector3(0, 0, 0.005)), Vector3(0.04, 0.03, 0.008), belt)
+	for side: float in [-1.0, 1.0]:
+		var p := side * 0.15
+		torso.panel(xf, [Vector2(0.315, 0.33), Vector2(0.29, 0.38)], 3, cloth, 1.0, TORSO_DEPTH, p - 0.055, p + 0.055, 0.05, 0.012, seam)
+
+
 ## Halbe Breite des V-Ausschnitts (Winkelanteil) in Höhe [param y].
 func _v_half(y: float, tip: float) -> float:
 	return 0.075 * clampf((y - tip) / (NECK_Y - tip), 0.0, 1.0)
@@ -928,9 +956,9 @@ func _build_arms() -> void:
 				kit.lathe(xf, [Vector2(0.062, -0.2), Vector2(0.07, -0.08), Vector2(0.078, 0.0), Vector2(0.06, 0.05), Vector2(0.0, 0.07)],
 					10, sleeve)
 				if look.outer in [CharacterAppearance.Outer.DUFFLE_COAT, CharacterAppearance.Outer.LONG_COAT]:
-					# Umgeschlagene Mantelmanschette (duffle_girl)
-					kit.lathe(xf, [Vector2(0.074, -0.19), Vector2(0.09, -0.185), Vector2(0.092, -0.13), Vector2(0.08, -0.12)], 10,
-						_solid(look.outer_color.lightened(0.04)), true, 1.0, 1.0, 0.0, 1.0, 0.0, true)
+					# Umgeschlagene Mantelmanschette (duffle_girl), beim Mantel mit Pelz in outer_color2 (elf_girl)
+					kit.lathe(xf, [Vector2(0.074, -0.2), Vector2(0.094, -0.195), Vector2(0.098, -0.125), Vector2(0.082, -0.115)], 10,
+						_solid(look.outer_color2 if look.outer_color2.a > 0.0 else look.outer_color.lightened(0.04)), true, 1.0, 1.0, 0.0, 1.0, 0.0, true)
 				if look.top_style == CharacterAppearance.TopStyle.SWEATER:
 					# Breites Rippbündchen (winter_girl)
 					kit.lathe(xf, [Vector2(0.064, -0.235), Vector2(0.078, -0.228), Vector2(0.08, -0.165), Vector2(0.072, -0.158)], 10,
@@ -1083,7 +1111,7 @@ func _build_hair() -> void:
 				_hat_clip = 30.0
 			CharacterAppearance.HatStyle.CHEF_HAT:
 				_hat_clip = 12.0
-			CharacterAppearance.HatStyle.BUCKET_HAT:
+			CharacterAppearance.HatStyle.BUCKET_HAT, CharacterAppearance.HatStyle.ELF_HAT:
 				_hat_clip = 14.0
 			CharacterAppearance.HatStyle.BEANIE, CharacterAppearance.HatStyle.POMPOM_BEANIE:
 				_hat_clip = 12.0
@@ -1162,7 +1190,7 @@ func _build_hair() -> void:
 				_scale(f[0], f[1], f[2], f[3] * look.fringe_length, hair_dark if int(f[0]) == 14 else hair, -0.15, 0.97, 0.34, 0.45)
 			# Seitliches Volumen unter dem Tuch: rahmt das Gesicht bis über die Ohren
 			# (unter einem Hut mit Krempe würde es durch die Krempe stechen)
-			for side: float in ([] if hat in [CharacterAppearance.HatStyle.STRAW_HAT, CharacterAppearance.HatStyle.BUCKET_HAT] else [-1.0, 1.0]):
+			for side: float in ([] if hat in [CharacterAppearance.HatStyle.STRAW_HAT, CharacterAppearance.HatStyle.BUCKET_HAT, CharacterAppearance.HatStyle.ELF_HAT] else [-1.0, 1.0]):
 				for k in 3:
 					_scale(side * (78.0 + k * 26.0), 6.0 - k * 4.0, 0.22 * look.hair_volume, 0.24 * look.hair_volume, hair if k % 2 == 0 else hair_dark, 0.04 if hat == CharacterAppearance.HatStyle.HEADSCARF else -0.05,
 						1.03 if hat == CharacterAppearance.HatStyle.HEADSCARF else 1.0, 0.6)
@@ -1372,6 +1400,23 @@ func _build_hat(hat: CharacterAppearance.HatStyle) -> void:
 				_solid(look.hat_color2 if look.hat_color2.a > 0.0 else look.hat_color.darkened(0.04)), true, 1.0, 0.98, 0.0, 1.0, 0.0, true)
 			head.ellipsoid(hat_xf * Transform3D(Basis.IDENTITY, Vector3(0.02, 0.15, 0.03)), Vector3(0.345, 0.17, 0.33), 14, 9, wool, true, 0.2, 1.0)
 			head.ellipsoid(hat_xf * Transform3D(Basis.IDENTITY, Vector3(0.02, 0.32, 0.03)), Vector3(0.02, 0.018, 0.02), 6, 3, wool)
+		CharacterAppearance.HatStyle.ELF_HAT:
+			# Wichtelmütze (elf_girl): breite, hängende Krempe, Pelzband (hat_color2), darüber
+			# eine weiche Spitze, die nach hinten links umknickt und mit einem Bommel neben
+			# dem Kopf endet (Vorlage: Bommel 0,3 m seitlich, 0,25 m hinter der Kopfmitte).
+			var felt := _solid(look.hat_color)
+			var fur := _solid(look.hat_color2 if look.hat_color2.a > 0.0 else Color(0.88, 0.82, 0.7))
+			var hat_xf := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(12.0 + look.hat_tilt)) * Basis.from_scale(Vector3.ONE * look.hat_scale),
+				Vector3(0, 0.1 + look.hat_lift, 0.02))
+			head.lathe(hat_xf, [Vector2(0.24, -0.004), Vector2(0.32, -0.04), Vector2(0.39, -0.14), Vector2(0.405, -0.175),
+				Vector2(0.39, -0.17), Vector2(0.32, -0.055), Vector2(0.24, 0.012)], 14, _solid(look.hat_color.darkened(0.03)), true)
+			head.lathe(hat_xf, [Vector2(0.27, -0.01), Vector2(0.3, 0.01), Vector2(0.308, 0.07), Vector2(0.29, 0.1), Vector2(0.26, 0.105)], 18,
+				fur, true, 1.0, 1.0, 0.0, 1.0, 0.0, true)
+			var spine: Array[Vector3] = [Vector3(0, 0.09, 0), Vector3(0.0, 0.18, 0.03), Vector3(-0.07, 0.25, 0.08), Vector3(-0.19, 0.24, 0.14),
+				Vector3(-0.28, 0.15, 0.19), Vector3(-0.35, 0.05, 0.19)]
+			var radii: Array[float] = [0.27, 0.26, 0.215, 0.15, 0.085, 0.035]
+			_bent_cone(head, hat_xf, spine, radii, 12, felt)
+			head.ellipsoid(hat_xf * Transform3D(Basis.IDENTITY, Vector3(-0.37, 0.01, 0.19)), Vector3(0.09, 0.09, 0.09), 9, 6, fur)
 		CharacterAppearance.HatStyle.STRAW_HAT:
 			# Strohhut (gardener): runde Kuppel, breite leicht hängende Krempe, farbiges Band
 			# Maße aus der Vorlage: Krempe 0,1 m über der Kopfmitte, Krone 0,22 m hoch,
@@ -1537,3 +1582,29 @@ func _scarf_ring(xf: Transform3D, radius: float, width: float, thickness: float,
 		outward.append(xf.basis * Vector3(sin(a), 0.0, -cos(a)))
 	# Bahn = Ring, Normale radial: das Band steht senkrecht um den Hals
 	torso.strip(points, outward, width, thickness, paint)
+
+
+## Gebogener Kegel entlang einer Mittellinie (Wichtelmützenspitze): je Punkt ein Ring mit
+## eigenem Radius senkrecht zur Linie, facettiert.
+func _bent_cone(kit: CharacterKit, xf: Transform3D, spine: Array[Vector3], radii: Array[float], sides: int, paint: CharacterKit.Paint) -> void:
+	var rings: Array = []
+	var ref := Vector3.FORWARD
+	for i in spine.size():
+		var tangent: Vector3 = (spine[mini(i + 1, spine.size() - 1)] - spine[maxi(i - 1, 0)]).normalized()
+		var u := ref.cross(tangent).normalized()
+		if u.length() < 0.1:
+			u = Vector3.RIGHT
+		var v := tangent.cross(u).normalized()
+		var row: Array[Vector3] = []
+		for s in sides:
+			var a := TAU * float(s) / sides
+			row.append(xf * (spine[i] + (u * cos(a) + v * sin(a)) * radii[i]))
+		rings.append(row)
+	for i in rings.size() - 1:
+		var inside := xf * ((spine[i] + spine[i + 1]) * 0.5)
+		var lower: Array[Vector3] = rings[i]
+		var upper: Array[Vector3] = rings[i + 1]
+		for s in sides:
+			var s1 := (s + 1) % sides
+			kit._tri_away(lower[s], upper[s], upper[s1], paint, inside)
+			kit._tri_away(lower[s], upper[s1], lower[s1], paint, inside)
