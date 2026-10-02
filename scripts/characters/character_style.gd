@@ -245,7 +245,8 @@ func _build_torso() -> void:
 	if look.top_style == CharacterAppearance.TopStyle.TURTLENECK and look.shirt_pattern == CharacterAppearance.Pattern.SOLID:
 		shirt = CharacterKit.paint(look.shirt_color, P.RIBS, 30.0)
 	torso.lathe(xf, TORSO, 18, shirt, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.0, true, true)
-	if look.top_style == CharacterAppearance.TopStyle.SWEATER and look.outer not in SLEEVED_OUTER:
+	if look.top_style == CharacterAppearance.TopStyle.SWEATER and look.outer not in SLEEVED_OUTER and look.outer not in [
+			CharacterAppearance.Outer.OVERALLS, CharacterAppearance.Outer.SUSPENDERS, CharacterAppearance.Outer.PINAFORE]:
 		# Strickpulli (winter_girl): langer Rippbund über der Hüfte
 		torso.lathe(xf, [Vector2(0.262, 0.31), Vector2(0.27, 0.325), Vector2(0.268, 0.39), Vector2(0.258, 0.4)], 20,
 			CharacterKit.paint(look.shirt_color.darkened(0.03), P.KNIT_CUFF, 40.0), true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.0, true)
@@ -403,6 +404,8 @@ func _overalls() -> void:
 	torso.panel(xf, torso_profile(WAIST_Y - 0.01, 0.665, 3), 6, cloth, 1.0, TORSO_DEPTH, -0.115, 0.115, 0.014, 0.012, seam)
 	var pocket := _solid(look.outer_color.lightened(0.05))
 	torso.panel(xf, torso_profile(0.475, 0.6, 2), 4, pocket, 1.0, TORSO_DEPTH, -0.075, 0.075, 0.026, 0.016, seam)
+	if look.cargo_pockets:
+		_cargo_pockets(look.outer_color)
 	# Seitentaschen (Schlitz) und Gesäßtaschen
 	for side: float in [-1.0, 1.0]:
 		torso.panel(xf, torso_profile(0.36, 0.43, 2), 3, cloth, 1.0, TORSO_DEPTH,
@@ -1573,7 +1576,7 @@ func _build_beard() -> void:
 		for az: float in [-36.0, -12.0, 12.0, 36.0]:
 			var p := _face_point(az, -84.0) + Vector3(0, -0.035, -0.035)
 			head.ellipsoid(Transform3D(Basis(Vector3.UP, deg_to_rad(az)), p), Vector3(0.06, 0.055, 0.05), 7, 4, hair)
-	if look.mustache or look.beard:
+	if look.mustache:
 		for side: float in [-1.0, 1.0]:
 			head.ellipsoid(Transform3D(Basis(Vector3.FORWARD, side * 0.3), Vector3(side * 0.048, -0.138, -HEAD.z + 0.01)),
 				Vector3(0.055, 0.025, 0.028), 8, 4, hair)
