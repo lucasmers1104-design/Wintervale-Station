@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="CharacterAppearance" format=3]
+
+[ext_resource type="Script" path="res://scripts/characters/character_appearance.gd" id="1_look"]
+
+[resource]
+resource_name = "Newsboy"
+script = ExtResource("1_look")
+skin_color = Color(0.95, 0.63, 0.44, 1)
+freckles = true
+hair_style = 12
+hair_color = Color(0.44, 0.23, 0.12, 1)
+hat_style = 3
+hat_color = Color(0.39, 0.45, 0.26, 1)
+top_style = 4
+shirt_color = Color(0.82, 0.71, 0.57, 1)
+shirt_stripe_color = Color(0.78, 0.67, 0.53, 1)
+shirt_line_color = Color(0.9, 0.81, 0.69, 1)
+shirt_pattern = 1
+sleeves = 0
+accent_color = Color(0.82, 0.62, 0.3, 1)
+outer = 2
+outer_color = Color(0.24, 0.28, 0.16, 1)
+bottom = 0
+pants_color = Color(0.24, 0.28, 0.16, 1)
+shoe_color = Color(0.42, 0.25, 0.14, 1)

@@ -187,6 +187,27 @@ func _cap(row: PackedVector3Array, center: Vector3, pt: Paint, facing: Vector3) 
 			facing)
 
 
+## Geschlossener, frei verformter Drehkörper (z. B. Mütze mit schräger Unterkante und
+## waagerechter Kuppel): [param point] bildet (Winkel 0..1, Profilzeile) auf eine Position
+## ab. Facettiert; die Vorderseiten zeigen von [param inside] weg.
+func warped_lathe(profile: Array, segments: int, pt: Paint, point: Callable, inside: Vector3) -> void:
+	var rings: Array = []
+	for row_data: Variant in profile:
+		var row := PackedVector3Array()
+		for s in segments:
+			row.append(point.call(float(s) / segments, row_data))
+		rings.append(row)
+	for i in rings.size() - 1:
+		var lower: PackedVector3Array = rings[i]
+		var upper: PackedVector3Array = rings[i + 1]
+		for s in segments:
+			var s1 := (s + 1) % segments
+			if (upper[s] - upper[s1]).length() > 0.0001:
+				_tri_away(lower[s], upper[s], upper[s1], pt, inside)
+			if (lower[s] - lower[s1]).length() > 0.0001:
+				_tri_away(lower[s], upper[s1], lower[s1], pt, inside)
+
+
 ## Anliegendes Stoffteil mit Materialstärke: Außenfläche eines Drehkörper-Ausschnitts
 ## plus schmale Kanten ringsum (so sieht man Latz, Taschen, Schürze als eigenes Teil).
 func panel(xf: Transform3D, profile: Array, segments: int, pt: Paint, sx: float, sz: float, a0: float, a1: float,

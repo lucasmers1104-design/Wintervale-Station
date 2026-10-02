@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="CharacterAppearance" format=3]
+
+[ext_resource type="Script" path="res://scripts/characters/character_appearance.gd" id="1_look"]
+
+[resource]
+resource_name = "Gardener"
+script = ExtResource("1_look")
+skin_color = Color(0.95, 0.66, 0.5, 1)
+hair_style = 9
+hair_extra = 4
+hair_color = Color(0.46, 0.24, 0.13, 1)
+bow_color = Color(0.72, 0.24, 0.17, 1)
+hat_style = 5
+hat_color = Color(0.8, 0.66, 0.45, 1)
+hat_color2 = Color(0.33, 0.45, 0.22, 1)
+top_style = 4
+shirt_color = Color(0.84, 0.76, 0.65, 1)
+shirt_stripe_color = Color(0.79, 0.7, 0.58, 1)
+shirt_line_color = Color(0.91, 0.85, 0.76, 1)
+shirt_pattern = 1
+sleeves = 0
+accent_color = Color(0.85, 0.58, 0.24, 1)
+outer = 1
+outer_color = Color(0.33, 0.42, 0.2, 1)
+bottom = 0
+pants_color = Color(0.33, 0.42, 0.2, 1)
+shoe_color = Color(0.46, 0.26, 0.13, 1)
+scarf_style = 2
+scarf_color = Color(0.74, 0.25, 0.18, 1)
