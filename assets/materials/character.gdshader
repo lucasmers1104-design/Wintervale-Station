@@ -96,7 +96,9 @@ vec3 face(vec2 p, vec3 skin) {
 	// Brauen: kurze, kräftige Bögen
 	vec2 bq = q - vec2(0.57, 0.06);
 	float arch = bq.y - (0.03 - bq.x * bq.x * 1.4);
-	float brow = (1.0 - smoothstep(0.03, 0.045, abs(arch))) * (1.0 - smoothstep(0.14, 0.17, abs(bq.x)));
+	// color3.r: zusätzliche Dicke (0 = normal, 1 = buschig)
+	float thick = 1.0 + color3.r;
+	float brow = (1.0 - smoothstep(0.03 * thick, 0.045 * thick, abs(arch))) * (1.0 - smoothstep(0.14 + 0.02 * color3.r, 0.17 + 0.02 * color3.r, abs(bq.x)));
 	brow *= step(0.5, color2.a);
 	col = mix(col, color2.rgb, brow);
 	// Mund: schmaler Lächelbogen (Kreisbogen unter dem Mittelpunkt)

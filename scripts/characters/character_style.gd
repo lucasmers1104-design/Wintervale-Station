@@ -332,6 +332,8 @@ func _build_outer() -> void:
 			_suspenders()
 		CharacterAppearance.Outer.PINAFORE:
 			_pinafore()
+		CharacterAppearance.Outer.WORK_APRON:
+			_work_apron()
 
 
 ## Latzhose: Hosenteil, Latz mit großer Brusttasche, Träger mit Messingknöpfen,
@@ -459,6 +461,52 @@ func _pinafore() -> void:
 			Vector3(0.024, 0.024, 0.012), 10, 5, CharacterKit.paint(look.accent_color, P.GLOSS))
 
 
+## Schmiedeschürze (smith): dunkles Leinen rundum von der Brust (0,7 m) bis übers Knie,
+## Brusttasche, Lederträger mit Messingnieten, Ledergürtel mit Werkzeugtasche links.
+func _work_apron() -> void:
+	var cloth := _fabric(look.outer_color, look.outer_pattern, look.outer_color2)
+	var seam := _solid(look.outer_color.darkened(0.3))
+	var leather := _solid(look.accent_color)
+	var rivet := CharacterKit.paint(Color(0.85, 0.6, 0.3), P.GLOSS)
+	var xf := Transform3D.IDENTITY
+	var top := 0.7
+	torso.lathe(xf, [Vector2(0.265, 0.25), Vector2(0.258, 0.32)] + torso_profile(0.36, top, 4), 20, cloth, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.016)
+	torso.lathe(xf, [Vector2(0.258, 0.245), Vector2(0.27, 0.25), Vector2(0.264, 0.32)], 20, seam, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.012)
+	# Brusttasche (rechts der Mitte)
+	torso.panel(xf, torso_profile(0.56, 0.66, 2), 3, cloth, 1.0, TORSO_DEPTH, 0.015, 0.11, 0.03, 0.012, seam)
+	# Gürtel
+	torso.lathe(xf, torso_profile(0.455, 0.5, 1), 20, leather, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.03)
+	# Werkzeugtasche vorne links mit Klappe und zwei Griffen
+	var pouch := _solid(look.accent_color.lightened(0.12))
+	torso.panel(xf, torso_profile(0.3, 0.47, 2), 3, pouch, 1.0, TORSO_DEPTH, -0.15, -0.07, 0.05, 0.03, leather)
+	torso.panel(xf, torso_profile(0.4, 0.475, 1), 3, leather, 1.0, TORSO_DEPTH, -0.152, -0.068, 0.082, 0.01, leather)
+	torso.ellipsoid(Transform3D(Basis.looking_at(torso_normal(-0.11)), torso_point(-0.11, 0.415, 0.094)), Vector3(0.012, 0.012, 0.006),
+		6, 3, rivet)
+	for k in 2:
+		var at := torso_point(-0.09 - k * 0.04, 0.5, 0.06)
+		torso.box(Transform3D(Basis(Vector3.UP, -0.6), at), Vector3(0.018, 0.07, 0.018), _solid(look.accent_color.darkened(0.25)))
+	# Träger: über die Schultern, vorne und hinten mit Nieten am Schürzenrand
+	for side: float in [-1.0, 1.0]:
+		var points: Array = []
+		var outward: Array = []
+		var front_angle := side * 0.1
+		var back_angle := 0.5 - side * 0.1
+		for y: float in [top - 0.02, 0.73]:
+			points.append(torso_point(front_angle, y, 0.03))
+			outward.append(torso_normal(front_angle))
+		points.append(Vector3(side * 0.15, 0.755, -0.04))
+		outward.append(Vector3.UP + torso_normal(front_angle))
+		points.append(Vector3(side * 0.15, 0.758, 0.04))
+		outward.append(Vector3.UP + torso_normal(back_angle))
+		for y: float in [0.73, top - 0.02]:
+			points.append(torso_point(back_angle, y, 0.03))
+			outward.append(torso_normal(back_angle))
+		torso.strip(points, outward, 0.045, 0.012, leather)
+		for angle: float in [front_angle, back_angle]:
+			torso.ellipsoid(Transform3D(Basis.looking_at(torso_normal(angle)), torso_point(angle, top - 0.025, 0.046)),
+				Vector3(0.018, 0.018, 0.01), 8, 4, rivet)
+
+
 ## Halbe Breite des V-Ausschnitts (Winkelanteil) in Höhe [param y].
 func _v_half(y: float, tip: float) -> float:
 	return 0.075 * clampf((y - tip) / (NECK_Y - tip), 0.0, 1.0)
@@ -541,12 +589,17 @@ func _build_arms() -> void:
 
 ## Faust (bloße Hand) bzw. Fäustling mit Daumen.
 func _build_hand(kit: CharacterKit, side: float, y: float) -> void:
-	var mittens := winter and look.mitten_color.a > 0.0
+	var mittens := (winter or look.gloves) and look.mitten_color.a > 0.0
 	if mittens:
 		var m := _solid(look.mitten_color)
 		kit.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(0, y, -0.005)), Vector3(0.07, 0.078, 0.064), 10, 7, m)
 		kit.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(-side * 0.048, y + 0.012, -0.03)), Vector3(0.03, 0.042, 0.028), 6, 4, m)
-		if look.mitten_cuff_color.a > 0.0:
+		if look.gloves:
+			# Lederstulpe: weit ausgestellt über dem Handgelenk (Vorlage smith)
+			kit.lathe(Transform3D.IDENTITY, [Vector2(0.06, y + 0.04), Vector2(0.08, y + 0.06), Vector2(0.088, y + 0.11),
+				Vector2(0.082, y + 0.12), Vector2(0.06, y + 0.115)], 10, _solid(look.mitten_color.darkened(0.08)), true, 1.0, 1.0,
+				0.0, 1.0, 0.0, false, true)
+		elif look.mitten_cuff_color.a > 0.0:
 			kit.lathe(Transform3D.IDENTITY, [Vector2(0.062, y + 0.045), Vector2(0.07, y + 0.06), Vector2(0.07, y + 0.095),
 				Vector2(0.064, y + 0.105)], 10, CharacterKit.paint(look.mitten_cuff_color, P.KNIT_CUFF, 16.0))
 		return
@@ -559,7 +612,7 @@ func _build_hand(kit: CharacterKit, side: float, y: float) -> void:
 
 func _build_head() -> void:
 	var face := CharacterKit.paint(look.skin_color, P.FACE, 1.0, Color(_brow_color(), 1.0),
-		Color(0, 0, 0, 1.0 if look.freckles else 0.0))
+		Color(look.brow_thickness, 0, 0, 1.0 if look.freckles else 0.0))
 	head.head_shape(Transform3D.IDENTITY, HEAD, 28, 18, face)
 	# Ohren
 	for side: float in [-1.0, 1.0]:
@@ -570,6 +623,8 @@ func _build_head() -> void:
 			Vector3(0.014, 0.036, 0.028), 8, 5, CharacterKit.paint(look.skin_color.darkened(0.1), P.SKIN), false)
 	if look.glasses:
 		_build_glasses()
+	if look.beard or look.mustache:
+		_build_beard()
 	# Nase: kleine dreiseitige Pyramide, Spitze nach vorne, eine Ecke unten
 	head.pyramid(Transform3D(Basis.IDENTITY, Vector3(0, -0.119, -HEAD.z + 0.008)), 0.025, 0.03, 3,
 		_solid(Color(0.91, 0.43, 0.34)), PI)
@@ -673,16 +728,25 @@ func _build_hair() -> void:
 			_hat_rim = Vector2(0.1, 0.137)
 		_hat_bang = 0.6
 	match look.hair_style:
-		CharacterAppearance.HairStyle.SPIKY, CharacterAppearance.HairStyle.MESSY:
+		CharacterAppearance.HairStyle.SPIKY, CharacterAppearance.HairStyle.MESSY, CharacterAppearance.HairStyle.CURLY:
 			# Strubbelkopf (player_male): runde, facettierte Schuppen wie ein Tannenzapfen,
 			# seitlich über dem Ohr (Kotelette davor), hinten bis in den Nacken; dicker Pony
 			# bis knapp über die Brauen, eine Strähne rechts der Mitte länger; Spitze oben.
-			_hair_cap(hair_dark, 16.0, 0.5, 0.94, 1.0)
+			# Lockenkopf (smith): dieselben Schuppen, aber größer und stärker abstehend, oben
+			# hoch aufgetürmt, kürzerer Pony.
+			var curly := look.hair_style == CharacterAppearance.HairStyle.CURLY
+			var big := 1.0
+			var puff := -0.08 if curly else 0.0
+			_hair_cap(hair_dark, 16.0, 0.5, 0.94 if not curly else 0.97, 1.0 if not curly else 1.06)
 			# Unter der Schiebermütze (newsboy) enden die Haare höher im Nacken
 			var back_len := 0.7 if look.hair_style == CharacterAppearance.HairStyle.MESSY else 1.0
 			# Hinterkopf: Reihen von oben nach unten (untere zuerst, damit obere darüber liegen)
 			var rows := [[-38.0, 3, 0.17, 0.19, 26.0], [-14.0, 4, 0.21, 0.23, 44.0], [12.0, 4, 0.24, 0.26, 58.0],
 				[36.0, 4, 0.25, 0.27, 70.0], [58.0, 3, 0.22, 0.24, 84.0]]
+			if curly:
+				# Viele kleinere, dicht anliegende Schuppen (Vorlage smith: Hinterkopf wie ein Zapfen)
+				rows = [[-40.0, 4, 0.15, 0.17, 40.0], [-20.0, 5, 0.17, 0.19, 64.0], [2.0, 6, 0.18, 0.2, 80.0], [24.0, 6, 0.19, 0.21, 92.0],
+					[46.0, 5, 0.19, 0.21, 100.0], [64.0, 4, 0.19, 0.2, 120.0]]
 			for row: Array in rows:
 				var count: int = row[1]
 				var spread: float = row[4]
@@ -690,20 +754,27 @@ func _build_hair() -> void:
 					var az := 180.0 + (float(k) - (count - 1) * 0.5) * (spread * 2.0 / maxf(count - 1, 1))
 					if float(row[0]) > 40.0:
 						az += 15.0
-					_scale(az, row[0], row[2], row[3] * back_len, hair if (k % 2) == 0 else hair_dark, 0.34 * back_len * back_len, 1.0)
+					_scale(az, row[0], row[2] * big, row[3] * back_len * big, hair if (k % 2) == 0 else hair_dark,
+						0.34 * back_len * back_len + puff, 1.0)
 			# Seiten: über dem Ohr, hinter dem Ohr bis zum Nacken
 			for side: float in [-1.0, 1.0]:
-				_scale(side * 128.0, -2.0, 0.17, 0.21, hair_dark, 0.25, 1.0)
-				_scale(side * 104.0, 30.0, 0.22, 0.25, hair, 0.38, 1.02)
-				_scale(side * 78.0, 38.0, 0.21, 0.24, hair_dark, 0.32, 1.02)
+				_scale(side * 128.0, -2.0, 0.17 * big, 0.21 * big, hair_dark, 0.25 + puff * 2.0, 1.0 - 0.06 * float(curly))
+				_scale(side * 104.0, 30.0, 0.22 * big, 0.25 * big, hair, 0.38 + puff * 2.0, 1.02 - 0.06 * float(curly))
+				_scale(side * 78.0, 38.0, 0.21 * big, 0.24 * big, hair_dark, 0.32 + puff * 2.0, 1.02 - 0.06 * float(curly))
 				_scale(side * 64.0, 8.0, 0.075, 0.16, hair_dark, 0.04, 0.98, 0.7)
 			# Pony
 			var bangs := [[-48.0, 34.0, 0.2, 0.28], [-20.0, 38.0, 0.21, 0.3], [10.0, 38.0, 0.21, 0.36], [38.0, 34.0, 0.2, 0.28]]
 			for b: Array in bangs:
-				_scale(b[0], b[1], b[2], b[3], hair_dark if int(b[0]) == 10 else hair, 0.0, 1.0, 0.85, 0.75)
+				var lift := 0.08 if curly else 0.0
+				var bang_el: float = b[1] + (10.0 if curly else 0.0)
+				_scale(b[0], bang_el, b[2] * big, b[3] * (0.85 if curly else 1.0), hair_dark if int(b[0]) == 10 else hair, lift, 1.0,
+					0.85, 0.4 if curly else 0.75)
 			# Krone
 			for az: float in [-30.0, 40.0, 110.0, 250.0]:
-				_scale(az, 68.0, 0.2, 0.22, hair, 0.12, 1.0)
+				_scale(az, 68.0, 0.2 * big, 0.22 * big, hair, 0.12 + puff * 1.6, 1.0)
+			if curly:
+				for az: float in [-80.0, 0.0, 80.0, 160.0, 240.0]:
+					_scale(az, 84.0, 0.2, 0.22, hair_dark if int(az) % 160 == 0 else hair, 0.7, 1.02)
 			# Aufrechte Spitze oben, leicht zur Seite geneigt (nur beim Strubbelkopf ohne Mütze)
 			if look.hair_style == CharacterAppearance.HairStyle.SPIKY and hat == CharacterAppearance.HatStyle.NONE:
 				var tip := Transform3D(Basis(Vector3.FORWARD, PI + 0.35) * Basis(Vector3.RIGHT, 0.2), Vector3(-0.03, 0.34, -0.02))
@@ -899,3 +970,40 @@ func _bow(center: Vector3, yaw: float, roll: float, paint: CharacterKit.Paint) -
 		head.pyramid(frame * Transform3D(lobe, outer), 0.1, 0.172, 6, paint)
 		head.scale_tuft(frame * Transform3D(Basis(Vector3.FORWARD, side * 0.45), Vector3(side * 0.03, -0.065, -0.004)),
 			0.06, 0.12, 0.025, paint)
+
+
+## Punkt auf der Kopfform (Superellipsoid wie CharacterKit.head_shape) in Richtung
+## Azimut/Höhe (Grad; Azimut 0 = vorne).
+func _face_point(az: float, el: float, power := 2.6) -> Vector3:
+	var a := deg_to_rad(az)
+	var e := deg_to_rad(el)
+	var d := Vector3(sin(a) * cos(e), sin(e), -cos(a) * cos(e))
+	var sum := pow(absf(d.x / HEAD.x), power) + pow(absf(d.y / HEAD.y), power) + pow(absf(d.z / HEAD.z), power)
+	return d * pow(sum, -1.0 / power)
+
+
+## Vollbart aus facettierten Büscheln (smith): Koteletten vor den Ohren, über die Wangen
+## unterhalb der Bäckchen bis unters Kinn; Mund bleibt frei. Schnurrbart aus zwei
+## hängenden Wülsten zwischen Nase und Mund.
+func _build_beard() -> void:
+	var hair := _solid(look.hair_color.darkened(0.08))
+	var hair_dark := _solid(look.hair_color.darkened(0.2))
+	if look.beard:
+		# Je Azimut die Oberkante des Barts (Grad): Koteletten hoch, Wangen unter den
+		# Bäckchen, vorne erst unter dem Mund
+		var columns := [[100.0, 6.0], [86.0, 0.0], [72.0, -16.0], [58.0, -34.0], [44.0, -46.0], [30.0, -54.0], [15.0, -56.0], [0.0, -58.0]]
+		var k := 0
+		for column: Array in columns:
+			for side: float in ([1.0] if float(column[0]) == 0.0 else [-1.0, 1.0]):
+				var az: float = column[0] * side
+				var el: float = column[1]
+				while el >= -82.0:
+					var p := _face_point(az, el)
+					k += 1
+					head.ellipsoid(Transform3D(Basis(Vector3.UP, deg_to_rad(az)) * Basis(Vector3.RIGHT, deg_to_rad(el) * 0.5), p),
+						Vector3(0.05, 0.048, 0.034), 7, 4, hair if k % 2 == 0 else hair_dark)
+					el -= 16.0
+	if look.mustache or look.beard:
+		for side: float in [-1.0, 1.0]:
+			head.ellipsoid(Transform3D(Basis(Vector3.FORWARD, side * 0.3), Vector3(side * 0.048, -0.138, -HEAD.z + 0.01)),
+				Vector3(0.055, 0.025, 0.028), 8, 4, hair)

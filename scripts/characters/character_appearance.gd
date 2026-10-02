@@ -37,6 +37,8 @@ enum Outfit { WINTER, SUMMER }
 @export var mustache := false
 ## Brauen (Alpha 0 = Haarfarbe, etwas dunkler).
 @export var brow_color := Color(0, 0, 0, 0)
+## Zusätzliche Dicke der Augenbrauen (0 = normal, 1 = buschig).
+@export_range(0.0, 1.0, 0.05) var brow_thickness := 0.0
 
 @export_group("Haare")
 @export var hair_style := HairStyle.NONE
@@ -94,6 +96,8 @@ enum Outfit { WINTER, SUMMER }
 @export var mitten_color := Color(0, 0, 0, 0)
 ## Bündchen der Fäustlinge (Alpha 0 = keins).
 @export var mitten_cuff_color := Color(0, 0, 0, 0)
+## Arbeitshandschuhe aus Leder in mitten_color (auch im Sommer; Stulpe in mitten_cuff_color).
+@export var gloves := false
 
 @export_group("Taschen")
 ## Umhängetasche quer über die Brust.
