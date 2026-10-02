@@ -149,10 +149,15 @@ func _build_legs() -> void:
 				# Rock/Kleid: nur Bein bzw. Strumpfhose
 				kit.lathe(xf, [Vector2(0.066, -0.3), Vector2(0.072, -0.1), Vector2(0.08, 0.02)], 10, leg, look.tights_color.a > 0.0)
 		if look.sock_color.a > 0.0:
-			# Kniestrumpf bzw. Söckchen mit umgeschlagenem Rand (Vorlage baker: bis 0,11 m)
-			kit.lathe(xf, [Vector2(0.074, -0.3), Vector2(0.078, -0.25)], 10, _solid(look.sock_color))
-			kit.lathe(xf, [Vector2(0.078, -0.25), Vector2(0.088, -0.245), Vector2(0.09, -0.22), Vector2(0.083, -0.21)], 12,
-				CharacterKit.paint(look.sock_color, P.KNIT_CUFF, 22.0), true, 1.0, 1.0, 0.0, 1.0, 0.0, false, true)
+			if look.shoes in [CharacterAppearance.Shoes.BOOTS, CharacterAppearance.Shoes.LACED_BOOTS]:
+				# Dicker Strickrand über dem Stiefelschaft (winter_girl: 0,14–0,19 m über dem Boden)
+				kit.lathe(xf, [Vector2(0.09, -0.195), Vector2(0.104, -0.19), Vector2(0.108, -0.155), Vector2(0.098, -0.142),
+					Vector2(0.085, -0.14)], 12, CharacterKit.paint(look.sock_color, P.KNIT_CUFF, 22.0), true, 1.0, 1.05, 0.0, 1.0, 0.0, true)
+			else:
+				# Kniestrumpf bzw. Söckchen mit umgeschlagenem Rand (Vorlage baker: bis 0,11 m)
+				kit.lathe(xf, [Vector2(0.074, -0.3), Vector2(0.078, -0.25)], 10, _solid(look.sock_color))
+				kit.lathe(xf, [Vector2(0.078, -0.25), Vector2(0.088, -0.245), Vector2(0.09, -0.22), Vector2(0.083, -0.21)], 12,
+					CharacterKit.paint(look.sock_color, P.KNIT_CUFF, 22.0), true, 1.0, 1.0, 0.0, 1.0, 0.0, false, true)
 		_build_shoe(kit, side)
 
 
@@ -233,9 +238,15 @@ static func torso_normal(angle: float) -> Vector3:
 func _build_torso() -> void:
 	var xf := Transform3D.IDENTITY
 	var shirt := _fabric(look.shirt_color, look.shirt_pattern, look.shirt_stripe_color, 1.0, look.shirt_line_color)
+	if look.top_style == CharacterAppearance.TopStyle.SWEATER and look.shirt_pattern == CharacterAppearance.Pattern.SOLID:
+		shirt = CharacterKit.paint(look.shirt_color, P.RIBS, 30.0)
 	if look.top_style == CharacterAppearance.TopStyle.TURTLENECK and look.shirt_pattern == CharacterAppearance.Pattern.SOLID:
 		shirt = CharacterKit.paint(look.shirt_color, P.RIBS, 30.0)
 	torso.lathe(xf, TORSO, 18, shirt, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.0, true, true)
+	if look.top_style == CharacterAppearance.TopStyle.SWEATER:
+		# Strickpulli (winter_girl): langer Rippbund über der Hüfte
+		torso.lathe(xf, [Vector2(0.262, 0.31), Vector2(0.27, 0.325), Vector2(0.268, 0.39), Vector2(0.258, 0.4)], 20,
+			CharacterKit.paint(look.shirt_color.darkened(0.03), P.KNIT_CUFF, 40.0), true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.0, true)
 	_build_neckline()
 	_build_scarf()
 	_build_waist()
@@ -369,6 +380,8 @@ func _build_outer() -> void:
 			_vest()
 		CharacterAppearance.Outer.TUNIC:
 			_tunic()
+		CharacterAppearance.Outer.PUFFER_VEST:
+			_puffer_vest()
 
 
 ## Latzhose: Hosenteil, Latz mit großer Brusttasche, Träger mit Messingknöpfen,
@@ -720,6 +733,29 @@ func _tunic() -> void:
 	torso.box(Transform3D(nb, at + Vector3(0, 0, -0.005)), Vector3(0.045, 0.03, 0.008), belt)
 
 
+## Daunenweste (winter_girl): dicke, gesteppte Weste ohne Ärmel bis 0,38 m, vorne offen
+## (Pulli sichtbar), aufgesetzte Klappentaschen; Stehkragen hinten.
+func _puffer_vest() -> void:
+	var quilt := CharacterKit.paint(look.outer_color, P.QUILT, 9.0)
+	var seam := _solid(look.outer_color.darkened(0.25))
+	var xf := Transform3D.IDENTITY
+	var hem := 0.38
+	var gap := 0.06
+	var profile: Array = [Vector2(0.27, hem), Vector2(0.282, hem + 0.03)] + torso_profile(0.45, NECK_Y - 0.03, 4)
+	torso.lathe(xf, profile, 22, quilt, true, 1.0, TORSO_DEPTH, gap, 1.0 - gap, 0.035)
+	# Stehkragen hinten und an den Seiten
+	torso.lathe(xf, [Vector2(0.13, NECK_Y - 0.035), Vector2(0.125, NECK_Y + 0.02)], 16, quilt, true, 1.0, 0.9, 0.18, 0.82, 0.02)
+	# Kanten vorne
+	for side: float in [-1.0, 1.0]:
+		torso.panel(xf, profile, 1, quilt, 1.0, TORSO_DEPTH, side * gap - 0.004, side * gap + 0.004, 0.035, 0.012, seam)
+		# Klappentasche
+		var at := side * 0.13
+		torso.panel(xf, torso_profile(hem + 0.03, hem + 0.12, 2), 3, _solid(look.outer_color.darkened(0.05)), 1.0, TORSO_DEPTH,
+			at - 0.05, at + 0.05, 0.05, 0.012, seam)
+		torso.panel(xf, torso_profile(hem + 0.1, hem + 0.135, 1), 3, _solid(look.outer_color), 1.0, TORSO_DEPTH,
+			at - 0.055, at + 0.055, 0.064, 0.012, seam)
+
+
 ## Halbe Breite des V-Ausschnitts (Winkelanteil) in Höhe [param y].
 func _v_half(y: float, tip: float) -> float:
 	return 0.075 * clampf((y - tip) / (NECK_Y - tip), 0.0, 1.0)
@@ -814,8 +850,13 @@ func _build_arms() -> void:
 			_:
 				kit.lathe(xf, [Vector2(0.062, -0.2), Vector2(0.07, -0.08), Vector2(0.078, 0.0), Vector2(0.06, 0.05), Vector2(0.0, 0.07)],
 					10, sleeve)
-				kit.lathe(xf, [Vector2(0.06, -0.225), Vector2(0.066, -0.195)], 10,
-					CharacterKit.paint(look.shirt_color.darkened(0.05), P.KNIT_CUFF, 18.0))
+				if look.top_style == CharacterAppearance.TopStyle.SWEATER and look.outer not in SLEEVED_OUTER:
+					# Breites Rippbündchen (winter_girl)
+					kit.lathe(xf, [Vector2(0.064, -0.235), Vector2(0.078, -0.228), Vector2(0.08, -0.165), Vector2(0.072, -0.158)], 10,
+						CharacterKit.paint(look.shirt_color.darkened(0.04), P.KNIT_CUFF, 22.0), true, 1.0, 1.0, 0.0, 1.0, 0.0, true)
+				else:
+					kit.lathe(xf, [Vector2(0.06, -0.225), Vector2(0.066, -0.195)], 10,
+						CharacterKit.paint(look.shirt_color.darkened(0.05), P.KNIT_CUFF, 18.0))
 		_build_hand(kit, -1.0 if i == 0 else 1.0, HAND_Y)
 
 
@@ -971,7 +1012,7 @@ func _build_hair() -> void:
 			_hat_skip_crown = true
 		elif hat in [CharacterAppearance.HatStyle.BEANIE, CharacterAppearance.HatStyle.POMPOM_BEANIE]:
 			# Umschlag vorne 0,04 m über, hinten 0,14 m unter der Kopfmitte (18° gekippt)
-			_hat_rim = Vector2(-0.05, 0.091)
+			_hat_rim = Vector2(-0.05, 0.3 * sin(deg_to_rad(18.0 + look.hat_tilt)))
 		_hat_bang = 0.36 if hat in [CharacterAppearance.HatStyle.BEANIE, CharacterAppearance.HatStyle.POMPOM_BEANIE] else 0.6
 	match look.hair_style:
 		CharacterAppearance.HairStyle.SPIKY, CharacterAppearance.HairStyle.MESSY, CharacterAppearance.HairStyle.CURLY:
@@ -1184,7 +1225,7 @@ func _build_hat(hat: CharacterAppearance.HatStyle) -> void:
 			# gekippt; Vorlage: Umschlag vorne 0,04 m über der Kopfmitte, oben 0,36 m.
 			var knit := CharacterKit.paint(look.hat_color, P.PLAID, 9.0, look.hat_color.darkened(0.05), look.hat_color.darkened(0.3))
 			var rib := CharacterKit.paint(look.hat_color.darkened(0.04), P.PLAID, 8.0, look.hat_color.darkened(0.08), look.hat_color.darkened(0.32))
-			var hat_xf := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(18.0)), Vector3(0, -0.05, 0.03))
+			var hat_xf := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(18.0 + look.hat_tilt)), Vector3(0, -0.05, 0.03))
 			head.lathe(hat_xf, [Vector2(0.295, 0.0), Vector2(0.312, 0.025), Vector2(0.315, 0.11), Vector2(0.3, 0.135)], 20, rib,
 				true, 1.0, 0.97, 0.0, 1.0, 0.0, true)
 			head.lathe(hat_xf, [Vector2(0.285, 0.12), Vector2(0.305, 0.18), Vector2(0.295, 0.24), Vector2(0.25, 0.3), Vector2(0.14, 0.335),
@@ -1265,12 +1306,23 @@ func _build_scarf() -> void:
 			if not winter:
 				return
 			var knit := _fabric(look.scarf_color, look.scarf_pattern, look.scarf_color2, 1.0)
-			torso.torus(Transform3D(Basis.IDENTITY, Vector3(0, NECK_Y, 0)), 0.115, 0.045, 18, 7, knit, 1.0, 0.88, 1.1)
-			# Herabhängendes Ende vorne links
-			var points := [torso_point(-0.06, NECK_Y - 0.03, 0.045), torso_point(-0.075, NECK_Y - 0.12, 0.03),
-				torso_point(-0.08, NECK_Y - 0.22, 0.025)]
-			var outward := [torso_normal(-0.06), torso_normal(-0.075), torso_normal(-0.08)]
-			torso.strip(points, outward, 0.085, 0.03, knit)
+			# Dicker, zweimal gewickelter Schal (winter_girl), ein Ende vorne links, eines
+			# hinten, beide mit Fransen
+			torso.torus(Transform3D(Basis.IDENTITY, Vector3(0, NECK_Y - 0.005, 0)), 0.12, 0.05, 18, 7, knit, 1.0, 0.88, 1.0)
+			torso.torus(Transform3D(Basis(Vector3.RIGHT, 0.2), Vector3(0, NECK_Y - 0.05, -0.01)), 0.15, 0.04, 18, 6, knit, 1.0, 0.86, 1.0)
+			for end: Array in [[-0.09, 0.3], [0.54, 0.22]]:
+				var angle: float = end[0]
+				var length: float = end[1]
+				var points := [torso_point(angle, NECK_Y - 0.04, 0.07), torso_point(angle * 1.05, NECK_Y - 0.04 - length * 0.5, 0.05),
+					torso_point(angle * 1.1, NECK_Y - 0.04 - length, 0.045)]
+				var outward := [torso_normal(angle), torso_normal(angle), torso_normal(angle)]
+				torso.strip(points, outward, 0.1, 0.03, knit)
+				var tip: Vector3 = points[2]
+				var n := torso_normal(angle)
+				var across := Vector3.UP.cross(n).normalized()
+				for k in 5:
+					var at := tip + across * (float(k) - 2.0) * 0.019 + n * 0.015 + Vector3(0, -0.025, 0)
+					torso.box(Transform3D(Basis.looking_at(-n, Vector3.UP), at), Vector3(0.011, 0.05, 0.01), knit)
 
 
 ## Runde Brille (grandpa_cardigan): zwei Ringe vor den Augen, Steg, Bügel zu den Ohren.
