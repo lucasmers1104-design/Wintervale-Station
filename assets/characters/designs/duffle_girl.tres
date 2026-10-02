@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="CharacterAppearance" format=3]
+
+[ext_resource type="Script" path="res://scripts/characters/character_appearance.gd" id="1_look"]
+
+[resource]
+resource_name = "Duffle Girl"
+script = ExtResource("1_look")
+skin_color = Color(0.95, 0.64, 0.47, 1)
+hair_style = 9
+hair_extra = 6
+hair_color = Color(0.43, 0.24, 0.14, 1)
+hat_style = 2
+hat_color = Color(0.72, 0.33, 0.33, 1)
+hat_color2 = Color(0.88, 0.8, 0.68, 1)
+hat_color3 = Color(0.86, 0.55, 0.52, 1)
+top_style = 1
+shirt_color = Color(0.86, 0.79, 0.68, 1)
+sleeves = 1
+accent_color = Color(0.4, 0.24, 0.14, 1)
+outer = 12
+outer_color = Color(0.6, 0.18, 0.18, 1)
+bottom = 4
+pants_color = Color(0.6, 0.18, 0.18, 1)
+tights_color = Color(0.22, 0.13, 0.09, 1)
+sock_color = Color(0.86, 0.79, 0.68, 1)
+shoe_color = Color(0.55, 0.32, 0.17, 1)
+scarf_style = 1
+scarf_color = Color(0.82, 0.5, 0.48, 1)
+scarf_color2 = Color(0.88, 0.8, 0.68, 1)
+scarf_pattern = 3
+hat_tilt = -6.0
+hat_lift = 0.03
+hat_scale = 1.05

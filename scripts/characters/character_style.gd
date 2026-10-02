@@ -386,6 +386,8 @@ func _build_outer() -> void:
 			_puffer_vest()
 		CharacterAppearance.Outer.PUFFER_JACKET:
 			_puffer_jacket()
+		CharacterAppearance.Outer.DUFFLE_COAT:
+			_duffle_coat()
 
 
 ## Latzhose: Hosenteil, Latz mit großer Brusttasche, Träger mit Messingknöpfen,
@@ -785,6 +787,35 @@ func _puffer_jacket() -> void:
 			p - 0.06, p + 0.06, 0.066, 0.012, seam)
 
 
+## Dufflecoat (duffle_girl): A-Linie bis 0,27 m, runder Kragen, zwei Knebelverschlüsse
+## (Holzknebel mit Kordelschlaufe), Klappentaschen; Ärmel aus SLEEVED_OUTER mit Umschlag.
+func _duffle_coat() -> void:
+	var cloth := _fabric(look.outer_color, look.outer_pattern, look.outer_color2)
+	var seam := _solid(look.outer_color.darkened(0.25))
+	var xf := Transform3D.IDENTITY
+	var hem := 0.27
+	var profile: Array = [Vector2(0.335, hem), Vector2(0.31, 0.33), Vector2(0.28, 0.4)] + torso_profile(0.45, NECK_Y - 0.02, 4)
+	torso.lathe(xf, profile, 22, cloth, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.03)
+	torso.panel(xf, profile, 1, seam, 1.0, TORSO_DEPTH, 0.02, 0.026, 0.032, 0.006, seam)
+	# Runder Kragen
+	torso.torus(Transform3D(Basis(Vector3.RIGHT, 0.2), Vector3(0, NECK_Y - 0.02, 0.0)), 0.135, 0.03, 18, 5, cloth, 1.0, 0.86)
+	# Knebel: Holzstab rechts, Kordelschlaufe nach links
+	var wood := _solid(look.accent_color)
+	var cord := _solid(look.accent_color.lightened(0.2))
+	for k in 2:
+		var y := 0.6 - k * 0.13
+		var at := torso_point(0.0, y, 0.05)
+		torso.box(Transform3D(Basis(Vector3.FORWARD, 0.15), at + Vector3(0.015, 0, 0)), Vector3(0.065, 0.022, 0.022), wood)
+		torso.tube([at + Vector3(-0.02, 0.012, 0), at + Vector3(-0.07, 0.01, 0.0), at + Vector3(-0.07, -0.01, 0.0),
+			at + Vector3(-0.02, -0.012, 0)], 0.007, 4, cord)
+		torso.ellipsoid(Transform3D(Basis.IDENTITY, at + Vector3(-0.075, 0, 0.005)), Vector3(0.014, 0.014, 0.01), 6, 3, wood)
+	for side: float in [-1.0, 1.0]:
+		var p := side * 0.15
+		torso.panel(xf, [Vector2(0.318, 0.3), Vector2(0.3, 0.35), Vector2(0.285, 0.39)], 3, cloth, 1.0, TORSO_DEPTH,
+			p - 0.055, p + 0.055, 0.045, 0.012, seam)
+		torso.panel(xf, [Vector2(0.29, 0.375), Vector2(0.28, 0.41)], 3, cloth, 1.0, TORSO_DEPTH, p - 0.06, p + 0.06, 0.058, 0.012, seam)
+
+
 ## Halbe Breite des V-Ausschnitts (Winkelanteil) in Höhe [param y].
 func _v_half(y: float, tip: float) -> float:
 	return 0.075 * clampf((y - tip) / (NECK_Y - tip), 0.0, 1.0)
@@ -890,6 +921,10 @@ func _build_arms() -> void:
 			_:
 				kit.lathe(xf, [Vector2(0.062, -0.2), Vector2(0.07, -0.08), Vector2(0.078, 0.0), Vector2(0.06, 0.05), Vector2(0.0, 0.07)],
 					10, sleeve)
+				if look.outer in [CharacterAppearance.Outer.DUFFLE_COAT, CharacterAppearance.Outer.LONG_COAT]:
+					# Umgeschlagene Mantelmanschette (duffle_girl)
+					kit.lathe(xf, [Vector2(0.074, -0.19), Vector2(0.09, -0.185), Vector2(0.092, -0.13), Vector2(0.08, -0.12)], 10,
+						_solid(look.outer_color.lightened(0.04)), true, 1.0, 1.0, 0.0, 1.0, 0.0, true)
 				if look.top_style == CharacterAppearance.TopStyle.SWEATER:
 					# Breites Rippbündchen (winter_girl)
 					kit.lathe(xf, [Vector2(0.064, -0.235), Vector2(0.078, -0.228), Vector2(0.08, -0.165), Vector2(0.072, -0.158)], 10,
@@ -1190,6 +1225,10 @@ func _build_hair_extra(hair: CharacterKit.Paint, _hair_dark: CharacterKit.Paint)
 			for side: float in [-1.0, 1.0]:
 				head.ellipsoid(Transform3D(Basis(Vector3.UP, side * 0.5), Vector3(side * 0.19, -0.12, 0.16)), Vector3(0.1, 0.1, 0.095), 9, 6, hair)
 			head.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(0.0, -0.19, 0.25)), Vector3(0.09, 0.085, 0.08), 9, 6, hair)
+		CharacterAppearance.HairExtra.LOW_TWIN_BUNS:
+			# Zwei tiefe Knoten hinter den Ohren (duffle_girl)
+			for side: float in [-1.0, 1.0]:
+				head.ellipsoid(Transform3D(Basis(Vector3.UP, side * 0.4), Vector3(side * 0.25, -0.17, 0.11)), Vector3(0.1, 0.1, 0.095), 9, 6, hair)
 		CharacterAppearance.HairExtra.LOW_TAIL:
 			# Tiefer, runder Zopf im Nacken mit Haargummi (bow_color)
 			head.ellipsoid(Transform3D(Basis(Vector3.RIGHT, 0.5), Vector3(0.0, -0.2, 0.27)), Vector3(0.085, 0.1, 0.075), 10, 6, hair)
@@ -1265,7 +1304,9 @@ func _build_hat(hat: CharacterAppearance.HatStyle) -> void:
 			# mit Rautengitter (Strickbild der Vorlage), Bommel oben hinten. Nach hinten
 			# gekippt; Vorlage: Umschlag vorne 0,04 m über der Kopfmitte, oben 0,36 m.
 			var knit := CharacterKit.paint(look.hat_color, P.PLAID, 9.0, look.hat_color.darkened(0.05), look.hat_color.darkened(0.3))
-			var rib := CharacterKit.paint(look.hat_color.darkened(0.04), P.PLAID, 8.0, look.hat_color.darkened(0.08), look.hat_color.darkened(0.32))
+			# Umschlag in hat_color3 (duffle_girl: heller als die Kuppel), sonst Mützenfarbe
+			var cuff_color := look.hat_color3 if look.hat_color3.a > 0.0 else look.hat_color.darkened(0.04)
+			var rib := CharacterKit.paint(cuff_color, P.PLAID, 8.0, cuff_color.darkened(0.04), cuff_color.darkened(0.28))
 			var hat_xf := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(18.0 + look.hat_tilt)) * Basis.from_scale(Vector3.ONE * look.hat_scale),
 				Vector3(0, -0.05 + look.hat_lift, 0.03))
 			head.lathe(hat_xf, [Vector2(0.295, 0.0), Vector2(0.312, 0.025), Vector2(0.315, 0.11), Vector2(0.3, 0.135)], 20, rib,
@@ -1363,11 +1404,16 @@ func _build_scarf() -> void:
 		CharacterAppearance.ScarfStyle.WRAP:
 			if not winter:
 				return
-			var knit := _fabric(look.scarf_color, look.scarf_pattern, look.scarf_color2, 1.0)
+			# Breite Blockstreifen bzw. grobes Karo wie in den Vorlagen
+			var knit := _fabric(look.scarf_color, look.scarf_pattern, look.scarf_color2,
+				0.3 if look.scarf_pattern == CharacterAppearance.Pattern.STRIPES else 0.5)
 			# Dicker, zweimal gewickelter Schal (winter_girl), ein Ende vorne links, eines
 			# hinten, beide mit Fransen
-			torso.torus(Transform3D(Basis.IDENTITY, Vector3(0, NECK_Y - 0.005, 0)), 0.12, 0.05, 18, 7, knit, 1.0, 0.88, 1.0)
-			torso.torus(Transform3D(Basis(Vector3.RIGHT, 0.2), Vector3(0, NECK_Y - 0.05, -0.01)), 0.15, 0.04, 18, 6, knit, 1.0, 0.86, 1.0)
+			# Wickellagen als geschlossene Bänder (Streifen laufen quer zur Wickelrichtung)
+			var ring_knit := _fabric(look.scarf_color, look.scarf_pattern, look.scarf_color2,
+				0.75 if look.scarf_pattern == CharacterAppearance.Pattern.STRIPES else 0.5)
+			_scarf_ring(Transform3D(Basis.IDENTITY, Vector3(0, NECK_Y + 0.005, 0)), 0.13, 0.1, 0.05, ring_knit)
+			_scarf_ring(Transform3D(Basis(Vector3.RIGHT, 0.2), Vector3(0, NECK_Y - 0.06, -0.01)), 0.16, 0.08, 0.04, ring_knit)
 			for end: Array in [[-0.09, 0.3], [0.54, 0.22]]:
 				var angle: float = end[0]
 				var length: float = end[1]
@@ -1460,3 +1506,16 @@ func _build_beard() -> void:
 		for side: float in [-1.0, 1.0]:
 			head.ellipsoid(Transform3D(Basis(Vector3.FORWARD, side * 0.3), Vector3(side * 0.048, -0.138, -HEAD.z + 0.01)),
 				Vector3(0.055, 0.025, 0.028), 8, 4, hair)
+
+
+## Geschlossenes Schalband um den Hals: [param width] hoch, [param thickness] dick.
+func _scarf_ring(xf: Transform3D, radius: float, width: float, thickness: float, paint: CharacterKit.Paint) -> void:
+	var points: Array = []
+	var outward: Array = []
+	for k in 17:
+		var a := TAU * float(k) / 16.0
+		var dir := Vector3(sin(a), 0.0, -cos(a) * 0.86)
+		points.append(xf * (dir * radius))
+		outward.append(xf.basis * Vector3(sin(a), 0.0, -cos(a)))
+	# Bahn = Ring, Normale radial: das Band steht senkrecht um den Hals
+	torso.strip(points, outward, width, thickness, paint)
