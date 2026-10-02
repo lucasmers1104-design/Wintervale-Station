@@ -422,6 +422,14 @@ func _on_build_cost_changed(cost: Dictionary) -> void:
 		_cost_row.add_child(amount)
 	if cost.size() == 0 or entries.is_empty():
 		title.text = "Kostenlos"
+	# Fehlende Baustoffe kauft der Baustoffhandel dazu (Epochen-Spiel).
+	var shop := Economy.get_shop_cost(cost)
+	if shop > 0:
+		var note := Label.new()
+		note.text = "+ %s Baustoffhandel" % Economy.format_money(shop)
+		note.add_theme_font_size_override("font_size", 14)
+		note.add_theme_color_override("font_color", Color(1.0, 0.8, 0.45))
+		_cost_row.add_child(note)
 
 
 ## Objekte der gewählten Dorf-Kategorie als kleine Buttons.

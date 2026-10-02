@@ -497,6 +497,18 @@ func _stations() -> void:
 	grid.add_theme_constant_override("h_separation", 18)
 	grid.add_theme_constant_override("v_separation", 18)
 	_content.add_child(grid)
+	for portal in region.portals:
+		var tunnel := S.card(grid, true)
+		tunnel.get_parent().size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var tunnel_head := _row(tunnel, 12)
+		tunnel_head.add_child(S.icon_rect(S.icon("trips"), 56))
+		var tunnel_names := VBoxContainer.new()
+		tunnel_names.add_theme_constant_override("separation", -4)
+		tunnel_names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tunnel_head.add_child(tunnel_names)
+		tunnel_names.add_child(S.label(portal.station_name, 30))
+		tunnel_names.add_child(S.label("Tunnel in die weite Welt", 17, S.INK_SOFT))
+		tunnel.add_child(S.paragraph("Von hier kommen Züge, Gäste und neue Familien. %d Fahrgäste sind schon hierher gereist." % portal.passenger_total, 17))
 	for station in region.stations:
 		var card := S.card(grid)
 		card.get_parent().size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -554,6 +566,14 @@ func _station() -> void:
 	S.stat(stats, "trips", str(station.services), "Ankünfte")
 	S.stat(stats, "goods", str(station.delivered_goods), "gelieferte Güter")
 	S.stat(stats, "population", str(station.house_ids.size()), "Häuser")
+	if not station.waiting_houses.is_empty():
+		var waiting := _row(stats_card, 10)
+		waiting.add_child(S.icon_rect(S.icon("passengers"), 30))
+		var served := false
+		for line in region.lines:
+			var other := station_other_end(line, station.station_id)
+			served = served or (other != null and other.is_portal())
+		waiting.add_child(S.paragraph(("%d Familien sitzen schon im Zug aus dem Tunnel." if served else "%d Familien warten im Tunnel auf einen Zug – richte eine Linie vom Tunnel hierher ein.") % station.waiting_houses.size(), 17, S.GREEN if served else S.RED.lightened(0.1)))
 	var row := _row(_content, 18)
 	var upgrade_card := S.card(row, true)
 	upgrade_card.get_parent().size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -817,8 +837,8 @@ func _line_form(parent: Node, train_id: String) -> void:
 	var title := _row(form, 10)
 	title.add_child(S.icon_rect(S.icon("lines"), 40))
 	title.add_child(S.label("Zug auf die Strecke schicken", 26))
-	if region.stations.size() < 2:
-		form.add_child(S.paragraph("Für eine Verbindung werden zwei Haltepunkte gebraucht. Baue sie im Baumodus (B) mit dem Haltepunkt-Werkzeug (H)."))
+	if region.stations.is_empty():
+		form.add_child(S.paragraph("Für eine Verbindung brauchst du einen Haltepunkt am Gleis, das vom Tunnel kommt. Baue ihn im Baumodus (B) mit dem Haltepunkt-Werkzeug (H)."))
 		return
 	var row := _row(form, 10)
 	var a := OptionButton.new()
@@ -832,10 +852,17 @@ func _line_form(parent: Node, train_id: String) -> void:
 	a.custom_minimum_size.x = 230
 	b.custom_minimum_size.x = 230
 	types.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Tunnel zuerst: die erste Linie fährt Nordtal ⇄ eigener Ort.
+	for portal in region.portals:
+		a.add_item("%s (Tunnel)" % portal.station_name, portal.station_id)
 	for station in region.stations:
 		a.add_item(station.station_name, station.station_id)
 		b.add_item(station.station_name, station.station_id)
-	b.select(1)
+	for portal in region.portals:
+		b.add_item("%s (Tunnel)" % portal.station_name, portal.station_id)
+	b.select(0)
+	if region.portals.is_empty() and region.stations.size() > 1:
+		b.select(1)
 	for id in EpochCatalog.TRAIN_IDS:
 		if region.progression.is_train_unlocked(id):
 			types.add_item(EpochCatalog.train(id).display_name)
@@ -853,6 +880,8 @@ func _line_form(parent: Node, train_id: String) -> void:
 		var line := region.add_line(a.get_selected_id(), b.get_selected_id(), String(types.get_selected_metadata()))
 		if not line.is_empty():
 			S.play_chime()
+			_show_arrival(line)
+			return
 		_refresh(), true, "trips", 22)
 	action.custom_minimum_size = Vector2(260, 56)
 	bottom.add_child(hint)
@@ -913,10 +942,42 @@ func _line_card(line: Dictionary) -> void:
 	remove.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 
+## Nach dem Einsetzen: Buch schließen und die Kamera zum Tunnel schwenken,
+## aus dem der neue Zug gleich herausrollt.
+func _show_arrival(line: Dictionary) -> void:
+	var a := region.station_by_id(int(line["a"]))
+	var b := region.station_by_id(int(line["b"]))
+	var portal := (a if a.is_portal() else (b if b.is_portal() else region.portal_for(a))) as RegionPortal
+	close()
+	if portal == null:
+		return
+	var build := region.get_parent().get_node_or_null("BuildMode") as BuildMode
+	if build == null:
+		return
+	if build.view_mode_controller.mode != GameDefs.ViewMode.BIRD_EYE:
+		build.view_mode_controller.set_mode(GameDefs.ViewMode.BIRD_EYE)
+	build.bird_eye.stop_following()
+	build.bird_eye.focus_on(portal.get_mouth() + portal.global_basis.z * 14.0)
+	Events.notification_requested.emit("Der Zug ist unterwegs – gleich kommt er aus dem Tunnel %s" % portal.station_name)
+
+
+func station_other_end(line: Dictionary, station_id: int) -> RegionStation:
+	if int(line["a"]) == station_id:
+		return region.station_by_id(int(line["b"]))
+	if int(line["b"]) == station_id:
+		return region.station_by_id(int(line["a"]))
+	return null
+
+
 func _line_state(line: Dictionary, train: Train) -> String:
 	if not bool(line.get("enabled", true)):
 		return "pausiert"
 	if train == null:
+		var a := region.station_by_id(int(line["a"]))
+		var b := region.station_by_id(int(line["b"]))
+		var portal: RegionStation = a if a and a.is_portal() else (b if b and b.is_portal() else null)
+		if portal and region.line_is_valid(line):
+			return "nächster Zug kommt bald aus %s" % portal.station_name
 		return "wartet auf freie Gleise" if region.line_is_valid(line) else "Verbindung prüfen – Gleis unterbrochen?"
 	if train.doors_open() or train.speed < 0.05:
 		return "hält in %s" % train.entry.station

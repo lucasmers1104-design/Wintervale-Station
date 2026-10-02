@@ -30,7 +30,7 @@ func _run() -> void:
 		for part in 4:
 			var a := Vector3(x,0,-120+part*60)
 			var b := a+Vector3(0,0,60)
-			region.network.restore_segment({"id":route*10+part+1,"kind":0,"start_node":route*10+part+1,"end_node":route*10+part+2,"points":[SaveUtils.vec3_to_array(a),SaveUtils.vec3_to_array(a.lerp(b,0.333333)),SaveUtils.vec3_to_array(a.lerp(b,0.666667)),SaveUtils.vec3_to_array(b)]})
+			region.network.restore_segment({"id":100+route*10+part+1,"kind":0,"start_node":100+route*10+part+1,"end_node":100+route*10+part+2,"points":[SaveUtils.vec3_to_array(a),SaveUtils.vec3_to_array(a.lerp(b,0.333333)),SaveUtils.vec3_to_array(a.lerp(b,0.666667)),SaveUtils.vec3_to_array(b)]})
 	for pair in 3:
 		for side in 2:
 			region.build_station({"id":pair*2+side+1,"name":"Ort %d" % (pair*2+side+1),"level":[6,3,1][pair],"pos":[[-60,-15,30][pair],0,-65 if side==0 else 65],"angle":0},false)
@@ -62,10 +62,10 @@ func _run() -> void:
 	check(a.rename_station("Wintervale Zentrum"),"station rename updates stop/director/spot identity")
 	for stop in a.get_stops():
 		check(stop.station_name==a.station_name,"renamed platform identity")
-	var high := region.add_line(1,2,"high_speed")
-	var old := region.add_line(1,2,"nostalgic_regional")
-	var freight := region.add_line(3,4,"reference_freight")
-	var local := region.add_line(5,6,"diesel_heritage")
+	var high := _line(1,2,"high_speed")
+	var old := _line(1,2,"nostalgic_regional")
+	var freight := _line(3,4,"reference_freight")
+	var local := _line(5,6,"diesel_heritage")
 	check(not high.is_empty() and not old.is_empty() and not freight.is_empty() and not local.is_empty(),"mixed fleet assignments accepted")
 	check(region.dispatcher.get_trains().size()==4,"four independent services run concurrently")
 	var high_train := region.train_for_line(int(high.get("id",-1)))
@@ -100,7 +100,7 @@ func _run() -> void:
 	region.progression.unlocked.append("special_winter") if not region.progression.unlocked.has("special_winter") else null
 	region.stations[4].level = 2
 	region.stations[5].level = 2
-	var shared := region.add_line(5,6,"special_winter")
+	var shared := _line(5,6,"special_winter")
 	check(not shared.is_empty(),"shared-track special service stays in roster")
 	for tick in 10000:
 		await get_tree().physics_frame
@@ -127,14 +127,14 @@ func _run() -> void:
 	check(region.lines[0]["passengers"]==saved["lines"][0]["passengers"],"completed transport counters restored without duplication")
 	# Requirements progress in sequence from measurable metrics, not a timer.
 	region.progression.epoch = 1
-	region.progression.passengers = 11
+	region.progression.passengers = 19
 	region.progression.goods = 120
 	region.progression.services = 50
 	for station in region.stations:
 		station.population = 16 # deterministic census fixture for milestone boundary tests
 	region.progression.refresh()
 	check(region.progression.epoch==1,"one missing passenger keeps epoch two locked")
-	for milestone in [[12,2],[40,3],[100,4],[220,5],[450,6]]:
+	for milestone in [[20,2],[60,3],[100,4],[220,5],[450,6]]:
 		region.progression.passengers = milestone[0]
 		region.progression.refresh()
 		check(region.progression.epoch==milestone[1],"milestone boundary unlocks epoch %d" % milestone[1])
@@ -142,3 +142,18 @@ func _run() -> void:
 	SaveManager.delete_save("regional_restart")
 	print("REGIONAL OPERATIONS RESULTS: %d checks, %d failures" % [checks,failures])
 	get_tree().quit(1 if failures else 0)
+
+
+## Linie zwischen eigenen Orten, deren Zug schon durch den Tunnel angereist ist
+## (so steht sie nach dem Laden im Spielstand). Die Prüfregeln von add_line
+## gelten weiter; nur die Anreise aus dem Tunnel entfällt im Testaufbau.
+func _line(a_id: int, b_id: int, train_id: String) -> Dictionary:
+	var reason := region.line_reason(a_id,b_id,train_id)
+	if reason != "" and not reason.contains("Tunnel"):
+		return {}
+	var line := {"id":region._next_line,"a":a_id,"b":b_id,"train":train_id,"enabled":true,"trips":0,"passengers":0,"goods":0,"cooldown":0.0,"delivered":true}
+	region._next_line += 1
+	region.lines.append(line)
+	region._try_dispatch(line)
+	region.refresh()
+	return line

@@ -100,6 +100,10 @@ func remove_at(point: Vector3) -> bool:
 		return true
 	if _hovered_id < 0:
 		return false
+	var portal_progress := RegionProgression.find(get_tree())
+	if portal_progress and portal_progress.region.is_portal_track(_hovered_id):
+		Events.notification_requested.emit("Der Tunnelanschluss bleibt – hier kommen deine Züge an")
+		return false
 	var id := _hovered_id
 	_set_hovered(-1, -1)
 	var data := network.get_segment_data(id)

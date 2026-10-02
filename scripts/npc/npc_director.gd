@@ -717,6 +717,10 @@ func get_exit_point() -> Vector3:
 ## Gesucht wird knapp über [param reference_y], damit Dächer nicht zählen.
 func ground_height(point: Vector3, reference_y: float) -> float:
 	var base := terrain.get_height(point.x, point.z) if terrain else 0.0
+	# Ein abgerissener Haltepunkt (Undo, Laden) räumt seine Bewohner erst im
+	# nächsten Frame ab – bis dahin gibt es keine Physikwelt mehr.
+	if not is_inside_tree():
+		return base
 	var from := Vector3(point.x, maxf(reference_y, base) + 1.2, point.z)
 	var query := PhysicsRayQueryParameters3D.create(from, Vector3(point.x, base - 1.0, point.z),
 		GameDefs.LAYER_WORLD | GameDefs.LAYER_OBJECTS)

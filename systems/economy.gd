@@ -221,16 +221,64 @@ func _book(amount: int, text: String, kind: String) -> void:
 # --- Kosten ------------------------------------------------------------------------------
 
 ## Was fehlt noch für [param cost]? Rückgabe {"money": n, "<goods>": n} (leer = alles da).
+## Mit [member material_shop] werden fehlende Baustoffe zu Geld umgerechnet.
 func get_missing(cost: Dictionary) -> Dictionary:
 	var missing := {}
 	if free_build:
 		return missing
+	var shop := get_shop_cost(cost)
 	for key: String in cost:
-		var need := int(cost[key])
+		var need := int(cost[key]) + (shop if key == "money" else 0)
 		var have := money if key == "money" else get_available(key)
+		if key != "money" and _shop_covers(key, need - have):
+			continue
 		if need > have:
 			missing[key] = need - have
+	if shop > 0 and not cost.has("money") and shop > money:
+		missing["money"] = shop - money
 	return missing
+
+
+# --- Baustoffhandel (Epochen-Spiel) ------------------------------------------------------
+
+## Fehlende Baustoffe kauft der Baustoffhandel in Nordtal mit Aufpreis dazu –
+## so lässt sich das Dorf auch vor den Güterzügen frei gestalten.
+var material_shop := false
+const SHOP_MARKUP := 1.5
+
+
+## Was der Baustoffhandel für die fehlenden Baustoffe von [param cost] verlangt.
+func get_shop_cost(cost: Dictionary) -> int:
+	if not material_shop or free_build:
+		return 0
+	var total := 0.0
+	for key: String in cost:
+		if key == "money" or not has_goods(key):
+			continue
+		var short := int(cost[key]) - get_available(key)
+		if _shop_covers(key, short):
+			total += short * get_goods_type(key).unit_price * SHOP_MARKUP
+	return ceili(total)
+
+
+func _shop_covers(goods_id: String, short: int) -> bool:
+	return material_shop and short > 0 and has_goods(goods_id) and get_stock(goods_id) + short <= get_max(goods_id)
+
+
+## Fehlende Baustoffe kaufen und einlagern (nur mit [member material_shop]).
+func _buy_short_goods(cost: Dictionary, label: String) -> bool:
+	var shop := get_shop_cost(cost)
+	if shop <= 0:
+		return true
+	if not pay(shop, "Baustoffhandel: " + label, "purchase"):
+		return false
+	for key: String in cost:
+		if key == "money" or not has_goods(key):
+			continue
+		var short := int(cost[key]) - get_available(key)
+		if _shop_covers(key, short):
+			add_stock(key, short)
+	return true
 
 
 func can_afford(cost: Dictionary) -> bool:
@@ -276,6 +324,8 @@ func charge_build(key: String, cost: Dictionary, label: String) -> bool:
 		_reservations[key] = {}
 		return true
 	if not can_afford(cost):
+		return false
+	if not _buy_short_goods(cost, label):
 		return false
 	pay(int(cost.get("money", 0)), label, "build")
 	var goods := {}

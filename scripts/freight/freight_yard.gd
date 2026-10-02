@@ -994,9 +994,10 @@ func _set_phase(phase: String) -> void:
 
 ## Ist der Auftrag noch ausführbar (Zug steht noch, Platz ist noch belegt/frei)?
 func _job_valid() -> bool:
-	var car: TrainCar = _job["car"]
-	if not is_instance_valid(car) or get_current_train() == null:
+	# Erst prüfen, dann typisiert zuweisen: ein abgefahrener Zug ist schon freigegeben.
+	if not is_instance_valid(_job.get("car")) or get_current_train() == null:
 		return false
+	var car: TrainCar = _job["car"]
 	var entry: Dictionary = car.get_cargo()[_job["index"]]
 	if _job["kind"] == "unload":
 		return entry["state"] == "full"

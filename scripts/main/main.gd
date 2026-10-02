@@ -20,6 +20,8 @@ var progression: RegionProgression
 var region: RegionRailway
 
 func _enter_tree() -> void:
+	# Baustoffhandel nur im Epochen-Spiel (dort baut man das Dorf ohne Güterzüge an).
+	Economy.material_shop = not legacy_world
 	if legacy_world:
 		return
 	for path in ["World/TestArea","World/Railway/NordtalPortal","World/Railway/SuedtalPortal","World/Railway/Platform1Stop","World/Railway/Platform2Stop","World/Railway/FreightStop"]:

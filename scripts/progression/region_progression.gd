@@ -27,15 +27,19 @@ func _ready() -> void:
 func metrics() -> Dictionary:
 	var result := {"passengers":passengers,"goods":goods,"services":services,"connected":0,"lines":0,"rail_length":0.0,"population":0}
 	if region:
+		# Eigene Strecke: ohne Tunnel und ohne das vorgegebene Anschlussgleis.
 		for segment in region.network.get_segments():
-			if not segment.tunnel:
+			if not segment.tunnel and not region.is_portal_track(segment.id):
 				result["rail_length"] += segment.length
+		# Verbundene Orte = eigene Haltepunkte mit Zugverkehr (Tunnel zählen nicht).
 		var connected := {}
 		for line in region.lines:
 			if region.line_is_valid(line):
 				result["lines"] += 1
-				connected[int(line["a"])] = true
-				connected[int(line["b"])] = true
+				for key in ["a","b"]:
+					var place := region.station_by_id(int(line[key]))
+					if place and not place.is_portal():
+						connected[place.station_id] = true
 		result["connected"] = connected.size()
 		for station in region.stations:
 			result["population"] += station.population

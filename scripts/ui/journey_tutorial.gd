@@ -1,6 +1,7 @@
-## Einstieg in eine neue Reise: Ilse, die Bahnhofsvorsteherin, führt in sieben
-## Schritten zur ersten fahrenden Linie. Danach bleibt eine kleine Zielkarte
-## mit den Bedingungen der nächsten Epoche.
+## Einstieg in eine neue Reise: Ilse, die Bahnhofsvorsteherin, führt vom
+## Tunnelanschluss über den ersten Zug aus Nordtal bis zur ersten Familie, die
+## in ein selbst gebautes Haus zieht. Danach bleibt eine kleine Zielkarte mit
+## den Bedingungen der nächsten Epoche.
 ##
 ## - Karte oben links im Stil des Reisebuchs (JourneyStyle): Schritt, Text,
 ##   Tastenkappen, Fortschritt als kleines Gleis, Stempel bei Erfolg.
@@ -15,16 +16,18 @@ extends CanvasLayer
 const S = preload("res://scripts/ui/journey_style.gd")
 const CARD_WIDTH := 450.0
 const CARD_POS := Vector2(22.0, 26.0)
-const RAIL_TARGET := 90.0
+const RAIL_TARGET := 60.0
 const NO_POINTS: Array[Vector3] = []
 const STEPS := [
-	{"id": "welcome", "title": "Willkommen in Wintervale!", "text": "Ich bin Ilse, die Bahnhofsvorsteherin. Noch fährt hier kein einziger Zug – lass uns gemeinsam die erste Bahnlinie bauen. Es dauert nur ein paar Minuten.", "button": "Los geht's"},
+	{"id": "welcome", "title": "Willkommen in Wintervale!", "text": "Ich bin Ilse, die Bahnhofsvorsteherin. Aus dem Berg im Norden kommt ein Gleis aus dem Tunnel – von dort reisen alle Züge, Gäste und neuen Nachbarn an. Verbinden wir es mit dem Tal!", "button": "Los geht's", "look": "stub"},
 	{"id": "build", "title": "Der Baumodus", "text": "Drück B, um den Baumodus zu öffnen. Unten links erscheinen dann deine Werkzeuge.", "keys": [&"build_mode"]},
-	{"id": "rails", "title": "Die erste Strecke", "text": "Wähle „Schiene“. Klick einen Startpunkt, dann das Ende – das Gleis folgt dem Gelände. Zwei gerade Stücke mit je etwa 45 m sind ideal.", "keys": [&"build_tool_rail", &"interact_primary"]},
-	{"id": "halts", "title": "Zwei Haltepunkte", "text": "Wähle „Haltepunkt“ und setz zwei Holz-Haltepunkte neben das Gleis – am besten auf die leuchtenden Ringe nahe der Enden.", "keys": [&"build_tool_station", &"interact_primary"], "note": "Falsch gesetzt? „Entfernen“ reißt ihn wieder ab – das Geld kommt zurück."},
-	{"id": "train", "title": "Dein erster Zug", "text": "Öffne den Fuhrpark – der alte Dieseltriebwagen wartet schon. Wähl beide Orte und drück „Zug einsetzen“.", "keys": [&"region_overview"]},
-	{"id": "ride", "title": "Abfahrt!", "text": "Sieh zu, wie Reisende zum Bahnsteig gehen, einsteigen und losfahren. Klick auf den Zug, um mitzufahren – T lässt die Zeit schneller laufen.", "keys": [&"time_speed", &"interact_primary"]},
-	{"id": "grow", "title": "Wintervale wächst", "text": "Jede Fahrt bringt Fahrgäste – und mit ihnen neue Nachbarn. Im Reisebuch siehst du, was die nächste Epoche freischaltet: neue Züge, größere Bahnhöfe, Weichen und Signale.", "button": "Reisebuch öffnen"},
+	{"id": "rails", "title": "Ans Tunnelgleis anschließen", "text": "Wähle „Schiene“ und klick auf das Gleisende am Tunnel (leuchtender Ring). Dann ins flache Tal klicken – Stück für Stück, bis die Strecke lang genug ist.", "keys": [&"build_tool_rail", &"interact_primary"], "look": "stub"},
+	{"id": "halts", "title": "Dein erster Ort", "text": "Ein Haltepunkt genügt: Wähle „Haltepunkt“ und setz ihn neben dein neues Gleis – am besten auf den leuchtenden Ring, mit Abstand zum Tunnel.", "keys": [&"build_tool_station", &"interact_primary"], "note": "Falsch gesetzt? „Entfernen“ reißt ihn wieder ab – das Geld kommt zurück.", "look": "halt"},
+	{"id": "train", "title": "Ein Zug aus Nordtal", "text": "Öffne den Fuhrpark: Der alte Dieseltriebwagen fährt zwischen dem Tunnel Nordtal und deinem Ort hin und her. Drück „Zug einsetzen“.", "keys": [&"region_overview"]},
+	{"id": "ride", "title": "Abfahrt!", "text": "Gleich rollt der Zug aus dem Tunnel, Gäste steigen aus und Reisende fahren nach Nordtal. Klick auf den Zug, um mitzufahren – T lässt die Zeit schneller laufen.", "keys": [&"time_speed", &"interact_primary"], "look": "tunnel"},
+	{"id": "house", "title": "Ein Zuhause bauen", "text": "Dein Dorf gestaltest du selbst. Wähle im Baumodus „Häuser“ und bau ein Häuschen in der Nähe deines Haltepunkts. Fehlende Baustoffe kauft der Baustoffhandel in Nordtal dazu.", "keys": [&"build_mode", &"build_tool_houses"], "look": "house"},
+	{"id": "family", "title": "Neue Nachbarn", "text": "Ist das Haus fertig, steigt die Familie aus dem nächsten Zug aus Nordtal und zieht ein. Bauen geht tagsüber – T beschleunigt die Zeit.", "keys": [&"time_speed"], "look": "halt"},
+	{"id": "grow", "title": "Wintervale wächst", "text": "Mehr Häuser bringen mehr Familien, mehr Familien mehr Fahrgäste. Im Reisebuch siehst du, was die nächste Epoche freischaltet: neue Züge, Weichen, Signale – und später einen zweiten Tunnel.", "button": "Reisebuch öffnen"},
 ]
 
 var region: RegionRailway
@@ -125,35 +128,59 @@ func _evaluate() -> void:
 		_complete_step()
 		return
 	_update_progress(id)
-	_update_markers(_halt_suggestions() if id == "halts" else NO_POINTS)
+	_update_markers(_marker_points(id))
+
+
+func _portal() -> RegionPortal:
+	return region.portals[0] if not region.portals.is_empty() else null
+
+
+## Ein Haltepunkt, den Züge aus dem Tunnel erreichen (null = noch keiner).
+func _served_station() -> RegionStation:
+	var portal := _portal()
+	for station in region.stations:
+		if portal and not region.plan_from_portal(portal, station).is_empty():
+			return station
+	return null
+
+
+func _population() -> int:
+	return int(region.progression.metrics()["population"])
 
 
 func _condition_met(id: String) -> bool:
-	var metrics := region.progression.metrics()
+	var portal := _portal()
 	match id:
 		"welcome":
-			return region.network.get_segment_count() > 0
+			return not region.lines.is_empty()
 		"build":
-			return build_mode.active or region.network.get_segment_count() > 0
+			return build_mode.active or (portal != null and region.connected_length(portal) > 0.0)
 		"rails":
-			return float(metrics["rail_length"]) >= RAIL_TARGET or region.stations.size() >= 2
+			return (portal != null and region.connected_length(portal) >= RAIL_TARGET) or _served_station() != null
 		"halts":
-			return region.stations.size() >= 2
+			return _served_station() != null
 		"train":
 			return not region.lines.is_empty()
 		"ride":
 			return region.progression.passengers > 0 or region.progression.services >= 2
+		"house":
+			return not region.village.get_houses().is_empty()
+		"family":
+			return _population() > 0
 	return false
 
 
 func _progress_of(id: String) -> Vector2:
 	match id:
 		"rails":
-			return Vector2(float(region.progression.metrics()["rail_length"]), RAIL_TARGET)
+			var portal := _portal()
+			return Vector2(region.connected_length(portal) if portal else 0.0, RAIL_TARGET)
 		"halts":
-			return Vector2(region.stations.size(), 2)
+			return Vector2(1 if _served_station() else 0, 1)
 		"ride":
 			return Vector2(mini(region.progression.passengers, 1), 1)
+		"family":
+			return Vector2(mini(_population(), 1), 1)
 	return Vector2(-1, -1)
 
 
@@ -255,7 +282,7 @@ func _build_step_card(step: Dictionary) -> void:
 		row.add_theme_constant_override("separation", 10)
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_body.add_child(row)
-		var icon_name: String = {"rails": "rail", "halts": "station", "ride": "passengers"}.get(String(step["id"]), "journey")
+		var icon_name: String = {"rails": "rail", "halts": "station", "ride": "passengers", "family": "population"}.get(String(step["id"]), "journey")
 		row.add_child(S.icon_rect(S.icon(icon_name), 34))
 		_progress_bar = S.TrackBar.new(progress.x, progress.y)
 		_progress_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -286,6 +313,10 @@ func _build_step_card(step: Dictionary) -> void:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	footer.add_child(spacer)
+	if step.has("look"):
+		# Kamera fährt sanft zur passenden Stelle (Tunnel, Haltepunkt, Bauplatz).
+		var look := String(step["look"])
+		S.button(footer, "Zeigen", func() -> void: _look_at(look), false, "journey", 18)
 	if step.has("button"):
 		var id := String(step["id"])
 		S.button(footer, String(step["button"]), func() -> void:
@@ -390,7 +421,8 @@ func _key_caption(action: StringName) -> String:
 		&"build_mode": return "Baumodus"
 		&"build_tool_rail": return "Schiene"
 		&"build_tool_station": return "Haltepunkt"
-		&"interact_primary": return "setzen" if _step() != 5 else "mitfahren"
+		&"build_tool_houses": return "Häuser"
+		&"interact_primary": return "mitfahren" if not is_finished() and String(STEPS[_step()]["id"]) == "ride" else "setzen"
 		&"region_overview": return "Reisebuch & Fuhrpark"
 		&"time_speed": return "Zeitraffer"
 	return ""
@@ -409,8 +441,13 @@ func _update_progress(id: String) -> void:
 		tween.parallel().tween_method(func(_v: float) -> void: _progress_bar.queue_redraw(), 0.0, 1.0, 0.45)
 	match id:
 		"rails": _progress_label.text = "%d / %d m" % [mini(int(progress.x), int(progress.y)), int(progress.y)]
-		"halts": _progress_label.text = "%d / 2 Orte" % mini(int(progress.x), 2)
+		"halts": _progress_label.text = "noch keiner" if region.stations.is_empty() else ("verbunden" if progress.x >= 1 else "nicht verbunden")
 		"ride": _progress_label.text = "unterwegs" if progress.x < 1 else "angekommen"
+		"family":
+			var waiting := false
+			for station in region.stations:
+				waiting = waiting or not station.waiting_houses.is_empty()
+			_progress_label.text = "eingezogen" if progress.x >= 1 else ("im Zug" if waiting else "im Bau")
 
 
 # --- Position --------------------------------------------------------------
@@ -455,12 +492,14 @@ func _panel_hint() -> String:
 	match String(STEPS[_step()]["id"]):
 		"train":
 			if panel.get_page() in ["fleet", "lines"]:
-				return "Ilse: Wähl beide Orte und drück „Zug einsetzen“ – der Dieseltriebwagen ist kostenlos."
+				return "Ilse: Nordtal ⇄ dein Ort ist schon gewählt – drück „Zug einsetzen“. Der Dieseltriebwagen ist kostenlos."
 			return "Ilse: Öffne den Fuhrpark, um deinen ersten Zug einzusetzen."
 		"welcome", "build", "rails", "halts":
-			return "Ilse: Schließ das Reisebuch (Esc) – draußen wartet deine erste Strecke."
+			return "Ilse: Schließ das Reisebuch (Esc) – draußen wartet der Tunnelanschluss."
 		"ride":
-			return "Ilse: Schließ das Buch und sieh deinem Zug bei der ersten Fahrt zu."
+			return "Ilse: Schließ das Buch und sieh, wie der Zug aus dem Tunnel rollt."
+		"house", "family":
+			return "Ilse: Schließ das Buch – dein erstes Haus wartet auf dich."
 	return ""
 
 
@@ -487,7 +526,83 @@ func _pointer_target() -> Control:
 				var assign := panel.get_tutorial_target("assign")
 				return assign if assign else panel.get_tutorial_target("fleet_tab")
 			return panel.get_tutorial_target("fleet_sign")
+		"house":
+			if build_mode.active and (current_tool == null or current_tool.tool_id != &"village_houses"):
+				return _tool_button(&"village_houses")
 	return null
+
+
+# --- Kamera und Markierungen -----------------------------------------------
+
+## Fährt die Vogelperspektive zur Stelle, um die es im Schritt geht.
+func _look_at(target: String) -> void:
+	var point := _focus_point(target)
+	if point == Vector3.INF:
+		return
+	if build_mode.view_mode_controller.mode != GameDefs.ViewMode.BIRD_EYE:
+		build_mode.view_mode_controller.set_mode(GameDefs.ViewMode.BIRD_EYE)
+	build_mode.bird_eye.stop_following()
+	build_mode.bird_eye.focus_on(point)
+
+
+func _focus_point(target: String) -> Vector3:
+	var portal := _portal()
+	match target:
+		"stub":
+			return portal.get_stub_end() if portal else Vector3.INF
+		"tunnel":
+			return portal.get_mouth() + portal.global_basis.z * 12.0 if portal else Vector3.INF
+		"halt":
+			var station := _served_station()
+			if station:
+				return station.global_position
+			var suggestions := _halt_suggestions()
+			if not suggestions.is_empty():
+				return suggestions[0]
+			return portal.get_stub_end() + portal.global_basis.z * 30.0 if portal else Vector3.INF
+		"house":
+			var spot := _house_suggestion()
+			if spot != Vector3.INF:
+				return spot
+			return _focus_point("halt")
+	return Vector3.INF
+
+
+var _marker_label := "Haltepunkt"
+
+
+## Leuchtende Ringe für den aktuellen Schritt (und ihre Beschriftung).
+func _marker_points(id: String) -> Array[Vector3]:
+	var points: Array[Vector3] = []
+	var portal := _portal()
+	match id:
+		"welcome", "build", "rails":
+			if portal and region.connected_length(portal) <= 0.0:
+				_marker_label = "Hier anschließen"
+				points.append(portal.get_stub_end())
+		"halts":
+			_marker_label = "Haltepunkt"
+			points = _halt_suggestions()
+		"house":
+			_marker_label = "Bauplatz"
+			var spot := _house_suggestion()
+			if spot != Vector3.INF:
+				points.append(spot)
+	return points
+
+
+## Ein freier Bauplatz für ein Häuschen hinter dem ersten Haltepunkt.
+func _house_suggestion() -> Vector3:
+	var station := _served_station()
+	if station == null and not region.stations.is_empty():
+		station = region.stations[0]
+	if station == null:
+		return Vector3.INF
+	for offset: Vector3 in [Vector3(27, 0, 0), Vector3(27, 0, 11), Vector3(27, 0, -11), Vector3(36, 0, 5), Vector3(36, 0, -6)]:
+		var point := station.to_global(offset)
+		if region.village.check_placement("house_cottage", point, station.rotation.y + PI / 2) == "":
+			return point
+	return Vector3.INF
 
 
 func _tool_button(id: StringName) -> Control:
@@ -503,7 +618,7 @@ func _tool_button(id: StringName) -> Control:
 ## Gute Plätze für Haltepunkte: nahe an Gleisenden, mit Platz für den Zug.
 func _halt_suggestions() -> Array[Vector3]:
 	var result: Array[Vector3] = []
-	var wanted := 2 - region.stations.size()
+	var wanted := 0 if _served_station() else 1
 	if wanted <= 0:
 		return result
 	var network := region.network
@@ -551,6 +666,7 @@ func _update_markers(points: Array[Vector3]) -> void:
 	var key := ""
 	for point in points:
 		key += "%d,%d;" % [roundi(point.x), roundi(point.z)]
+	key += _marker_label
 	if key == _marker_key:
 		return
 	_marker_key = key
@@ -558,6 +674,7 @@ func _update_markers(points: Array[Vector3]) -> void:
 		child.queue_free()
 	for point in points:
 		var marker := TutorialMarker.new()
+		marker.caption = _marker_label
 		_markers.add_child(marker)
 		marker.global_position = Vector3(point.x, region.terrain.get_height(point.x, point.z), point.z)
 
@@ -602,6 +719,7 @@ class TutorialPointer extends Control:
 
 ## Leuchtender Ring mit schwebendem Pfeil: „Hier passt ein Haltepunkt hin.“
 class TutorialMarker extends Node3D:
+	var caption := "Haltepunkt"
 	var _arrow: Node3D
 	var _ring: MeshInstance3D
 	var _time := 0.0
@@ -648,7 +766,7 @@ class TutorialMarker extends Node3D:
 		shaft.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_arrow.add_child(shaft)
 		var label := Label3D.new()
-		label.text = "Haltepunkt"
+		label.text = caption
 		label.font = JourneyStyle.serif()
 		label.font_size = 64
 		label.pixel_size = 0.02

@@ -200,12 +200,10 @@ func prepare(item_id: String, position: Vector3, angle: float, variant := 0, end
 		data["home"] = _new_home_name(int(data["seed"]))
 		var progress := RegionProgression.find(get_tree())
 		if progress:
-			var best := 65.0
-			for station in progress.region.stations:
-				var distance := RailGeometry.flat(pos-station.global_position).length()
-				if distance<best:
-					best = distance
-					data["region_station"] = station.station_id
+			# Jedes Haus gehört zum nächsten Haltepunkt – dort kommt die Familie an.
+			var station := progress.region.nearest_station(pos)
+			if station:
+				data["region_station"] = station.station_id
 	return data
 
 
@@ -369,6 +367,8 @@ func check_placement(item_id: String, position: Vector3, angle: float, variant :
 	var progress := RegionProgression.find(get_tree()) if is_inside_tree() else null
 	if progress and not organic and progress.epoch < EpochCatalog.item_epoch(item_id):
 		return "Freigeschaltet ab Epoche %d" % EpochCatalog.item_epoch(item_id)
+	if progress and not organic and VillageCatalog.get_kind(item_id) == "house" and progress.region.stations.is_empty():
+		return "Zuerst einen Haltepunkt bauen – neue Familien kommen mit dem Zug"
 	var kind := VillageCatalog.get_kind(item_id)
 	var fp := VillageFootprint.for_item(item_id, position, angle, variant, end)
 	if VillageCatalog.is_line(item_id):
@@ -686,6 +686,20 @@ func _move_in(house: VillageHouse, arriving: bool) -> void:
 		var station := progress.region.station_by_id(house.region_station_id) if progress else null
 		if station==null or station.director==null:
 			return
+		if arriving:
+			# Gerade fertig: Die Familie reist mit dem nächsten Zug aus dem Tunnel an.
+			if not station.waiting_houses.has(house.object_id):
+				station.waiting_houses.append(house.object_id)
+			progress.region.refresh()
+			var portal := progress.region.serving_portal(station)
+			if not Engine.is_editor_hint():
+				if portal:
+					Events.notification_requested.emit("Familie %s kommt mit dem nächsten Zug aus %s" % [house.home_name, portal.station_name])
+				else:
+					Events.notification_requested.emit("Familie %s wartet im Tunnel – richte im Fuhrpark eine Linie nach %s ein" % [house.home_name, station.station_name])
+			return
+		if station.waiting_houses.has(house.object_id):
+			return
 		var household := get_household(house)
 		var present: Array = _residents.get(house.object_id,[])
 		# Town census includes every household; only a bounded sample becomes NPCs.
@@ -721,6 +735,27 @@ func _move_in(house: VillageHouse, arriving: bool) -> void:
 				Events.notification_requested.emit("Familie %s kommt mit dem Zug aus %s (%d)" % [
 					house.home_name, (household[0] as NpcProfile).came_from, added])
 		changed.emit()
+
+
+## Epochen-Spiel: Die Familie eines fertigen Hauses steigt aus dem Zug aus
+## [param origin] (Tunnel) – höchstens sechs Bewohner je Ort werden zu Figuren.
+func welcome_household(house: VillageHouse, origin: String) -> void:
+	var progress := RegionProgression.find(get_tree())
+	var station := progress.region.station_by_id(house.region_station_id) if progress else null
+	if station == null or station.director == null:
+		return
+	var household := get_household(house)
+	var present: Array = _residents.get(house.object_id, [])
+	for profile: NpcProfile in household:
+		if not present.has(profile) and station.director.get_npcs().size() < 6:
+			profile.came_from = origin
+			station.director.add_resident(profile, origin)
+			present.append(profile)
+	_residents[house.object_id] = present
+	residents_arriving.emit(house.home_name, household.size())
+	if not Engine.is_editor_hint():
+		Events.notification_requested.emit("Familie %s ist in %s angekommen (%d)" % [house.home_name, station.station_name, household.size()])
+	changed.emit()
 
 
 func _move_out(house: VillageHouse) -> void:

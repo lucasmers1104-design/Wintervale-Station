@@ -19,6 +19,14 @@ var _loading := false
 var _growth_timer := 0.0
 var _deliveries: Array[Dictionary] = []
 var _validity_cache := {}
+## Tunnel in den Bergen: Nordtal ab Start, Südtal öffnet sich mit Epoche 3.
+const PORTALS := [
+	{"id":1001,"name":"Nordtal","mouth":Vector3(3.8,0,-78),"yaw":0.0,"epoch":1},
+	{"id":1002,"name":"Südtal","mouth":Vector3(3.8,0,78),"yaw":PI,"epoch":3},
+]
+## Pause zwischen zwei Zügen derselben Tunnel-Linie (Spielsekunden).
+const PORTAL_HEADWAY := 24.0
+var portals: Array[RegionPortal] = []
 
 func _ready() -> void:
 	add_to_group(GameDefs.GROUP_SAVEABLE)
@@ -26,15 +34,77 @@ func _ready() -> void:
 		_validity_cache.clear()
 		refresh())
 	Events.game_loaded.connect(_after_load)
+	# Nach der laufenden Fortschrittsprüfung öffnen (keine verschachtelte Neuzählung).
+	progression.epoch_unlocked.connect(func(_level: int) -> void: open_portals.call_deferred(true))
+	open_portals.call_deferred(false)
+
+## Öffnet alle Tunnel, die zur aktuellen Epoche gehören, samt Anschlussgleis.
+func open_portals(announce: bool, with_track := true) -> void:
+	for definition: Dictionary in PORTALS:
+		if int(definition["epoch"]) > progression.epoch:
+			continue
+		var portal := station_by_id(int(definition["id"])) as RegionPortal
+		if portal == null:
+			portal = RegionPortal.new()
+			portal.configure_portal(int(definition["id"]),String(definition["name"]),definition["mouth"],float(definition["yaw"]),self)
+			portals.append(portal)
+			add_child(portal)
+			if announce:
+				Events.event_banner_requested.emit("Ein neuer Tunnel: %s" % portal.station_name,"Schließe dein Netz an – von dort kommen weitere Gäste und Familien","train")
+		if with_track:
+			portal.ensure_track()
+	_validity_cache.clear()
+	if with_track:
+		refresh()
+
+func _portal_epoch(id: int) -> int:
+	for definition: Dictionary in PORTALS:
+		if int(definition["id"]) == id:
+			return int(definition["epoch"])
+	return 1
+
+## Eigene Gleislänge, die mit dem Tunnel [param portal] verbunden ist (Meter).
+func connected_length(portal: RegionPortal) -> float:
+	var start := network.find_node_near(portal.get_mouth(),2.0)
+	if start == null:
+		return 0.0
+	var seen_nodes := {start.id: true}
+	var seen_segments := {}
+	var open: Array[int] = [start.id]
+	var total := 0.0
+	while not open.is_empty():
+		var node := network.get_rail_node(open.pop_back())
+		for id in node.segment_ids:
+			if seen_segments.has(id):
+				continue
+			seen_segments[id] = true
+			var segment := network.get_segment(id)
+			if segment == null or segment.tunnel:
+				continue
+			if not portal.track_ids.has(id):
+				total += segment.length
+			for next in [segment.start_node_id,segment.end_node_id]:
+				if not seen_nodes.has(next):
+					seen_nodes[next] = true
+					open.append(next)
+	return total
+
+func is_portal_track(segment_id: int) -> bool:
+	for portal in portals:
+		if portal.track_ids.has(segment_id):
+			return true
+	return false
 
 func refresh() -> void:
 	if _loading or progression.loading:
 		return
 	for station in stations:
 		station.population = 0
+		station.waiting_houses.assign(station.waiting_houses.filter(func(id: int) -> bool: return village.get_object(id) != null))
 		for id in station.house_ids:
 			var house := village.get_object(id) as VillageHouse
-			if house and house.is_finished():
+			# Einwohner zählen erst, wenn die Familie mit dem Zug angekommen ist.
+			if house and house.is_finished() and not station.waiting_houses.has(id):
 				station.population += VillageManager.household_size(house)
 	progression.refresh()
 	changed.emit()
@@ -45,13 +115,30 @@ func station_by_id(id: int) -> RegionStation:
 	for station in stations:
 		if station.station_id == id:
 			return station
+	for portal in portals:
+		if portal.station_id == id:
+			return portal
 	return null
 
 func station_by_name(label: String) -> RegionStation:
 	for station in stations:
 		if station.station_name == label:
 			return station
+	for portal in portals:
+		if portal.station_name == label:
+			return portal
 	return null
+
+## Nächstgelegener Haltepunkt (für neue Häuser); null = es gibt noch keinen.
+func nearest_station(point: Vector3) -> RegionStation:
+	var best: RegionStation = null
+	var best_distance := INF
+	for station in stations:
+		var distance := RailGeometry.flat(point-station.global_position).length()
+		if distance < best_distance:
+			best_distance = distance
+			best = station
+	return best
 
 ## Station whose platform or buildings lie under [param point] (null = none).
 func station_at(point: Vector3) -> RegionStation:
@@ -110,6 +197,9 @@ func placement(point: Vector3) -> Dictionary:
 		var occupied := VillageFootprint.make(station.to_global(Vector3(10.7,0,0)),Vector2(9.3,float(EpochCatalog.epoch(station.level)["length"])/2+1),station.rotation.y)
 		if VillageFootprint.overlaps(footprint,occupied,0.2):
 			data["reason"] = "Die Bahnhofsfläche von %s freihalten" % station.station_name
+	for portal in portals:
+		if RailGeometry.flat(axis-portal.get_mouth()).length() < 30:
+			data["reason"] = "Etwas mehr Abstand zum Tunnel lassen"
 	if data["reason"] != "":
 		return data
 	var right := Basis(Vector3.UP,angle).x
@@ -217,6 +307,60 @@ func plan_between(a: RegionStation, b: RegionStation, type: TrainType = null) ->
 					best = {"path":path,"from":from,"to":to,"stop":destination_stop,"origin_stop":origin_stop,"score":score}
 	return best
 
+## Fahrweg vom tiefen Tunnelende zu einem Bahnsteig von [param station].
+## Rückgabe {"path", "to", "stop"} oder {} (keine Verbindung / zu wenig Platz).
+func plan_from_portal(portal: RegionPortal, station: RegionStation, type: TrainType = null) -> Dictionary:
+	if portal == null or station == null or station.is_portal():
+		return {}
+	var start := portal.get_end_segment()
+	if start == null:
+		return {}
+	# Das tiefe Ende ist das Segmentende; aus dem Berg heraus fährt man rückwärts.
+	var outward := start.start_node_id == portal.get_end_node_id()
+	var length := EpochCatalog.consist_length(type) if type else 16.0
+	var best := {}
+	for stop in station.get_stops():
+		var goal := stop.get_segment(network)
+		if goal == null:
+			continue
+		var plan := RailPathfinder.find(network,start.id,outward,goal.id)
+		if plan.is_empty():
+			continue
+		var ids: Array[int] = []
+		ids.assign(plan["ids"])
+		var directions: Array[bool] = []
+		directions.assign(plan["forwards"])
+		var path := TrainPath.new(network,ids,directions)
+		var to := path.distance_near(stop.global_position,goal.id)
+		# Hinter dem Bahnsteig muss die zweite Zughälfte Platz haben.
+		for attempt in 16:
+			if path.total_length-to >= length/2+0.5:
+				break
+			var last := network.get_segment(ids[-1])
+			var node := last.end_node_id if directions[-1] else last.start_node_id
+			var next := _margin_neighbor(last,node,ids)
+			if next == null:
+				break
+			ids.append(next.id)
+			directions.append(next.start_node_id == node)
+			path = TrainPath.new(network,ids,directions)
+		if to+length/2 > path.total_length-0.5 or to < length+4:
+			continue
+		var score := path.total_length
+		for id in ids:
+			if dispatcher.interlocking.get_train_on_segment(id) >= 0:
+				score += 10000
+		if best.is_empty() or score < float(best["score"]):
+			best = {"path":path,"to":to,"stop":stop,"score":score}
+	return best
+
+## Erster Tunnel, aus dem ein Zug [param station] erreichen kann (null = keiner).
+func portal_for(station: RegionStation, type: TrainType = null) -> RegionPortal:
+	for portal in portals:
+		if not plan_from_portal(portal,station,type).is_empty():
+			return portal
+	return null
+
 func _margin_neighbor(segment: RailSegment, node: int, excluded: Array[int]) -> RailSegment:
 	var selected: RailSegment
 	var score := -INF
@@ -291,11 +435,21 @@ func line_reason(a_id: int, b_id: int, train_id: String) -> String:
 	if type == null or not progression.is_train_unlocked(train_id):
 		return "Dieser Zug ist noch gesperrt"
 	if a == null or b == null or a == b:
-		return "Zwei unterschiedliche Haltepunkte auswählen"
+		return "Zwei unterschiedliche Orte auswählen"
+	if a.is_portal() and b.is_portal():
+		return "Zwischen zwei Tunneln hält kein Zug – wähle einen deiner Haltepunkte"
 	if mini(a.level,b.level) < type.required_station_level:
-		return "Beide Bahnhöfe benötigen Stufe %d" % type.required_station_level
-	if plan_between(a,b,type).is_empty():
-		return "Gleise verbinden und an beiden Enden Platz für den ganzen Zug lassen"
+		return "Der Haltepunkt braucht Stufe %d" % type.required_station_level
+	if a.is_portal() or b.is_portal():
+		var portal := (a if a.is_portal() else b) as RegionPortal
+		var station := b if a.is_portal() else a
+		if plan_from_portal(portal,station,type).is_empty():
+			return "Gleis vom Tunnel %s bis %s verbinden – mit Platz für den ganzen Zug" % [portal.station_name,station.station_name]
+	else:
+		if plan_between(a,b,type).is_empty():
+			return "Gleise verbinden und an beiden Enden Platz für den ganzen Zug lassen"
+		if portal_for(a,type) == null:
+			return "Der Zug reist durch den Tunnel an: %s mit dem Tunnel verbinden" % a.station_name
 	for line in lines:
 		if ((int(line["a"])==a_id and int(line["b"])==b_id) or (int(line["a"])==b_id and int(line["b"])==a_id)) and line["train"] == train_id:
 			return "Dieser Zug bedient diese Verbindung bereits"
@@ -309,7 +463,7 @@ func add_line(a_id: int, b_id: int, train_id: String) -> Dictionary:
 	var type := EpochCatalog.train(train_id)
 	if not Economy.pay(type.purchase_price,"Zug einsetzen: "+type.display_name,"build"):
 		return {}
-	var line := {"id":_next_line,"a":a_id,"b":b_id,"train":train_id,"enabled":true,"trips":0,"passengers":0,"goods":0,"cooldown":0.0}
+	var line := {"id":_next_line,"a":a_id,"b":b_id,"train":train_id,"enabled":true,"trips":0,"passengers":0,"goods":0,"cooldown":0.0,"delivered":false}
 	_next_line += 1
 	lines.append(line)
 	_try_dispatch(line)
@@ -333,7 +487,10 @@ func line_is_valid(line: Dictionary) -> bool:
 		return false
 	var key := "%d:%d:%s:%d:%d" % [a.station_id,b.station_id,line["train"],a.level,b.level]
 	if not _validity_cache.has(key):
-		_validity_cache[key] = not plan_between(a,b,type).is_empty()
+		if a.is_portal() or b.is_portal():
+			_validity_cache[key] = not plan_from_portal((a if a.is_portal() else b) as RegionPortal,b if a.is_portal() else a,type).is_empty()
+		else:
+			_validity_cache[key] = not plan_between(a,b,type).is_empty()
 	return _validity_cache[key]
 
 func train_for_line(id: int) -> Train:
@@ -360,19 +517,26 @@ func _process(delta: float) -> void:
 			line["cooldown"] = maxf(0,float(line.get("cooldown",0))-0.5*WorldClock.time_scale)
 			if bool(line.get("enabled",true)) and train_for_line(int(line["id"])) == null:
 				_try_dispatch(line)
-	_growth_timer -= delta
-	if _growth_timer <= 0:
-		_growth_timer = 3.0
-		for station in stations:
-			grow_station(station)
-			_grow_public_space(station)
+	# Die Stadt wächst nicht mehr von selbst: Häuser, Wege und Plätze baut der
+	# Spieler; Familien kommen mit dem Zug (siehe deliver_families).
 
 func _try_dispatch(line: Dictionary) -> void:
 	if float(line.get("cooldown",0))>0 or not line_is_valid(line):
 		return
 	var a := station_by_id(int(line["a"]))
 	var b := station_by_id(int(line["b"]))
-	var plan := plan_between(a,b,EpochCatalog.train(String(line["train"])))
+	var type := EpochCatalog.train(String(line["train"]))
+	if a.is_portal() or b.is_portal():
+		_dispatch_from_portal(line,(a if a.is_portal() else b) as RegionPortal,b if a.is_portal() else a,type,false)
+		return
+	# Neue Linien zwischen eigenen Orten: der Zug reist zuerst durch den Tunnel an.
+	if not bool(line.get("delivered",true)):
+		var portal := portal_for(a,type)
+		if portal:
+			_dispatch_from_portal(line,portal,a,type,true)
+			return
+		line["delivered"] = true
+	var plan := plan_between(a,b,type)
 	var path: TrainPath = plan["path"]
 	for id in path.segment_ids:
 		if dispatcher.interlocking.get_train_on_segment(id)>=0 or dispatcher.interlocking.is_block_reserved(network.get_segment(id).block_id):
@@ -411,6 +575,105 @@ func _try_dispatch(line: Dictionary) -> void:
 		if not a.director.passenger_boarded.is_connected(_on_boarded):
 			a.director.passenger_boarded.connect(_on_boarded)
 
+## Ein Zug kommt aus dem Tunnel: mit Gästen (und wartenden Familien) zu
+## [param station]. [param delivery]: Anreise für eine Linie zwischen eigenen
+## Orten – am Ziel übernimmt die eigentliche Linie den Zug.
+func _dispatch_from_portal(line: Dictionary, portal: RegionPortal, station: RegionStation, type: TrainType, delivery: bool) -> void:
+	var plan := plan_from_portal(portal,station,type)
+	if plan.is_empty():
+		return
+	var path: TrainPath = plan["path"]
+	for id in path.segment_ids:
+		if dispatcher.interlocking.get_train_on_segment(id)>=0 or dispatcher.interlocking.is_block_reserved(network.get_segment(id).block_id):
+			return
+	var entry := TimetableEntry.new()
+	entry.train_number = "%s %03d" % [type.type_code,int(line["id"])]
+	entry.train_name = "%s ↔ %s" % [portal.station_name,station.station_name]
+	entry.train_type = type
+	entry.origin = portal.station_name
+	entry.destination = station.station_name
+	entry.station = station.station_name
+	entry.departure = TimetableEntry.format_time(WorldClock.time_of_day)
+	var train := dispatcher.spawn_region_train(entry,path)
+	train.set_meta("region_line",int(line["id"]))
+	train.set_meta("origin_dwell",false)
+	train.set_meta("local_origin_stop",portal.stop)
+	train.set_meta("local_destination_stop",plan["stop"])
+	var manifest: Array = []
+	if delivery:
+		train.set_meta("delivery_line",int(line["id"]))
+	elif type.category == TrainType.Category.PASSENGER:
+		# Gäste aus der Ferne: mehr, je lebendiger der Ort ist.
+		var parties := clampi(2+station.population/6,2,6)
+		var size := clampi(1+station.population/12,1,4)
+		var seats := type.passenger_capacity
+		for i in parties:
+			var party := mini(size,seats)
+			if party <= 0:
+				break
+			manifest.append(party)
+			seats -= party
+	var onboard := 0
+	for party: int in manifest:
+		onboard += party
+	train.set_meta("manifest",manifest)
+	train.set_meta("onboard",onboard)
+	train.set_stop(float(plan["to"])+train.length/2,plan["stop"],(plan["stop"] as PlatformStop).platform_number)
+	train.set_despawn(INF)
+	train._visual_head = train.head
+	train.update_visuals(0)
+	train.update_occupancy()
+	train.arrived.connect(_on_arrived)
+	train.departed.connect(_on_departed)
+	train.tree_exiting.connect(_on_train_gone.bind(train))
+
+## Ein Zug ist im Tunnel verschwunden: Fahrgäste sind angekommen, nächster Zug folgt.
+func _on_train_gone(train: Train) -> void:
+	# Nur echte Ausfahrten in den Berg (nicht Laden, Abriss oder Spielende).
+	if train.state != Train.State.DONE or not is_inside_tree() or not bool(train.get_meta("to_portal",false)) or train.head < train.despawn_at-1.5:
+		return
+	var portal := station_by_name(train.entry.destination)
+	var delivered := 0
+	for party: int in train.get_meta("manifest",[]):
+		delivered += party
+	progression.services += 1
+	if portal:
+		portal.services += 1
+		portal.passenger_total += delivered
+	progression.passengers += delivered
+	if delivered > 0:
+		Economy.earn(8*delivered,"Fahrkarten nach "+train.entry.destination,"tickets")
+	for line in lines:
+		if int(line["id"]) == int(train.get_meta("region_line",-1)):
+			line["trips"] = int(line["trips"])+1
+			line["passengers"] = int(line["passengers"])+delivered
+			line["cooldown"] = PORTAL_HEADWAY
+	refresh.call_deferred()
+
+## Tunnel, aus dem eine aktive Linie [param station] bedient (null = keine).
+func serving_portal(station: RegionStation) -> RegionPortal:
+	for line in lines:
+		if not bool(line.get("enabled",true)):
+			continue
+		var a := station_by_id(int(line["a"]))
+		var b := station_by_id(int(line["b"]))
+		if a == station and b and b.is_portal():
+			return b as RegionPortal
+		if b == station and a and a.is_portal():
+			return a as RegionPortal
+	return null
+
+## Wartende Familien steigen aus dem Zug, der gerade aus dem Tunnel angekommen ist.
+func deliver_families(station: RegionStation, train: Train) -> void:
+	if station.waiting_houses.is_empty():
+		return
+	for id in station.waiting_houses.duplicate():
+		var house := village.get_object(id) as VillageHouse
+		station.waiting_houses.erase(id)
+		if house:
+			village.welcome_household(house,train.entry.origin)
+	refresh()
+
 func _board_visitors(train: Train, origin: RegionStation, destination: RegionStation, platform: PlatformStop, count: int, rng: RandomNumberGenerator) -> void:
 	var available := maxi(0,origin.director.max_travellers-origin.director.regular_traveller_count())
 	for i in mini(count,available):
@@ -435,6 +698,16 @@ func _on_boarded(npc: Npc, train: Train) -> void:
 func _on_arrived(train: Train) -> void:
 	if bool(train.get_meta("origin_dwell",false)):
 		return
+	if train.has_meta("delivery_line"):
+		# Angereist: Die Linie zwischen den eigenen Orten übernimmt hier.
+		var id := int(train.get_meta("delivery_line"))
+		dispatcher.retire(train,"")
+		for line in lines:
+			if int(line["id"]) == id:
+				line["delivered"] = true
+				line["cooldown"] = 0.0
+				_try_dispatch.call_deferred(line)
+		return
 	var station := station_by_name(train.entry.station)
 	if station == null:
 		return
@@ -443,6 +716,9 @@ func _on_arrived(train: Train) -> void:
 	for line in lines:
 		if int(line["id"])==int(train.get_meta("region_line",-1)):
 			line["trips"] = int(line["trips"])+1
+	var origin := station_by_name(train.entry.origin)
+	if origin and origin.is_portal():
+		deliver_families(station,train)
 	if train.train_type.category == TrainType.Category.PASSENGER:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = train.train_id*331+station.services
@@ -477,16 +753,28 @@ func _on_departed(train: Train) -> void:
 		train.set_meta("origin_dwell",false)
 		var station := station_by_name(train.entry.destination)
 		train.entry.station = station.station_name
+		train.departed_at = -1
+		if station.is_portal():
+			_head_into_tunnel(train)
+			return
 		var target_stop: PlatformStop = train.get_meta("local_destination_stop")
 		train.set_stop(float(train.get_meta("destination_distance"))+train.length/2,target_stop,target_stop.platform_number)
-		train.departed_at = -1
 		return
 	# Shared single-track routes take turns after completing a service. Independent
 	# tracks continue concurrently; the existing interlocking remains authoritative.
+	# Tunnelzüge fahren ohnehin in den Berg zurück und machen so Platz.
+	var from_portal := station_by_name(train.entry.origin) != null and station_by_name(train.entry.origin).is_portal()
 	for waiting in lines:
+		if from_portal:
+			break
 		if int(waiting["id"])==int(train.get_meta("region_line")) or train_for_line(int(waiting["id"]))!=null or not line_is_valid(waiting):
 			continue
-		var candidate := plan_between(station_by_id(int(waiting["a"])),station_by_id(int(waiting["b"])),EpochCatalog.train(String(waiting["train"])))
+		var wa := station_by_id(int(waiting["a"]))
+		var wb := station_by_id(int(waiting["b"]))
+		var waiting_type := EpochCatalog.train(String(waiting["train"]))
+		var candidate := plan_from_portal((wa if wa.is_portal() else wb) as RegionPortal,wb if wa.is_portal() else wa,waiting_type) if (wa.is_portal() or wb.is_portal()) else plan_between(wa,wb,waiting_type)
+		if candidate.is_empty():
+			continue
 		var overlaps := false
 		for id in candidate["path"].segment_ids:
 			overlaps = overlaps or train.path.segment_ids.has(id)
@@ -552,9 +840,20 @@ func _on_departed(train: Train) -> void:
 		_board_visitors(train,here,previous,here_stop,mini(5,2+here.population/8),rng)
 		if not here.director.passenger_boarded.is_connected(_on_boarded):
 			here.director.passenger_boarded.connect(_on_boarded)
+	elif previous.is_portal():
+		# Güterzüge fahren leer zurück in den Berg; der nächste kommt beladen.
+		_head_into_tunnel(train)
 	else:
 		for car in train.cars:
 			car.refill_region_cargo()
+
+
+## Ohne Halt bis ans tiefe Tunnelende fahren und dort verschwinden.
+func _head_into_tunnel(train: Train) -> void:
+	train.stop_at = -1.0
+	train.set_meta("to_portal",true)
+	train.set_despawn(train.path.total_length-1.0)
+	train.departed_at = -1
 
 func _unload_freight(train: Train, station: RegionStation) -> void:
 	for car in train.cars:
@@ -695,7 +994,10 @@ func save_state() -> Dictionary:
 	var station_data: Array = []
 	for station in stations:
 		station_data.append(station.get_data())
-	return {"stations":station_data,"lines":lines.duplicate(true),"next_station":_next_station,"next_line":_next_line}
+	var portal_data: Array = []
+	for portal in portals:
+		portal_data.append(portal.get_data())
+	return {"stations":station_data,"portals":portal_data,"lines":lines.duplicate(true),"next_station":_next_station,"next_line":_next_line}
 
 func load_state(data: Dictionary) -> void:
 	_loading = true
@@ -707,6 +1009,21 @@ func load_state(data: Dictionary) -> void:
 	for row: Variant in data.get("stations",[]):
 		if row is Dictionary and row.has("id"):
 			build_station(row,false)
+	# Tunnel der geladenen Epoche gibt es sofort; ihre Gleise prüft _after_load,
+	# weil das Gleisnetz erst nach den Orten geladen wird. Tunnel einer späteren
+	# Epoche (früherer Spielstand in derselben Sitzung) verschwinden wieder.
+	for portal in portals.duplicate():
+		if _portal_epoch(portal.station_id) > progression.epoch:
+			portals.erase(portal)
+			remove_child(portal)
+			portal.queue_free()
+	open_portals(false,false)
+	for row: Variant in data.get("portals",[]):
+		var portal := station_by_id(int((row as Dictionary).get("id",0))) as RegionPortal if row is Dictionary else null
+		if portal:
+			portal.passenger_total = int(row.get("passengers",0))
+			portal.services = int(row.get("services",0))
+			portal.delivered_goods = int(row.get("goods",0))
 	for row: Variant in data.get("lines",[]):
 		if row is Dictionary and EpochCatalog.TRAIN_IDS.has(String(row.get("train",""))) and station_by_id(int(row.get("a",0))) and station_by_id(int(row.get("b",0))):
 			lines.append(row.duplicate(true))
@@ -715,4 +1032,4 @@ func load_state(data: Dictionary) -> void:
 	_loading = false
 
 func _after_load(_slot: String) -> void:
-	refresh()
+	open_portals(false)

@@ -9,6 +9,8 @@ var passenger_total := 0
 var services := 0
 var delivered_goods := 0
 var house_ids: Array[int] = []
+## Fertige Häuser, deren Familie noch in Nordtal auf den nächsten Zug wartet.
+var waiting_houses: Array[int] = []
 var platform_tracks: Array[Dictionary] = []
 var public_space := {}
 var region: RegionRailway
@@ -32,6 +34,7 @@ func configure(data: Dictionary, owner_region: RegionRailway) -> void:
 	_growth_mark = maxi(0,int(data.get("growth_mark",0)))
 	public_space = data.get("public_space",{}).duplicate()
 	house_ids.assign(data.get("houses",[]))
+	waiting_houses.assign(data.get("waiting",[]))
 	for track: Variant in data.get("platforms",[]):
 		if track is Dictionary:
 			platform_tracks.append(track)
@@ -247,6 +250,11 @@ func upgrade(debug := false) -> bool:
 	Events.notification_requested.emit("%s · %s" % [station_name,EpochCatalog.epoch(level)["station"]])
 	return true
 
+## Tunnelanschlüsse (RegionPortal) überschreiben das.
+func is_portal() -> bool:
+	return false
+
+
 ## Platform, buildings or an extra platform cover [param point] (used for picking).
 func covers(point: Vector3) -> bool:
 	var p := to_local(Vector3(point.x,global_position.y,point.z))
@@ -273,4 +281,4 @@ func clears(x: float, z: float) -> bool:
 	return (p.x > 1.4 and p.x < 20 and absf(p.z) < length/2+2) or (level>=3 and p.x>5 and p.x<16 and absf(p.z-length*0.57)<9)
 
 func get_data() -> Dictionary:
-	return {"id":station_id,"name":station_name,"level":level,"pos":SaveUtils.vec3_to_array(position),"angle":rotation.y,"population":population,"passengers":passenger_total,"services":services,"goods":delivered_goods,"houses":house_ids.duplicate(),"growth_mark":_growth_mark,"platforms":platform_tracks.duplicate(true),"public_space":public_space.duplicate()}
+	return {"id":station_id,"name":station_name,"level":level,"pos":SaveUtils.vec3_to_array(position),"angle":rotation.y,"population":population,"passengers":passenger_total,"services":services,"goods":delivered_goods,"houses":house_ids.duplicate(),"waiting":waiting_houses.duplicate(),"growth_mark":_growth_mark,"platforms":platform_tracks.duplicate(true),"public_space":public_space.duplicate()}

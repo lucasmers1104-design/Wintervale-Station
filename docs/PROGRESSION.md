@@ -1,18 +1,29 @@
 # Wintervale: vom ersten Gleis zur Eisenbahnregion
 
-Neue Reisen beginnen ohne Gleise, Bahnhof, Gebäude oder Verkehr. Bereits gespeicherte Reisen behalten ihre bestehende Welt. Das neue System erweitert RailNetwork, TrainDispatcher, Train, NpcDirector, VillageManager und Economy; es benutzt dieselbe Gleis-, Sicherungs-, Tür-, Stufen- und Baulogik.
+Neue Reisen beginnen in einem leeren, verschneiten Tal. Nur aus dem Berg im Norden ragt ein kurzes Gleis aus einem Tunnel: **Nordtal**. Von dort kommen alle Züge, Gäste und neuen Familien – kein Zug erscheint aus dem Nichts. Bereits gespeicherte Reisen ohne Epochen behalten ihre bestehende Welt. Das System erweitert RailNetwork, TrainDispatcher, Train, NpcDirector, VillageManager und Economy; es benutzt dieselbe Gleis-, Sicherungs-, Tür-, Stufen- und Baulogik.
 
 ## Die ersten Schritte
 
-1. **B** öffnet den Baumodus. Zwei zusammenhängende gerade Gleisstücke von ungefähr 45 m bauen. Gleisstücke dürfen höchstens 60 m lang sein.
-2. Im Baumodus **H** wählen und zwei Holz-Haltepunkte neben das Gleis setzen. Rund 12 m Gleis an beiden Enden freilassen. Haltepunkte liegen mindestens 32 m auseinander.
-3. **P** oder **Fuhrpark** öffnen, den alten Dieseltriebwagen auswählen und beide Orte verbinden. Der erste Diesel kostet keinen zusätzlichen Kaufpreis.
-4. Das Menü schließen. Reisende gehen zum Bahnsteig, steigen durch die animierten Doppeltüren ein und am Ziel wieder aus. Erst ein abgeschlossener Ausstieg zählt als Beförderung.
-5. Nach erfolgreichem Verkehr entstehen Baustellen und anschließend bewohnte Häuser. Die Reiseübersicht zeigt die konkreten Bedingungen für den nächsten Abschnitt.
+1. **B** öffnet den Baumodus. Mit „Schiene“ am Gleisende vor dem Tunnel ansetzen und ins Tal bauen (Stücke bis 60 m).
+2. **H** wählen und einen Holz-Haltepunkt neben das neue Gleis setzen (mindestens 30 m vom Tunnel entfernt). Dahinter etwas Gleis frei lassen, damit der ganze Zug Platz hat.
+3. **P** oder **Fuhrpark** öffnen: „Nordtal (Tunnel) ⇄ dein Ort“ ist vorausgewählt, der alte Dieseltriebwagen ist kostenlos.
+4. Der Zug rollt aus dem Tunnel, Gäste steigen aus, Reisende steigen ein, und er fährt zurück in den Berg. Jede Ankunft zählt als Fahrt; jeder Gast, der wirklich aussteigt, und jede Reisegruppe, die im Tunnel ankommt, zählt als Fahrgast.
+5. Das Dorf baust du selbst (Häuser, Wege, Natur, Licht ab Epoche 1). Ist ein Haus fertig, wartet die Familie in Nordtal und steigt aus dem nächsten Zug von dort. Erst dann zählt sie als Einwohner.
 
-### Einführung mit Ilse (seit dem Debugging-Durchgang vom 2. Oktober 2026)
+## Tunnel, Linien und Familien (Umbau vom 2. Oktober 2026)
 
-Neue Reisen beginnen mit einer geführten Einführung (`scripts/ui/journey_tutorial.gd`). Ilse, die Bahnhofsvorsteherin, begleitet sieben Schritte: Willkommen → Baumodus (B) → 90 m Gleis → zwei Haltepunkte (H) → erster Zug im Fuhrpark (P) → erste Fahrgäste → Ausblick auf die Epochen. Jeder Schritt zeigt Tastenkappen, einen Fortschritt als kleines Gleis und wird mit Stempel und Glockenklang abgehakt. Ein goldener Pfeil zeigt auf den passenden Knopf (Werkzeug, Fuhrpark-Schild, „Zug einsetzen“). Leuchtende Ringe in der Welt markieren gute Plätze für Haltepunkte nahe den Gleisenden. Ist das Reisebuch offen, spricht Ilse in dessen Kopfzeile. Wer schneller ist, überspringt erledigte Schritte automatisch; „Einführung überspringen“ beendet sie sofort. Der Schritt steht im Spielstand (`progression.tutorial`, -1 = fertig). Ältere Reisen mit Verkehr starten ohne Einführung. Danach bleibt oben links eine einklappbare Zielkarte mit den Bedingungen der nächsten Epoche.
+Entscheidungen des Creative Directors: Züge kommen aus dem Berg; zum Start genügt ein Haltepunkt (Tunnel ⇄ eigener Ort); ein Tunnel zum Start, ein zweiter (**Südtal**, im Süden) öffnet sich mit Epoche 3; keine automatischen Häuser, Wege, Plätze oder Brunnen mehr; Familien kommen per Zug.
+
+- **Tunnelanschluss** (`scripts/progression/region_portal.gd`): ein Ort ohne Bahnsteig. Er besteht aus 125 m Tunnelgleis im Berg (lang genug für jeden Zug) und 14 m Anschlussgleis davor. Sichtbar sind nur Portal und die ersten Tunnelmeter; Wagen tiefer als 14 m im Berg werden ausgeblendet. Der Anschluss lässt sich nicht abreißen.
+- **Tunnel-Linien:** Der Zug fährt vom tiefen Tunnelende zum Bahnsteig, bringt Gäste (mehr, je mehr Einwohner der Ort hat) und wartende Familien, nimmt Reisende auf, fährt zurück in den Berg und verschwindet. Der nächste Zug derselben Linie folgt nach etwa 24 Spielsekunden. Güterzüge liefern ihre Ladung ab und fahren leer zurück.
+- **Linien zwischen eigenen Orten** gibt es weiterhin. Der Zug reist zuerst durch den Tunnel zum ersten Ort an und pendelt dann. Dafür muss dieser Ort mit dem Tunnel verbunden sein.
+- **Stadtbau:** Häuser gehören zum nächsten Haltepunkt. Ein Haus kann erst gebaut werden, wenn es einen Haltepunkt gibt. Fehlende Baustoffe kauft der **Baustoffhandel in Nordtal** automatisch mit 50 % Aufpreis dazu; die Kostenzeile zeigt das an.
+- **Freischaltungen:** Häuschen, A-Frame, Chalet, Kieswege, Natur, Laternen und Gartenlampen ab Epoche 1; Bauernhaus, Lichterketten und Dorfdeko ab Epoche 2; Stadthaus, Scheunenhaus, Steinwege, Dorfplatz, Brunnen ab Epoche 3; Turmhaus, Gaubenhaus, Straßen, Straßenlaternen ab Epoche 4.
+- **Bedingungen:** „Streckenlänge“ zählt nur selbst gebaute Gleise, „Verbundene Orte“ nur eigene Haltepunkte mit Zugverkehr.
+
+### Einführung mit Ilse
+
+Neue Reisen beginnen mit einer geführten Einführung (`scripts/ui/journey_tutorial.gd`). Ilse, die Bahnhofsvorsteherin, begleitet neun Schritte: Willkommen am Tunnel → Baumodus (B) → 60 m Gleis ab dem Tunnelanschluss → ein Haltepunkt (H) → Zug aus Nordtal (P) → erste Fahrgäste → ein Haus bauen → die Familie kommt mit dem Zug → Ausblick auf die Epochen. Jeder Schritt zeigt Tastenkappen und einen Fortschritt als kleines Gleis und wird mit Stempel und Glockenklang abgehakt. Ein goldener Pfeil zeigt auf den passenden Knopf (Werkzeug, Fuhrpark-Schild, „Zug einsetzen“, „Häuser“). Leuchtende Ringe in der Welt markieren „Hier anschließen“, einen guten Haltepunkt-Platz und einen freien „Bauplatz“. Der Knopf **Zeigen** fährt die Kamera dorthin. Ist das Reisebuch offen, spricht Ilse in dessen Kopfzeile. Wer schneller ist, überspringt erledigte Schritte automatisch; „Einführung überspringen“ beendet sie sofort. Der Schritt steht im Spielstand (`progression.tutorial`, -1 = fertig). Danach bleibt oben links eine einklappbare Zielkarte mit den Bedingungen der nächsten Epoche.
 
 ### Reisebuch
 
@@ -85,7 +96,7 @@ Der Passagierwechsel verwendet die bestehenden Phasen: Stillstand → Entriegeln
 
 Güterzüge liefern bestellte Waren in das bestehende gemeinsame Lager. Holz, Ziegel, Glas und Stein versorgen damit auch manuelle Bauprojekte. Lagerplatz, Bestellungen und vorhandenes Geld begrenzen die Lieferung. Ladung wird sichtbar angehoben, zum Güterschuppen bewegt und abgesetzt; währenddessen bleibt die Abfahrt gesperrt. Erst danach werden Lagerbestand, Frachtentgelt, örtliche Versorgung und Epochenfortschritt erhöht. Für den Tankwagen benutzt die vereinfachte vorhandene Wirtschaft ihre Glas-Lieferkategorie; es wurde keine zusätzliche Flüssigkeitswirtschaft eingeführt.
 
-Erfolgreicher Verkehr und örtliche Lieferungen erhöhen das Wachstumspotenzial. Vorhandene Hausformen werden nach Epoche ausgewählt, mit echten Baustellen aufgebaut und in die Nachbarschaft integriert. Organische Baustellen benötigen eine Spielstunde tagsüber; selbst beauftragte Gebäude verwenden weiterhin ihre regulären Bauzeiten und Materialreservierungen. Wege entwickeln sich von Kies zu Stein und Straße; Plätze, Brunnen und Laternen ergänzen entwickelte Orte, sofern ihre Fläche frei ist. Auch selbst gebaute Häuser nahe eines Bahnhofs gehören zur örtlichen Einwohnerzahl. Der Einwohnerstand enthält alle fertigen Haushalte; maximal sechs Bewohner je Ort werden zusätzlich als dauerhafte NPCs dargestellt.
+Die Stadt wächst nicht mehr von selbst (seit 2. Oktober 2026): Häuser, Wege, Plätze und Laternen baut der Spieler. Jedes Haus gehört zum nächsten Haltepunkt; fertige Häuser zählen zur Einwohnerzahl, sobald ihre Familie mit dem Zug aus dem Tunnel angekommen ist. Maximal sechs Bewohner je Ort werden zusätzlich als dauerhafte NPCs dargestellt. Der frühere organische Wachstumscode (`grow_station`, `_grow_public_space`) bleibt nur für das F8-Entwicklungsmenü erhalten.
 
 ## Speichern und bestehende Reisen
 
