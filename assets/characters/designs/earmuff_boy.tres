@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="CharacterAppearance" format=3]
+
+[ext_resource type="Script" path="res://scripts/characters/character_appearance.gd" id="1_look"]
+
+[resource]
+resource_name = "Earmuff Boy"
+script = ExtResource("1_look")
+skin_color = Color(0.95, 0.63, 0.45, 1)
+freckles = true
+hair_style = 8
+hair_color = Color(0.48, 0.24, 0.13, 1)
+hat_style = 11
+hat_color = Color(0.3, 0.42, 0.2, 1)
+hat_color2 = Color(0.86, 0.8, 0.68, 1)
+top_style = 1
+shirt_color = Color(0.86, 0.8, 0.68, 1)
+sleeves = 1
+accent_color = Color(0.78, 0.6, 0.35, 1)
+outer = 5
+outer_color = Color(0.3, 0.42, 0.2, 1)
+outer_pattern = 7
+bottom = 1
+pants_color = Color(0.8, 0.68, 0.5, 1)
+sock_color = Color(0.86, 0.8, 0.68, 1)
+shoes = 1
+shoe_color = Color(0.45, 0.24, 0.13, 1)
+mitten_color = Color(0.42, 0.22, 0.13, 1)
+hair_volume = 0.9

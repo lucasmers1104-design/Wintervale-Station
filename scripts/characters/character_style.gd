@@ -245,7 +245,7 @@ func _build_torso() -> void:
 	if look.top_style == CharacterAppearance.TopStyle.TURTLENECK and look.shirt_pattern == CharacterAppearance.Pattern.SOLID:
 		shirt = CharacterKit.paint(look.shirt_color, P.RIBS, 30.0)
 	torso.lathe(xf, TORSO, 18, shirt, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.0, true, true)
-	if look.top_style == CharacterAppearance.TopStyle.SWEATER:
+	if look.top_style == CharacterAppearance.TopStyle.SWEATER and look.outer not in SLEEVED_OUTER:
 		# Strickpulli (winter_girl): langer Rippbund über der Hüfte
 		torso.lathe(xf, [Vector2(0.262, 0.31), Vector2(0.27, 0.325), Vector2(0.268, 0.39), Vector2(0.258, 0.4)], 20,
 			CharacterKit.paint(look.shirt_color.darkened(0.03), P.KNIT_CUFF, 40.0), true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.0, true)
@@ -384,6 +384,8 @@ func _build_outer() -> void:
 			_tunic()
 		CharacterAppearance.Outer.PUFFER_VEST:
 			_puffer_vest()
+		CharacterAppearance.Outer.PUFFER_JACKET:
+			_puffer_jacket()
 
 
 ## Latzhose: Hosenteil, Latz mit großer Brusttasche, Träger mit Messingknöpfen,
@@ -758,6 +760,31 @@ func _puffer_vest() -> void:
 			at - 0.055, at + 0.055, 0.064, 0.012, seam)
 
 
+## Daunenjacke (earmuff_boy): gesteppt bis 0,36 m, hoher Stehkragen, Reißverschluss
+## mit Messingzipper, zwei Klappentaschen; Ärmel aus SLEEVED_OUTER.
+func _puffer_jacket() -> void:
+	var quilt := _fabric(look.outer_color, look.outer_pattern, look.outer_color2)
+	var seam := _solid(look.outer_color.darkened(0.25))
+	var xf := Transform3D.IDENTITY
+	var hem := 0.36
+	var profile: Array = [Vector2(0.27, hem), Vector2(0.285, hem + 0.03)] + torso_profile(0.45, NECK_Y - 0.03, 4)
+	torso.lathe(xf, profile, 22, quilt, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.035)
+	# Hoher, weicher Kragen
+	torso.lathe(xf, [Vector2(0.15, NECK_Y - 0.04), Vector2(0.15, NECK_Y + 0.02), Vector2(0.135, NECK_Y + 0.05),
+		Vector2(0.115, NECK_Y + 0.045)], 18, quilt, true, 1.0, 0.9, 0.0, 1.0, 0.0)
+	# Reißverschluss mit Zipper
+	torso.panel(xf, profile, 1, seam, 1.0, TORSO_DEPTH, -0.006, 0.006, 0.038, 0.006, seam)
+	var pull := CharacterKit.paint(look.accent_color, P.GLOSS)
+	var at := torso_point(0.0, NECK_Y - 0.02, 0.05) + Vector3(0, 0, -0.01)
+	torso.box(Transform3D(Basis.IDENTITY, at), Vector3(0.025, 0.05, 0.012), pull)
+	for side: float in [-1.0, 1.0]:
+		var p := side * 0.14
+		torso.panel(xf, torso_profile(hem + 0.03, hem + 0.12, 2), 3, _solid(look.outer_color.darkened(0.04)), 1.0, TORSO_DEPTH,
+			p - 0.055, p + 0.055, 0.052, 0.012, seam)
+		torso.panel(xf, torso_profile(hem + 0.1, hem + 0.14, 1), 3, _solid(look.outer_color), 1.0, TORSO_DEPTH,
+			p - 0.06, p + 0.06, 0.066, 0.012, seam)
+
+
 ## Halbe Breite des V-Ausschnitts (Winkelanteil) in Höhe [param y].
 func _v_half(y: float, tip: float) -> float:
 	return 0.075 * clampf((y - tip) / (NECK_Y - tip), 0.0, 1.0)
@@ -863,7 +890,7 @@ func _build_arms() -> void:
 			_:
 				kit.lathe(xf, [Vector2(0.062, -0.2), Vector2(0.07, -0.08), Vector2(0.078, 0.0), Vector2(0.06, 0.05), Vector2(0.0, 0.07)],
 					10, sleeve)
-				if look.top_style == CharacterAppearance.TopStyle.SWEATER and look.outer not in SLEEVED_OUTER:
+				if look.top_style == CharacterAppearance.TopStyle.SWEATER:
 					# Breites Rippbündchen (winter_girl)
 					kit.lathe(xf, [Vector2(0.064, -0.235), Vector2(0.078, -0.228), Vector2(0.08, -0.165), Vector2(0.072, -0.158)], 10,
 						CharacterKit.paint(look.shirt_color.darkened(0.04), P.KNIT_CUFF, 22.0), true, 1.0, 1.0, 0.0, 1.0, 0.0, true)
@@ -1077,7 +1104,7 @@ func _build_hair() -> void:
 				for az: float in [-80.0, 0.0, 80.0, 160.0, 240.0]:
 					_scale(az, 84.0, 0.2, 0.22, hair_dark if int(az) % 160 == 0 else hair, 0.7, 1.02)
 			# Aufrechte Spitze oben, leicht zur Seite geneigt (nur beim Strubbelkopf ohne Mütze)
-			if look.hair_style == CharacterAppearance.HairStyle.SPIKY and hat == CharacterAppearance.HatStyle.NONE:
+			if look.hair_style == CharacterAppearance.HairStyle.SPIKY and hat in [CharacterAppearance.HatStyle.NONE, CharacterAppearance.HatStyle.EARMUFFS]:
 				var tip := Transform3D(Basis(Vector3.FORWARD, PI + 0.35) * Basis(Vector3.RIGHT, 0.2), Vector3(-0.03, 0.34, -0.02))
 				head.scale_tuft(tip, 0.13, 0.2, 0.09, hair)
 		CharacterAppearance.HairStyle.FRINGE:
@@ -1270,6 +1297,22 @@ func _build_hat(hat: CharacterAppearance.HatStyle) -> void:
 			if look.hat_color3.a > 0.0:
 				head.scale_tuft(Transform3D(Basis(Vector3.FORWARD, PI - 0.9) * Basis(Vector3.UP, 0.5), side_at + Vector3(-0.08, 0.06, 0.0)),
 					0.13, 0.2, 0.07, _solid(look.hat_color3))
+		CharacterAppearance.HatStyle.EARMUFFS:
+			# Ohrenschützer (earmuff_boy): schmaler Bügel (hat_color) über den Kopf,
+			# große, facettierte Polster (hat_color2) über den Ohren.
+			var band := _solid(look.hat_color)
+			var pad := _solid(look.hat_color2 if look.hat_color2.a > 0.0 else look.hat_color.lightened(0.5))
+			var points: Array = []
+			var outward: Array = []
+			for k in 9:
+				var a := lerpf(-PI * 0.5, PI * 0.5, float(k) / 8.0)
+				points.append(Vector3(sin(a) * 0.335, -0.08 + cos(a) * 0.43, 0.04))
+				outward.append(Vector3(sin(a), cos(a), 0.0))
+			head.strip(points, outward, 0.065, 0.035, band)
+			for side: float in [-1.0, 1.0]:
+				head.ellipsoid(Transform3D(Basis(Vector3.FORWARD, PI * 0.5), Vector3(side * 0.335, -0.1, 0.04)), Vector3(0.06, 0.03, 0.06),
+					10, 4, band)
+				head.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(side * 0.3, -0.095, 0.04)), Vector3(0.078, 0.115, 0.115), 10, 7, pad)
 		CharacterAppearance.HatStyle.STRAW_HAT:
 			# Strohhut (gardener): runde Kuppel, breite leicht hängende Krempe, farbiges Band
 			# Maße aus der Vorlage: Krempe 0,1 m über der Kopfmitte, Krone 0,22 m hoch,
