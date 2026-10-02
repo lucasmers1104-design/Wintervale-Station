@@ -28,14 +28,13 @@ enum Pose { STAND, SIT, LOOK_UP, CHECK_WATCH, WAVE, HANDS_BEHIND, STRETCH, WARM_
 ## MUG = heißer Becher (Glühwein, Most) in beiden Händen, LANTERN = Laterne am Stab (Laternenumzug).
 enum Carry { NONE, SUITCASE, BACKPACK, SHOPPING_BAG, MUG, LANTERN }
 
-const PLAID_SHADER := preload("res://assets/materials/plaid.gdshader")
+## Gemeinsamer Shader aller Figurenteile (Farbe, Muster und Gesicht aus den Vertexdaten).
+const CHARACTER_SHADER := preload("res://assets/materials/character.gdshader")
 ## Augenhöhe über den Füßen (für die Ich-Perspektive).
-const EYE_HEIGHT := 1.16
+const EYE_HEIGHT := 0.99
 ## Hüfthöhe einer Erwachsenen-Figur (Sitzhöhe = Sitzfläche minus diese Höhe).
-const HIP_HEIGHT := 0.24
-const HEAD_Y := 1.13
-## Augenhöhe im Kopf (etwas unter der Mitte – das wirkt kindlich und freundlich).
-const EYE_Y := 0.004
+const HIP_HEIGHT := CharacterStyle.HIP_HEIGHT
+const HEAD_Y := CharacterStyle.HEAD_Y
 ## Überblendgeschwindigkeit der Haltungen (1/s). Hinsetzen/Aufstehen ist langsamer.
 const POSE_BLEND := 3.0
 const SIT_BLEND := 1.7
@@ -77,7 +76,8 @@ var _shoulder_right: Node3D
 var _carried: Node3D
 var _meshes: Array[MeshInstance3D] = []
 var _details: Array[MeshInstance3D] = []
-var _eyes: Array[MeshInstance3D] = []
+## Kopf-Mesh: der Shader zeichnet dort das Gesicht (Blinzeln über eye_open).
+var _head_mesh: MeshInstance3D
 var _shadows_only := false
 var _height := 1.0
 
@@ -126,35 +126,33 @@ func rebuild() -> void:
 		child.queue_free()
 	_meshes.clear()
 	_details.clear()
-	_eyes.clear()
+	_head_mesh = null
 
 	var look := appearance if appearance else CharacterAppearance.new()
 	var winter := outfit == CharacterAppearance.Outfit.WINTER
 	_height = look.height_scale
-	var skin := _material(look.skin_color, 0.5, 0.32)  # leicht glänzend wie Vinyl-Spielzeug
-	var pants := _material(look.pants_color, 0.9)
-	var shoes := _material(look.shoe_color, 0.55)
 
 	_body = _pivot(self, "Body", Vector3.ZERO)
 	_body.scale = Vector3(look.width_scale, look.height_scale, look.width_scale)
-
-	# Kurze Beinchen mit kleinen runden Schuhen
-	_hip_left = _pivot(_body, "HipLeft", Vector3(-0.1, HIP_HEIGHT, 0.0))
-	_hip_right = _pivot(_body, "HipRight", Vector3(0.1, HIP_HEIGHT, 0.0))
-	for hip in [_hip_left, _hip_right]:
-		_part(hip, _capsule(0.078, 0.26), pants, Vector3(0.0, -0.1, 0.0))
-		_part(hip, _sphere(0.088, 16, 8), shoes, Vector3(0.0, -0.195, -0.035), Vector3(0.95, 0.58, 1.35))
-		# Dunkle Sohle
-		_detail(_part(hip, _sphere(0.09, 14, 6), _material(look.shoe_color.darkened(0.45), 0.8), Vector3(0.0, -0.215, -0.035),
-			Vector3(0.98, 0.3, 1.38)))
-
-	# Rundlicher Rumpf: Hosenboden und Oberteil
+	_hip_left = _pivot(_body, "HipLeft", Vector3(-CharacterStyle.HIP_X, HIP_HEIGHT, 0.0))
+	_hip_right = _pivot(_body, "HipRight", Vector3(CharacterStyle.HIP_X, HIP_HEIGHT, 0.0))
 	_torso = _pivot(_body, "Torso", Vector3.ZERO)
-	_part(_torso, _sphere(0.235, 24, 12), pants, Vector3(0.0, 0.34, 0.0), Vector3(1.0, 0.66, 0.88))
-	_build_top(look, winter, skin)
+	_shoulder_left = _pivot(_body, "ShoulderLeft", Vector3(-CharacterStyle.SHOULDER.x, CharacterStyle.SHOULDER.y, 0.0))
+	_shoulder_right = _pivot(_body, "ShoulderRight", CharacterStyle.SHOULDER)
+	_head = _pivot(_body, "Head", Vector3(0.0, HEAD_Y, 0.0))
+	_head.scale = Vector3(look.head_scale / look.width_scale, look.head_scale / look.height_scale, look.head_scale / look.width_scale)
 
-	_build_arms(look, winter, skin)
-	_build_head(look, winter, skin)
+	# Alle Teile eines Gelenks sind ein Mesh (CharacterStyle, gleiche Figuren teilen es)
+	var meshes := CharacterStyle.build(look, winter)
+	var pivots := {"head": _head, "torso": _torso, "hip_left": _hip_left, "hip_right": _hip_right,
+		"shoulder_left": _shoulder_left, "shoulder_right": _shoulder_right}
+	for key: String in pivots:
+		if meshes.get(key) == null:
+			continue
+		var instance := _part(pivots[key], meshes[key], _character_material(), Vector3.ZERO)
+		instance.name = key.to_pascal_case() + "Mesh"
+		if key == "head":
+			_head_mesh = instance
 	_build_carry(look)
 	set_shadows_only(_shadows_only)
 	if view_distance > 0.0:
@@ -263,6 +261,7 @@ func get_mesh_count() -> int:
 ## Materialien werden zwischen allen Figuren geteilt (spart Speicher und Draw-Setup).
 static func clear_cache() -> void:
 	_material_cache.clear()
+	CharacterStyle.clear_cache()
 
 
 func _process(delta: float) -> void:
@@ -411,10 +410,10 @@ func _update_blink(delta: float) -> void:
 	if _blink_timer <= 0.0:
 		_blink_timer = _rng.randf_range(2.2, 5.5)
 		_blink = 1.0
+	var was_blinking := _blink > 0.0
 	_blink = maxf(0.0, _blink - delta * 7.0)
-	var open := 1.0 - sin(_blink * PI) * 0.9
-	for eye in _eyes:
-		eye.scale.y = 1.15 * open
+	if _head_mesh and (_blink > 0.0 or was_blinking):
+		_head_mesh.set_instance_shader_parameter(&"eye_open", 1.0 - sin(_blink * PI) * 0.9)
 
 
 func _emit_steps() -> void:
@@ -567,180 +566,6 @@ static func _steam_material() -> StandardMaterial3D:
 	return _steam
 
 
-# --- Aufbau -----------------------------------------------------------------------
-
-## Im Sommer werden Pulli und Mantel zum T-Shirt in derselben Farbe.
-func _effective_top(look: CharacterAppearance, winter: bool) -> CharacterAppearance.TopStyle:
-	if not winter and look.top_style != CharacterAppearance.TopStyle.PLAID_SHIRT:
-		return CharacterAppearance.TopStyle.SWEATER
-	return look.top_style
-
-
-func _build_top(look: CharacterAppearance, winter: bool, _skin: Material) -> void:
-	var style := _effective_top(look, winter)
-	var top := _top_material(look, style)
-	var accent := _material(look.accent_color, 0.6)
-	_part(_torso, _sphere(0.27, 28, 14), top, Vector3(0.0, 0.58, 0.0), Vector3(1.0, 1.12, 0.9))
-	match style:
-		CharacterAppearance.TopStyle.PLAID_SHIRT:
-			for i in 3:
-				_detail(_part(_torso, _sphere(0.018, 8, 4), accent, Vector3(0.0, 0.72 - i * 0.12, -0.245 + i * 0.012)))
-		CharacterAppearance.TopStyle.SWEATER:
-			var rib := _material(look.shirt_color.darkened(0.14), 0.95)
-			_part(_torso, _torus(0.215, 0.26), rib, Vector3(0.0, 0.37, 0.0), Vector3(1.0, 1.0, 0.9))
-			if winter:
-				_part(_torso, _torus(0.1, 0.16), rib, Vector3(0.0, 0.86, 0.0))
-		CharacterAppearance.TopStyle.COAT:
-			# Etwas längerer Mantel mit Knopfleiste und Kragen
-			_part(_torso, _cylinder(0.262, 0.29, 0.22, 24), top, Vector3(0.0, 0.34, 0.0), Vector3(1.0, 1.0, 0.9))
-			for i in 3:
-				_detail(_part(_torso, _sphere(0.022, 8, 4), accent, Vector3(0.0, 0.66 - i * 0.13, -0.25 + i * 0.006)))
-			_part(_torso, _torus(0.12, 0.19), top, Vector3(0.0, 0.85, 0.0))
-
-
-func _build_arms(look: CharacterAppearance, winter: bool, skin: Material) -> void:
-	var top := _top_material(look, _effective_top(look, winter))
-	var hand := _material(look.scarf_color.lerp(look.hat_color, 0.35), 0.95) if winter and look.mittens else skin
-	_shoulder_left = _pivot(_body, "ShoulderLeft", Vector3(-0.25, 0.8, 0.0))
-	_shoulder_right = _pivot(_body, "ShoulderRight", Vector3(0.25, 0.8, 0.0))
-	for shoulder in [_shoulder_left, _shoulder_right]:
-		if winter:
-			_part(shoulder, _capsule(0.072, 0.36, 14, 5), top, Vector3(0.0, -0.13, 0.0))
-		else:
-			_part(shoulder, _capsule(0.074, 0.18, 14, 4), top, Vector3(0.0, -0.05, 0.0))
-			_part(shoulder, _capsule(0.056, 0.28, 12, 4), skin, Vector3(0.0, -0.17, 0.0))
-		# Einfache runde Hände (im Winter Fäustlinge)
-		_part(shoulder, _sphere(0.072 if hand != skin else 0.064, 14, 7), hand, Vector3(0.0, -0.32, -0.005))
-		if hand != skin:
-			# Gestricktes Bündchen am Fäustling
-			_detail(_part(shoulder, _torus(0.05, 0.078, 14), _material(look.hat_color.lightened(0.1), 1.0),
-				Vector3(0.0, -0.265, 0.0), Vector3(1.0, 1.4, 1.0)))
-
-
-func _build_head(look: CharacterAppearance, winter: bool, skin: Material) -> void:
-	_head = _pivot(_body, "Head", Vector3(0.0, HEAD_Y, 0.0))
-	var head_size := look.head_scale
-	_head.scale = Vector3(head_size / look.width_scale, head_size / look.height_scale, head_size / look.width_scale)
-	_part(_head, _sphere(0.3, 32, 16), skin, Vector3.ZERO, Vector3(1.0, 0.94, 0.97))
-	for x: float in [-0.29, 0.29]:
-		_part(_head, _sphere(0.055, 10, 5), skin, Vector3(x, -0.01, 0.01), Vector3(0.6, 1.0, 1.0))
-
-	# Gesicht: nur Knopfaugen, Näschen und rosige Wangen
-	var eyes := _material(Color(0.08, 0.065, 0.06), 0.3)
-	# Kindchenschema: Augen etwas tiefer und weiter auseinander, mit kleinem Glanzpunkt
-	var catchlight := _material(Color(1.0, 0.98, 0.94), 0.2)
-	for x: float in [-0.105, 0.105]:
-		var eye := _part(_head, _sphere(0.031, 12, 6), eyes, Vector3(x, EYE_Y, -0.27), Vector3(0.9, 1.15, 0.55))
-		_eyes.append(eye)
-		_detail(eye)
-		# Glanzpunkt als Kind des Auges – blinzelt mit
-		_detail(_part(eye, _sphere(0.012, 6, 3), catchlight, Vector3(0.011, 0.012, -0.031)))
-	_detail(_part(_head, _sphere(0.042, 12, 6), _material(look.skin_color.darkened(0.07), 0.55, 0.3), Vector3(0.0, -0.058, -0.283)))
-	var blush := _material(look.skin_color.lerp(Color(0.96, 0.45, 0.42), 0.36), 0.8)
-	for x: float in [-0.17, 0.17]:
-		_detail(_part(_head, _sphere(0.052, 10, 5), blush, Vector3(x, -0.078, -0.232), Vector3(1.0, 0.6, 0.4)))
-
-	if look.beard:
-		var beard := _material(look.hair_color, 0.95)
-		_part(_head, _sphere(0.24, 20, 10), beard, Vector3(0.0, -0.125, -0.1), Vector3(1.04, 0.8, 0.82))
-
-	var hat_style := look.hat_style if winter else CharacterAppearance.HatStyle.NONE
-	_build_hair(look, hat_style != CharacterAppearance.HatStyle.NONE)
-	_build_hat(look, hat_style)
-
-	if winter and look.scarf:
-		var scarf := _material(look.scarf_color, 1.0)
-		var ring := _part(_body, _torus(0.13, 0.225), scarf, Vector3(0.0, 0.855, 0.0))
-		ring.scale = Vector3(1.0, 1.25, 0.95)
-		var tail := _part(_body, _capsule(0.05, 0.22, 10, 3), scarf, Vector3(0.09, 0.73, -0.232), Vector3(1.15, 1.0, 0.6))
-		tail.rotation = Vector3(-0.12, 0.0, 0.12)
-
-	if look.glasses:
-		var frame := _material(look.glasses_color, 0.35)
-		for x: float in [-0.105, 0.105]:
-			var lens := _detail(_part(_head, _torus(0.047, 0.061, 18), frame, Vector3(x, EYE_Y, -0.284)))
-			lens.rotation.x = PI * 0.5
-		var bridge := BoxMesh.new()
-		bridge.size = Vector3(0.075, 0.014, 0.014)
-		_part(_head, bridge, frame, Vector3(0.0, EYE_Y + 0.01, -0.295))
-
-
-func _build_hair(look: CharacterAppearance, under_hat: bool) -> void:
-	var hair := _material(look.hair_color, 0.9)
-	match look.hair_style:
-		CharacterAppearance.HairStyle.SHORT:
-			if not under_hat:
-				var cap := _part(_head, _sphere(0.31, 28, 14, true), hair, Vector3(0.0, 0.03, 0.02))
-				cap.rotation.x = -0.35
-		CharacterAppearance.HairStyle.SIDES:
-			for x: float in [-0.265, 0.265]:
-				_part(_head, _sphere(0.12, 12, 6), hair, Vector3(x, 0.02, 0.06), Vector3(0.55, 0.85, 1.2))
-			_part(_head, _sphere(0.2, 16, 8), hair, Vector3(0.0, 0.0, 0.16), Vector3(1.2, 0.7, 0.6))
-		CharacterAppearance.HairStyle.BOB:
-			if not under_hat:
-				var cap := _part(_head, _sphere(0.315, 28, 14, true), hair, Vector3(0.0, 0.02, 0.03))
-				cap.rotation.x = -0.3
-			for x: float in [-0.25, 0.25]:
-				_part(_head, _sphere(0.14, 14, 7), hair, Vector3(x, -0.06, 0.04), Vector3(0.6, 1.15, 1.05))
-			_part(_head, _sphere(0.24, 18, 9), hair, Vector3(0.0, -0.04, 0.13), Vector3(1.1, 0.9, 0.7))
-		CharacterAppearance.HairStyle.BUN:
-			if not under_hat:
-				var cap := _part(_head, _sphere(0.31, 28, 14, true), hair, Vector3(0.0, 0.03, 0.02))
-				cap.rotation.x = -0.35
-				_part(_head, _sphere(0.1, 14, 7), hair, Vector3(0.0, 0.2, 0.22))
-			else:
-				_part(_head, _sphere(0.1, 14, 7), hair, Vector3(0.0, -0.02, 0.29))
-			for x: float in [-0.25, 0.25]:
-				_part(_head, _sphere(0.1, 12, 6), hair, Vector3(x, -0.02, 0.07), Vector3(0.55, 0.9, 1.1))
-		CharacterAppearance.HairStyle.PONYTAIL:
-			if not under_hat:
-				var cap := _part(_head, _sphere(0.31, 28, 14, true), hair, Vector3(0.0, 0.03, 0.02))
-				cap.rotation.x = -0.35
-			var tail := _part(_head, _capsule(0.07, 0.3, 12, 4), hair, Vector3(0.0, -0.1, 0.3))
-			tail.rotation.x = 0.35
-			var tie := _part(_head, _torus(0.035, 0.065), _material(look.scarf_color, 0.6), Vector3(0.0, 0.0, 0.295))
-			tie.rotation.x = PI * 0.5
-		CharacterAppearance.HairStyle.CURLY:
-			for i in 16:
-				var angle := TAU * i / 16.0
-				var up := 0.15 + 0.35 * float(i % 2)
-				var direction := Vector3(cos(angle) * cos(up), sin(up), sin(angle) * cos(up))
-				if direction.z < -0.35 and direction.y < 0.5:
-					continue  # Gesicht frei lassen
-				if under_hat and direction.y > 0.3:
-					continue
-				_part(_head, _sphere(0.085, 10, 5), hair, direction * 0.28 + Vector3(0.0, 0.02, 0.0))
-			if not under_hat:
-				_part(_head, _sphere(0.1, 10, 5), hair, Vector3(0.0, 0.28, 0.02))
-		CharacterAppearance.HairStyle.LONG:
-			# Lange, wellige Haare: fallen hinten bis auf die Schultern und rahmen das
-			# Gesicht mit zwei Strähnen, die unten in einer weichen Welle enden.
-			if not under_hat:
-				var cap := _part(_head, _sphere(0.315, 28, 14, true), hair, Vector3(0.0, 0.03, 0.02))
-				cap.rotation.x = -0.3
-			_part(_head, _sphere(0.27, 20, 10), hair, Vector3(0.0, -0.12, 0.13), Vector3(1.12, 1.3, 0.8))
-			for x: float in [-0.25, 0.25]:
-				_part(_head, _sphere(0.13, 14, 7), hair, Vector3(x, -0.12, 0.02), Vector3(0.62, 1.45, 0.95))
-				_part(_head, _sphere(0.085, 12, 6), hair, Vector3(x * 1.08, -0.31, 0.05), Vector3(1.0, 0.9, 1.0))
-				_part(_head, _sphere(0.08, 12, 6), hair, Vector3(x * 0.75, -0.34, 0.16))
-
-
-func _build_hat(look: CharacterAppearance, hat_style: CharacterAppearance.HatStyle) -> void:
-	var hat := _material(look.hat_color, 1.0)
-	match hat_style:
-		CharacterAppearance.HatStyle.BEANIE, CharacterAppearance.HatStyle.POMPOM_BEANIE:
-			_part(_head, _sphere(0.318, 28, 14, true), hat, Vector3(0.0, 0.075, 0.0), Vector3(1.0, 1.04, 1.0))
-			# Weicher, gerollter Umschlag statt harter Kante
-			_part(_head, _torus(0.28, 0.345, 32), _material(look.hat_color.darkened(0.1), 1.0),
-				Vector3(0.0, 0.1, 0.0), Vector3(1.0, 1.3, 1.0))
-			if hat_style == CharacterAppearance.HatStyle.POMPOM_BEANIE:
-				_part(_head, _sphere(0.085, 14, 7), _material(look.scarf_color.lightened(0.15), 1.0),
-					Vector3(0.0, 0.42, 0.0))
-		CharacterAppearance.HatStyle.FLAT_CAP:
-			_part(_head, _sphere(0.325, 28, 14, true), hat, Vector3(0.0, 0.1, 0.02), Vector3(1.02, 0.55, 1.08))
-			_part(_head, _sphere(0.17, 16, 6), hat, Vector3(0.0, 0.11, -0.27), Vector3(1.35, 0.16, 0.9))
-
-
 # --- Bausteine ------------------------------------------------------------------
 
 func _pivot(parent: Node3D, pivot_name: String, pos: Vector3) -> Node3D:
@@ -815,21 +640,6 @@ func _material(color: Color, roughness: float, rim := 0.15) -> StandardMaterial3
 	return material
 
 
-func _top_material(look: CharacterAppearance, style: CharacterAppearance.TopStyle) -> Material:
-	if style != CharacterAppearance.TopStyle.PLAID_SHIRT:
-		return _material(look.shirt_color, 0.95, 0.2)
-	var key := "plaid|%s|%s|%s" % [look.shirt_color.to_html(), look.shirt_stripe_color.to_html(),
-		look.shirt_line_color.to_html()]
-	if _material_cache.has(key):
-		return _material_cache[key]
-	var material := ShaderMaterial.new()
-	material.shader = PLAID_SHADER
-	material.set_shader_parameter(&"base_color", look.shirt_color)
-	material.set_shader_parameter(&"stripe_color", look.shirt_stripe_color)
-	material.set_shader_parameter(&"line_color", look.shirt_line_color)
-	_material_cache[key] = material
-	return material
-
 
 ## Kleines Detail: wirft keinen Schatten und wird aus der Ferne nicht gezeichnet.
 func _detail(mesh: MeshInstance3D) -> MeshInstance3D:
@@ -838,3 +648,14 @@ func _detail(mesh: MeshInstance3D) -> MeshInstance3D:
 	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_details.append(mesh)
 	return mesh
+
+
+static var _shared_material: ShaderMaterial
+
+
+## Ein Material für alle Figurenteile aller Figuren (Farben stehen in den Vertexdaten).
+static func _character_material() -> ShaderMaterial:
+	if _shared_material == null:
+		_shared_material = ShaderMaterial.new()
+		_shared_material.shader = CHARACTER_SHADER
+	return _shared_material
