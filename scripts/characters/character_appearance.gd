@@ -22,7 +22,7 @@ enum Outer { NONE, OVERALLS, SUSPENDERS, VEST, PUFFER_VEST, PUFFER_JACKET, CARDI
 	DRESS_APRON, TUNIC, LONG_COAT, DUFFLE_COAT, PARKA, KNIT_DRESS }
 enum Bottom { SHORTS, TROUSERS, SKIRT, LONG_SKIRT, NONE }
 enum Shoes { BOOTS, LACED_BOOTS, MARY_JANES, LOAFERS }
-enum ScarfStyle { NONE, WRAP, NECKERCHIEF }
+enum ScarfStyle { NONE, WRAP, NECKERCHIEF, NECKERCHIEF_BACK }
 enum Pattern { SOLID, PLAID, GINGHAM, STRIPES, RIBS, FAIR_ISLE, DIAMONDS, QUILT, TARTAN }
 ## Kleidung passend zur Jahreszeit: Im Sommer entfallen Wintermützen, Schals und Fäustlinge.
 enum Outfit { WINTER, SUMMER }
@@ -50,6 +50,8 @@ enum Outfit { WINTER, SUMMER }
 @export var middle_part := false
 ## Lange Strähnen vor den Ohren bis unters Kinn (FRINGE, BOB).
 @export var face_strands := true
+## Reihen von Haarschuppen am Hinterkopf unter einem Hut (FRINGE, scout).
+@export var back_scales := false
 ## Schleife im Haar (Alpha 0 = keine).
 @export var bow_color := Color(0, 0, 0, 0)
 
