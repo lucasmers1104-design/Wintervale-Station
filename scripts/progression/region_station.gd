@@ -239,6 +239,26 @@ func upgrade(debug := false) -> bool:
 	Events.notification_requested.emit("%s · %s" % [station_name,EpochCatalog.epoch(level)["station"]])
 	return true
 
+## Platform, buildings or an extra platform cover [param point] (used for picking).
+func covers(point: Vector3) -> bool:
+	var p := to_local(Vector3(point.x,global_position.y,point.z))
+	var length := float(EpochCatalog.epoch(level)["length"])
+	if p.x > 1.5 and p.x < 20 and absf(p.z) < length/2+1.5:
+		return true
+	for track in platform_tracks:
+		var axis := SaveUtils.array_to_vec3(track.get("pos"))
+		var local := Basis(Vector3.UP,float(track.get("angle",0))).inverse()*(Vector3(point.x,axis.y,point.z)-axis)
+		if local.x > 1.5 and local.x < 2.2+float(EpochCatalog.epoch(level)["width"]) and absf(local.z) < length/2+1.5:
+			return true
+	return false
+
+## Red overlay while the remove tool hovers the station.
+func set_highlight(material: Material) -> void:
+	if _visual == null:
+		return
+	for node in _visual.find_children("*","GeometryInstance3D",true,false):
+		(node as GeometryInstance3D).material_overlay = material
+
 func clears(x: float, z: float) -> bool:
 	var p := to_local(Vector3(x,global_position.y,z))
 	var length := float(EpochCatalog.epoch(level)["length"])

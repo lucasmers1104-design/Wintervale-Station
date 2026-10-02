@@ -72,6 +72,9 @@ func _ready() -> void:
 
 
 func _setup() -> void:
+	# Ein Haltepunkt kann im selben Frame wieder abgerissen werden (Undo/Redo).
+	if not is_inside_tree():
+		return
 	for node in get_tree().get_nodes_in_group(NpcHome.GROUP):
 		_homes[(node as NpcHome).home_name] = node
 	for node in get_tree().get_nodes_in_group(StationSpot.GROUP):

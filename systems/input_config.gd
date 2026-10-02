@@ -104,6 +104,7 @@ const LEGENDS := {
 		{"actions": [&"interact_primary"], "text": "Zug anklicken: mitfahren"},
 		{"actions": [&"interact_primary"], "text": "Weiche anklicken: umstellen"},
 		{"actions": [&"build_mode"], "text": "Bauen"},
+		{"actions": [&"region_overview"], "text": "Reise & Fuhrpark"},
 		{"actions": [&"toggle_view"], "text": "Zur Spielfigur"},
 	],
 	&"build_rail": [
@@ -119,7 +120,11 @@ const LEGENDS := {
 		{"literal": ["Mausseite"], "text": "Fahrtrichtung"},
 	],
 	&"build_remove": [
-		{"actions": [&"interact_primary"], "text": "Gleis, Signal oder Dorfobjekt entfernen"},
+		{"actions": [&"interact_primary"], "text": "Gleis, Haltepunkt, Signal oder Dorfobjekt entfernen"},
+	],
+	&"build_station": [
+		{"actions": [&"interact_primary"], "text": "Neben dem Gleis: Haltepunkt errichten"},
+		{"actions": [&"build_tool_remove"], "text": "Falsch gesetzt? Entfernen"},
 	],
 	&"build_village": [
 		{"actions": [&"interact_primary"], "text": "Setzen / Linie: Start und Ende"},
@@ -132,6 +137,7 @@ const LEGENDS := {
 		{"actions": [&"interact_primary"], "text": "Signal: Halt ein / aus"},
 	],
 	&"build_common": [
+		{"actions": [&"build_tool_station"], "text": "Haltepunkt"},
 		{"actions": [&"build_tool_rail", &"build_tool_switch", &"build_tool_signal", &"build_tool_remove",
 			&"build_tool_test"], "text": "Bahn-Werkzeug"},
 		{"actions": [&"build_tool_houses", &"build_tool_paths", &"build_tool_nature", &"build_tool_lighting",

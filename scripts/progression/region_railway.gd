@@ -53,6 +53,44 @@ func station_by_name(label: String) -> RegionStation:
 			return station
 	return null
 
+## Station whose platform or buildings lie under [param point] (null = none).
+func station_at(point: Vector3) -> RegionStation:
+	for station in stations:
+		if station.covers(point):
+			return station
+	return null
+
+## Player demolition with the remove tool. The halt's price is refunded; lines
+## serving it end. The returned data restores everything via [method restore_station].
+func demolish_station(id: int) -> Dictionary:
+	var station := station_by_id(id)
+	if station == null:
+		return {}
+	var served: Array = []
+	for line in lines:
+		if int(line["a"]) == id or int(line["b"]) == id:
+			served.append(line.duplicate(true))
+	var label := station.station_name
+	var data := remove_station(id)
+	data["lines"] = served
+	Economy.earn(int(EpochCatalog.epoch(1)["cost"]),"Abriss: "+label,"refund")
+	Events.notification_requested.emit("%s abgerissen · %s zurück" % [label,Economy.format_money(int(EpochCatalog.epoch(1)["cost"]))])
+	return data
+
+## Undo of [method demolish_station]: the refund is taken back, lines return.
+func restore_station(data: Dictionary) -> void:
+	if station_by_id(int(data["id"])):
+		return
+	Economy.pay(int(EpochCatalog.epoch(1)["cost"]),"Wiederaufbau: "+String(data.get("name","")),"build")
+	build_station(data,false)
+	for row: Variant in data.get("lines",[]):
+		var line: Dictionary = (row as Dictionary).duplicate(true)
+		if station_by_id(int(line["a"])) and station_by_id(int(line["b"])):
+			line["cooldown"] = 0.0
+			lines.append(line)
+	_validity_cache.clear()
+	refresh()
+
 func placement(point: Vector3) -> Dictionary:
 	var rail := network.find_segment_near(point,8.0)
 	if rail == null or rail.tunnel:

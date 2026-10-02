@@ -14,6 +14,7 @@ extends BuildTool
 var _hovered_id := -1
 var _hovered_signal := -1
 var _hovered_village = null
+var _hovered_station: RegionStation
 
 
 func deactivate() -> void:
@@ -48,6 +49,14 @@ func hover_at(point: Vector3) -> void:
 	if village_object:
 		_set_hovered(-1, -1, village_object)
 		return
+	# Haltepunkte (Epochen-Spiel): Bahnsteig oder Gebäude anklicken. Direkt auf
+	# einem Gleis gewinnt das Gleis, damit Parallelgleise abreißbar bleiben.
+	var progress := RegionProgression.find(get_tree())
+	if progress and network.find_segment_near(point, 1.5) == null:
+		var station := progress.region.station_at(point)
+		if station:
+			_set_hovered(-1, -1, null, station)
+			return
 	var segment := network.find_segment_near(point, pick_radius)
 	_set_hovered(segment.id if segment else -1, -1)
 
@@ -66,6 +75,18 @@ func remove_at(point: Vector3) -> bool:
 		undo_redo.create_action("%s entfernen" % label)
 		undo_redo.add_do_method(village.demolish.bind(object_id))
 		undo_redo.add_undo_method(village.build.bind(object_data))
+		undo_redo.commit_action()
+		return true
+	if _hovered_station and is_instance_valid(_hovered_station):
+		var region := _hovered_station.region
+		var station_id := _hovered_station.station_id
+		# Lambdas kopieren lokale Variablen – der Halter teilt die Abrissdaten.
+		var holder := {"data": _hovered_station.get_data()}
+		var label := _hovered_station.station_name
+		_set_hovered(-1, -1)
+		undo_redo.create_action("%s abreißen" % label)
+		undo_redo.add_do_method(func() -> void: holder["data"] = region.demolish_station(station_id))
+		undo_redo.add_undo_method(func() -> void: region.restore_station(holder["data"]))
 		undo_redo.commit_action()
 		return true
 	if _hovered_signal >= 0:
@@ -89,7 +110,13 @@ func remove_at(point: Vector3) -> bool:
 	return true
 
 
-func _set_hovered(segment_id: int, signal_id: int, village_object = null) -> void:
+func _set_hovered(segment_id: int, signal_id: int, village_object = null, station: RegionStation = null) -> void:
+	if station != _hovered_station:
+		if _hovered_station and is_instance_valid(_hovered_station):
+			_hovered_station.set_highlight(null)
+		_hovered_station = station
+		if station:
+			station.set_highlight(highlight_material)
 	if village_object != _hovered_village:
 		if _hovered_village and is_instance_valid(_hovered_village):
 			_hovered_village.set_highlight(null)

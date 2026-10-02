@@ -159,11 +159,10 @@ func _try_toggle_switch_outside_build(event: InputEvent) -> bool:
 		return false
 	var progress := RegionProgression.find(get_tree())
 	if progress:
-		for station in progress.region.stations:
-			var local := station.to_local(point)
-			if local.x>1.5 and local.x<20 and absf(local.z)<float(EpochCatalog.epoch(station.level)["length"])/2:
-				Events.region_station_requested.emit(station.station_id)
-				return true
+		var station := progress.region.station_at(point)
+		if station:
+			Events.region_station_requested.emit(station.station_id)
+			return true
 	var switch := rail_network.find_switch_near(point, switch_pick_radius)
 	if switch == null:
 		return false
