@@ -10,6 +10,23 @@ Neue Reisen beginnen ohne Gleise, Bahnhof, Gebäude oder Verkehr. Bereits gespei
 4. Das Menü schließen. Reisende gehen zum Bahnsteig, steigen durch die animierten Doppeltüren ein und am Ziel wieder aus. Erst ein abgeschlossener Ausstieg zählt als Beförderung.
 5. Nach erfolgreichem Verkehr entstehen Baustellen und anschließend bewohnte Häuser. Die Reiseübersicht zeigt die konkreten Bedingungen für den nächsten Abschnitt.
 
+### Einführung mit Ilse (seit dem Debugging-Durchgang vom 2. Oktober 2026)
+
+Neue Reisen beginnen mit einer geführten Einführung (`scripts/ui/journey_tutorial.gd`). Ilse, die Bahnhofsvorsteherin, begleitet sieben Schritte: Willkommen → Baumodus (B) → 90 m Gleis → zwei Haltepunkte (H) → erster Zug im Fuhrpark (P) → erste Fahrgäste → Ausblick auf die Epochen. Jeder Schritt zeigt Tastenkappen, einen Fortschritt als kleines Gleis und wird mit Stempel und Glockenklang abgehakt. Ein goldener Pfeil zeigt auf den passenden Knopf (Werkzeug, Fuhrpark-Schild, „Zug einsetzen“). Leuchtende Ringe in der Welt markieren gute Plätze für Haltepunkte nahe den Gleisenden. Ist das Reisebuch offen, spricht Ilse in dessen Kopfzeile. Wer schneller ist, überspringt erledigte Schritte automatisch; „Einführung überspringen“ beendet sie sofort. Der Schritt steht im Spielstand (`progression.tutorial`, -1 = fertig). Ältere Reisen mit Verkehr starten ohne Einführung. Danach bleibt oben links eine einklappbare Zielkarte mit den Bedingungen der nächsten Epoche.
+
+### Reisebuch
+
+Das Reisebuch (`scripts/ui/region_panel.gd`, Taste P oder die Holzschilder oben rechts) nutzt die Bildsprache der Menüseiten: Pergament im verschneiten Holzrahmen (`parchment_panel.png` als Neun-Feld-Grafik), Messingknöpfe der Spielstand-Seite, Serifenschrift und eigene Symbole in `assets/ui/journey/`. Gemeinsame Bausteine stehen in `scripts/ui/journey_style.gd`. Das Buch liegt unter der Statusleiste, damit Geld, Tag und Uhr sichtbar bleiben.
+
+- **Reise:** sechs Epochen als Haltestellen an einem Gleis, die aktuelle leuchtet; Klick zeigt Bahnhof, neuen Zug (mit Lackierungs-Silhouette), Neuerungen und Bedingungen mit Fortschritt und einem Tipp zum ersten offenen Ziel.
+- **Orte / Bahnhof:** Kennzahlen mit Symbolen, Stufenpunkte, Umbenennen, Ausbau mit Preis und Grund, Bahnsteige, Linien des Ortes.
+- **Fuhrpark:** Regal mit allen Zügen (gesperrte mit Schloss), drehbare 3D-Vorschau auf einem kleinen Schaugleis, Kennzahlen und „Zug auf die Strecke schicken“.
+- **Linien:** Karten mit Zustand („hält in …“, „unterwegs nach …“, „Gleis unterbrochen?“), Pausieren und Aufheben.
+
+### Haltepunkte abreißen
+
+Im Baumodus reißt „Entfernen“ (4) auch Haltepunkte ab: Bahnsteig oder Gebäude anklicken (rot markiert). Der Preis des Holz-Haltepunkts (180 Taler) kommt zurück, die Linien des Ortes enden. Strg+Z stellt Bahnhof und Linien wieder her und bucht den Betrag erneut. Ein Klick direkt auf ein Gleis entfernt weiterhin das Gleis.
+
 Ein Bahnhof lässt sich außerhalb des Baumodus anklicken. Sein Menü bietet Namen, Auslastungszahlen, angeschlossene Linien, Ausbau und zusätzliche Bahnsteige. Kleine Bahnhöfe bleiben beim Epochenwechsel erhalten; jeder Ort wird separat ausgebaut. **F8** öffnet ausschließlich im Entwicklungsbuild die Testwerkzeuge.
 
 Für längere Züge die Gleise hinter den vorhandenen Haltepunkten verlängern. Der Fahrweg berücksichtigt auch diese zusätzlichen Endstücke. Auf der Verbindung müssen der ganze Zug und die Bremswege Platz finden. Die Fehlermeldung im Fuhrpark erklärt fehlende Bahnhofsstufen oder Gleislängen. Bahnhofsflächen werden für spätere Ausbauten freigehalten; benachbarte Bahnsteige dürfen beim Ausbau nicht überlappen.
@@ -41,6 +58,20 @@ Alle sechs Bilder aus `C:\Users\Luca Warmers\Pictures\TrainModels` wurden einzel
 | 4 | `modern_local` | Kurze schräge Front, Türkis/Creme, orange Doppeltüren, drei Wagen | 3 / 51,68 m | 100 / 0 |
 | 5 | `intercity` | Creme mit burgunderfarbenen Bändern, rote Sitze und Türen, vier Wagen | 4 / 72,52 m | 160 / 0 |
 | 6 | `high_speed` | Lange verjüngte Nase, weiße/blaue Flächen, dunkles Fensterband, fünf Wagen | 5 / 97,36 m | 220 / 0 |
+
+**Überarbeitung 2. Oktober 2026** (Vergleich mit denselben sechs Bildern im Studio und in der Spielwelt):
+
+- Der Lack-Shader (`railcar_paint.gdshader`) dunkelte helle Farben auf 62 % ab – Creme wurde zu Khaki, Weiß zu Beige. Jetzt höchstens auf 79 %.
+- Lackierungen nach den Bildern: kräftigeres Rot/Creme (Triebwagen), Tannengrün (Epoche 2), Signalrot (Güterlok), Türkis/Orange (Nahverkehr), Burgunder (Intercity), Weiß/Kobalt (Hochgeschwindigkeit); alle Dächer anthrazit.
+- Puffer, Kupplungen und Dachgeräte dunkel statt hellgrau; moderne Züge tragen flache Klimakästen.
+- Epoche 2: geschlossenes Führerhaus (unten grün, oben creme mit echten Fensteröffnungen), gleich hohe Vorbauten, runde Puffer; Wagen mit Tonnendach und Pilzlüftern.
+- Güterlok: rote Stirn mit cremefarbenem Fensterrahmen, dunkles Dach auf dem Maschinenraum.
+- Alter Triebwagen: lange Dachkiste, orange Begrenzungsleuchten, Trittlampe über der Tür.
+- Hochgeschwindigkeitszug: breites blaues Band unter den Fenstern.
+
+### Bahnsteige
+
+Der Holz-Haltepunkt (`EpochStationMeshes._timber_halt`) hat ein Bretterdeck auf Stelzen mit Streben und Stirnblenden, einen Zaun mit Schneekappen und eine kleine Treppe dort, wo die Reisenden zum Ort gehen. Dazu kommen ein Unterstand mit Satteldach, Schneedecke, Zierbrettern, Fenster, Bank, Fahrplanaushang und Hängelaterne sowie Gepäckkarren, Milchkannen, Kisten, Pflanzkübel und Endtreppen mit Handlauf. Alle Stufen haben gusseiserne Laternenmasten (die Lichtquellen sitzen in den Laternen) und Schnee auf allen Dächern. Ab Stufe 2 liegen zusätzlich Schneereste, Gepäckkarren und Kannen auf dem Bahnsteig. Der Ortsname steht jetzt lesbar auf beiden Seiten des Schildes; vorher lag die Schrift in der Tafel.
 
 Die komplette bisherige Fahrzeugbibliothek bleibt zusätzlich erhalten: Regionalbahn, Regional-Express, Holz-, Baustoff-, Schüttgut- und gemischter Güterzug sowie Weihnachts-, Ernte- und Schneeräumzug. Sonderfahrzeuge benötigen keine saisonalen Ereignisse zum Fortschritt. Ihre Bahnhofsvoraussetzungen gelten auch im neuen regionalen Betrieb. Neue Fahrzeuge erweitern den Fuhrpark; ältere werden nicht automatisch ersetzt.
 

@@ -81,14 +81,22 @@ func rebuild() -> void:
 	glass.material_override = _glow
 	glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_visual.add_child(glass)
-	var label := Label3D.new()
-	label.text = station_name
-	label.position = Vector3(parts["center_x"],float(parts["height"])+2.2,float(EpochCatalog.epoch(level)["length"])*0.36)
-	label.rotation.y = PI/2
-	label.font_size = 48
-	label.pixel_size = 0.005
-	label.outline_size = 0
-	_visual.add_child(label)
+	# Ortsname auf beiden Seiten der Schildtafel (vorher steckte er in der Tafel).
+	var sign_at: Vector3 = parts["sign_at"]
+	var font := SystemFont.new()
+	font.font_names = PackedStringArray(["Georgia", "Palatino Linotype", "Noto Serif", "Times New Roman"])
+	for side: float in [-1.0,1.0]:
+		var label := Label3D.new()
+		label.text = station_name
+		label.font = font
+		label.font_size = 64 if station_name.length() <= 11 else 46
+		label.pixel_size = 0.0042
+		label.outline_size = 0
+		label.modulate = Color(0.96,0.92,0.8)
+		label.double_sided = false
+		label.position = sign_at+Vector3(side*float(parts["sign_face"]),float(parts["sign_y"]),0)
+		label.rotation.y = side*PI/2
+		_visual.add_child(label)
 	_light = OmniLight3D.new()
 	_light.position = Vector3(parts["center_x"],3.0,0)
 	_light.light_color = Color(1,0.75,0.46)
@@ -97,9 +105,9 @@ func rebuild() -> void:
 	_light.distance_fade_begin = 65
 	_light.distance_fade_length = 20
 	_visual.add_child(_light)
-	for z: float in [-0.28,0.28]:
+	for lamp_point: Vector3 in parts["lamps"]:
 		var lamp := OmniLight3D.new()
-		lamp.position = Vector3(parts["center_x"],3.3,float(EpochCatalog.epoch(level)["length"])*z)
+		lamp.position = lamp_point+Vector3(-0.2,0,0)
 		lamp.light_color = Color(1,0.78,0.50)
 		lamp.omni_range = 8
 		lamp.distance_fade_enabled = true

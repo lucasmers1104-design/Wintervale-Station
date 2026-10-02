@@ -24,6 +24,8 @@ func _ready() -> void:
 	_test_geometry()
 
 	var main: Node3D = load("res://scenes/main/main.tscn").instantiate()
+	# Die Grundfunktionen prüfen die klassische Welt mit Testgelände und Laternen.
+	main.set("legacy_world", true)
 	add_child(main)
 	_use_empty_map(main)
 	var player: PlayerController = main.get_node("Player")
