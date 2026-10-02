@@ -141,8 +141,10 @@ func _build_legs() -> void:
 				# Rock/Kleid: nur Bein bzw. Strumpfhose
 				kit.lathe(xf, [Vector2(0.066, -0.3), Vector2(0.072, -0.1), Vector2(0.08, 0.02)], 10, leg, look.tights_color.a > 0.0)
 		if look.sock_color.a > 0.0:
-			kit.lathe(xf, [Vector2(0.086, -0.205), Vector2(0.095, -0.18), Vector2(0.095, -0.15), Vector2(0.088, -0.135)], 12,
-				CharacterKit.paint(look.sock_color, P.KNIT_CUFF, 22.0))
+			# Kniestrumpf bzw. Söckchen mit umgeschlagenem Rand (Vorlage baker: bis 0,11 m)
+			kit.lathe(xf, [Vector2(0.074, -0.3), Vector2(0.078, -0.25)], 10, _solid(look.sock_color))
+			kit.lathe(xf, [Vector2(0.078, -0.25), Vector2(0.088, -0.245), Vector2(0.09, -0.22), Vector2(0.083, -0.21)], 12,
+				CharacterKit.paint(look.sock_color, P.KNIT_CUFF, 22.0), true, 1.0, 1.0, 0.0, 1.0, 0.0, false, true)
 		_build_shoe(kit, side)
 
 
@@ -242,13 +244,15 @@ func _build_neckline() -> void:
 			# Dicker, gerollter Rollkragen, der breit auf den Schultern liegt
 			torso.torus(Transform3D(Basis.IDENTITY, Vector3(0, NECK_Y, 0)), 0.1, 0.048, 18, 7,
 				CharacterKit.paint(look.shirt_color.darkened(0.02), P.KNIT_CUFF, 34.0), 1.0, 0.88, 0.95)
-		CharacterAppearance.TopStyle.BLOUSE:
+		CharacterAppearance.TopStyle.BLOUSE, CharacterAppearance.TopStyle.DRESS:
 			# Bubikragen mit Bogenkante (bow_girl): zwölf flache Bögen rundum auf den
 			# Schultern (Vorlage: 0,70–0,77 m hoch, ±0,145 m breit), vorne mittig geteilt;
 			# zwei braune Knöpfe darunter
-			var collar := _solid(look.shirt_color.lightened(0.12))
+			# Kleid (baker): sechs große, runde Kragenlappen in shirt_line_color, keine Knöpfe
+			var dress := look.top_style == CharacterAppearance.TopStyle.DRESS
+			var collar := _solid(look.shirt_line_color if dress and look.shirt_line_color.a > 0.0 else look.shirt_color.lightened(0.12))
 			torso.torus(Transform3D(Basis.IDENTITY, Vector3(0, NECK_Y, 0)), 0.085, 0.022, 14, 5, collar, 1.0, 0.9)
-			var count := 12
+			var count := 6 if dress else 12
 			for k in count:
 				var t := (float(k) + 0.5) / count
 				var n := torso_normal(t)
@@ -256,9 +260,11 @@ func _build_neckline() -> void:
 				var x_axis := Vector3.UP.cross(n).normalized()
 				var y_axis := out.cross(x_axis).normalized()
 				var size := 0.7 + 0.3 * absf(cos(t * TAU))
+				if dress:
+					size = 1.05
 				torso.ellipsoid(Transform3D(Basis(x_axis, y_axis, out), torso_point(t, 0.712, 0.026)), Vector3(0.058, 0.05, 0.014) * size,
 					12, 6, collar)
-			for k in 2:
+			for k in (0 if dress else 2):
 				var y := NECK_Y - 0.055 - k * 0.05
 				torso.ellipsoid(Transform3D(Basis.looking_at(torso_normal(0.0)), torso_point(0.0, y, 0.01)), Vector3(0.016, 0.016, 0.008),
 					6, 3, _solid(look.shirt_color.darkened(0.45).lerp(Color(0.45, 0.26, 0.14), 0.6)))
@@ -296,8 +302,7 @@ const WAIST_Y := 0.447
 ## Hosenbund: Hose bzw. Rock reicht bis zur Taille.
 func _build_waist() -> void:
 	if look.outer in [CharacterAppearance.Outer.SUSPENDERS, CharacterAppearance.Outer.OVERALLS, CharacterAppearance.Outer.PINAFORE, CharacterAppearance.Outer.KNIT_DRESS,
-			CharacterAppearance.Outer.DRESS_APRON, CharacterAppearance.Outer.LONG_COAT, CharacterAppearance.Outer.DUFFLE_COAT,
-			CharacterAppearance.Outer.PARKA]:
+			CharacterAppearance.Outer.LONG_COAT, CharacterAppearance.Outer.DUFFLE_COAT, CharacterAppearance.Outer.PARKA]:
 		return
 	var pants := _fabric(look.pants_color, look.bottom_pattern, look.bottom_color2)
 	match look.bottom:
@@ -315,10 +320,21 @@ func _hip_profile(top: float) -> Array:
 
 
 func _skirt(long: bool, paint: CharacterKit.Paint, top: float) -> void:
-	var hem := 0.09 if long else 0.2
+	var profile := _skirt_profile(long, top)
+	torso.lathe(Transform3D.IDENTITY, profile, 20, paint, true, 1.0, 0.86, 0.0, 1.0, 0.0, true)
+	# Zierstreifen über dem Saum (baker)
+	if look.bottom_color2.a > 0.0:
+		var hem: float = profile[0].y
+		torso.lathe(Transform3D.IDENTITY, [Vector2(profile[0].x - 0.006, hem + 0.035), Vector2(profile[0].x - 0.01, hem + 0.06)], 20,
+			_solid(look.bottom_color2), true, 1.0, 0.86, 0.0, 1.0, 0.008)
+
+
+## Rockprofil (Radius, Höhe) vom Saum bis zur Taille; Rock bis übers Knie (Vorlage baker:
+## Saum bei 0,14 m) bzw. lang.
+func _skirt_profile(long: bool, top: float) -> Array:
+	var hem := 0.09 if long else 0.14
 	var flare := 0.36 if long else 0.33
-	torso.lathe(Transform3D.IDENTITY, [Vector2(flare, hem), Vector2(flare - 0.03, hem + 0.06), Vector2(0.27, 0.3),
-		Vector2(torso_radius(top) + 0.012, top)], 20, paint, true, 1.0, 0.86, 0.0, 1.0, 0.0, true)
+	return [Vector2(flare, hem), Vector2(flare - 0.025, hem + 0.06), Vector2(0.27, 0.3), Vector2(torso_radius(top) + 0.012, top)]
 
 
 ## Überkleidung (Latzhose, Westen, Jacken, Schürzen, Kleider …).
@@ -334,6 +350,8 @@ func _build_outer() -> void:
 			_pinafore()
 		CharacterAppearance.Outer.WORK_APRON:
 			_work_apron()
+		CharacterAppearance.Outer.DRESS_APRON:
+			_dress_apron()
 
 
 ## Latzhose: Hosenteil, Latz mit großer Brusttasche, Träger mit Messingknöpfen,
@@ -507,6 +525,54 @@ func _work_apron() -> void:
 				Vector3(0.018, 0.018, 0.01), 8, 4, rivet)
 
 
+## Latzschürze (baker): Latz bis 0,7 m mit Knöpfen an den Ecken, Träger über den
+## Schultern, hinten gekreuzt; Schürzenrock vorne bis 0,175 m mit Zierstreifen
+## (outer_color2) und aufgesetzter Tasche mit Blattmotiv; große Schleife hinten.
+func _dress_apron() -> void:
+	var cloth := _solid(look.outer_color)
+	var edge := _solid(look.outer_color.darkened(0.08))
+	var stripe := _solid(look.outer_color2 if look.outer_color2.a > 0.0 else look.outer_color.darkened(0.2))
+	var xf := Transform3D.IDENTITY
+	var top := 0.7
+	torso.panel(xf, torso_profile(WAIST_Y, top, 3), 6, cloth, 1.0, TORSO_DEPTH, -0.115, 0.115, 0.016, 0.012, edge)
+	torso.lathe(xf, torso_profile(WAIST_Y - 0.012, WAIST_Y + 0.03, 1), 20, cloth, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.02)
+	var skirt: Array = [Vector2(0.324, 0.175), Vector2(0.306, 0.235), Vector2(0.272, 0.3), Vector2(torso_radius(WAIST_Y) + 0.014, WAIST_Y)]
+	torso.panel(xf, skirt, 10, cloth, 1.0, 0.86, -0.17, 0.17, 0.016, 0.012, edge)
+	torso.panel(xf, [Vector2(0.322, 0.2), Vector2(0.318, 0.222)], 10, stripe, 1.0, 0.86, -0.17, 0.17, 0.03, 0.004, stripe)
+	# Tasche mit Streifen und Blattmotiv
+	var pocket_profile: Array = [Vector2(0.304, 0.235), Vector2(0.282, 0.3), Vector2(0.27, 0.36)]
+	torso.panel(xf, pocket_profile, 4, cloth, 1.0, 0.86, -0.1, 0.1, 0.036, 0.014, _solid(look.outer_color.darkened(0.2)))
+	torso.panel(xf, [Vector2(0.276, 0.335), Vector2(0.272, 0.35)], 4, stripe, 1.0, 0.86, -0.1, 0.1, 0.05, 0.003, stripe)
+	var leaf_at := Vector3(0.0, 0.29, -0.86 * 0.3 - 0.052)
+	for k in 3:
+		var tilt := (float(k) - 1.0) * 0.7
+		torso.scale_tuft(Transform3D(Basis(Vector3.FORWARD, PI + tilt), leaf_at + Vector3(sin(tilt) * 0.012, 0.0, 0.0)),
+			0.022, 0.05, 0.006, stripe)
+	# Träger: vorne von den Latzecken über die Schulter, hinten gekreuzt zur Gegenseite
+	for side: float in [-1.0, 1.0]:
+		var points: Array = []
+		var outward: Array = []
+		var front_angle := side * 0.1
+		for y: float in [top - 0.02, 0.73]:
+			points.append(torso_point(front_angle, y, 0.028))
+			outward.append(torso_normal(front_angle))
+		points.append(Vector3(side * 0.14, 0.756, -0.04))
+		outward.append(Vector3.UP + torso_normal(front_angle))
+		points.append(Vector3(side * 0.14, 0.758, 0.04))
+		outward.append(Vector3.UP + torso_normal(0.5 - side * 0.1))
+		for k in 4:
+			var u := float(k + 1) / 4.0
+			var angle := 0.5 - side * lerpf(0.1, 0.012, u)
+			var y := lerpf(0.72, WAIST_Y + 0.02, u)
+			points.append(torso_point(angle, y, 0.022 + 0.004 * side))
+			outward.append(torso_normal(angle))
+		torso.strip(points, outward, 0.05, 0.01, cloth, edge)
+		torso.ellipsoid(Transform3D(Basis.looking_at(torso_normal(side * 0.09)), torso_point(side * 0.09, top - 0.02, 0.044)),
+			Vector3(0.022, 0.022, 0.011), 10, 5, _solid(look.accent_color))
+	# Schleife hinten mit langen Bändern
+	_bow(torso, torso_point(0.5, WAIST_Y + 0.03, 0.05), PI, 0.0, cloth, 0.85, 1.9, true)
+
+
 ## Halbe Breite des V-Ausschnitts (Winkelanteil) in Höhe [param y].
 func _v_half(y: float, tip: float) -> float:
 	return 0.075 * clampf((y - tip) / (NECK_Y - tip), 0.0, 1.0)
@@ -579,6 +645,13 @@ func _build_arms() -> void:
 				kit.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(0, -0.07, 0)), Vector3(0.095, 0.12, 0.09), 10, 6, sleeve)
 				kit.lathe(xf, [Vector2(0.06, -0.215), Vector2(0.066, -0.17), Vector2(0.074, -0.11)], 10, sleeve)
 				kit.torus(Transform3D(Basis.IDENTITY, Vector3(0, -0.205, 0)), 0.055, 0.02, 10, 5, _solid(look.shirt_color.darkened(0.05)))
+			CharacterAppearance.Sleeves.SHORT_PUFF:
+				# Kurzer Puffärmel mit breitem Bündchen (baker), darunter der nackte Unterarm
+				var cuff_color := look.shirt_line_color if look.shirt_line_color.a > 0.0 else look.shirt_color.darkened(0.05)
+				kit.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(0, -0.045, 0)), Vector3(0.1, 0.105, 0.095), 10, 6, sleeve)
+				kit.lathe(xf, [Vector2(0.074, -0.16), Vector2(0.084, -0.155), Vector2(0.086, -0.12), Vector2(0.08, -0.11)], 10,
+					_solid(cuff_color), true, 1.0, 1.0, 0.0, 1.0, 0.0, true)
+				kit.lathe(xf, [Vector2(0.05, -0.24), Vector2(0.056, -0.15)], 10, _skin(), false)
 			_:
 				kit.lathe(xf, [Vector2(0.062, -0.2), Vector2(0.07, -0.08), Vector2(0.078, 0.0), Vector2(0.06, 0.05), Vector2(0.0, 0.07)],
 					10, sleeve)
@@ -723,7 +796,13 @@ func _build_hair() -> void:
 	if hat in [CharacterAppearance.HatStyle.FLAT_CAP, CharacterAppearance.HatStyle.BEANIE, CharacterAppearance.HatStyle.POMPOM_BEANIE,
 			CharacterAppearance.HatStyle.BERET, CharacterAppearance.HatStyle.BUCKET_HAT, CharacterAppearance.HatStyle.TRAPPER_HAT,
 			CharacterAppearance.HatStyle.ELF_HAT, CharacterAppearance.HatStyle.STRAW_HAT, CharacterAppearance.HatStyle.CHEF_HAT]:
-		_hat_clip = 30.0 if hat == CharacterAppearance.HatStyle.FLAT_CAP else 22.0
+		match hat:
+			CharacterAppearance.HatStyle.FLAT_CAP:
+				_hat_clip = 30.0
+			CharacterAppearance.HatStyle.CHEF_HAT:
+				_hat_clip = 12.0
+			_:
+				_hat_clip = 22.0
 		if hat == CharacterAppearance.HatStyle.FLAT_CAP:
 			_hat_rim = Vector2(0.1, 0.137)
 		_hat_bang = 0.6
@@ -792,7 +871,8 @@ func _build_hair() -> void:
 			# (unter einem Hut mit Krempe würde es durch die Krempe stechen)
 			for side: float in ([] if hat == CharacterAppearance.HatStyle.STRAW_HAT else [-1.0, 1.0]):
 				for k in 3:
-					_scale(side * (78.0 + k * 26.0), 6.0 - k * 4.0, 0.22, 0.24, hair if k % 2 == 0 else hair_dark, 0.12, 1.07, 0.6)
+					_scale(side * (78.0 + k * 26.0), 6.0 - k * 4.0, 0.22, 0.24, hair if k % 2 == 0 else hair_dark, 0.12 if hat == CharacterAppearance.HatStyle.HEADSCARF else -0.05,
+						1.07 if hat == CharacterAppearance.HatStyle.HEADSCARF else 1.0, 0.6)
 			for side: float in [-1.0, 1.0]:
 				var root: Array = _hair_point(side * 64.0, 4.0, 1.0)
 				var p: Vector3 = root[0]
@@ -840,12 +920,17 @@ func _build_hair_extra(hair: CharacterKit.Paint, _hair_dark: CharacterKit.Paint)
 			head.ellipsoid(Transform3D(Basis.IDENTITY, bun_at), Vector3(0.125, 0.115, 0.12), 10, 7, hair)
 			if look.bow_color.a > 0.0:
 				# Große Schleife vorne links am Dutt (Vorlage: 0,38 m breit, leicht schräg)
-				_bow(Vector3(-0.11, 0.29, 0.0), 0.7, -0.22, _solid(look.bow_color))
+				_bow(head, Vector3(-0.11, 0.29, 0.0), 0.7, -0.22, _solid(look.bow_color))
 		CharacterAppearance.HairExtra.BUN_BACK:
 			head.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(0.0, 0.12, 0.27)), Vector3(0.1, 0.095, 0.085), 10, 7, hair)
 		CharacterAppearance.HairExtra.TWIN_BUNS:
 			for side: float in [-1.0, 1.0]:
 				head.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(side * 0.22, 0.2, 0.1)), Vector3(0.085, 0.085, 0.08), 10, 6, hair)
+		CharacterAppearance.HairExtra.LOW_BUNS:
+			# Drei Knoten im Nacken (baker): einer mittig, zwei dahinter seitlich hinter den Ohren
+			for side: float in [-1.0, 1.0]:
+				head.ellipsoid(Transform3D(Basis(Vector3.UP, side * 0.5), Vector3(side * 0.19, -0.12, 0.16)), Vector3(0.1, 0.1, 0.095), 9, 6, hair)
+			head.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(0.0, -0.19, 0.25)), Vector3(0.09, 0.085, 0.08), 9, 6, hair)
 		CharacterAppearance.HairExtra.LOW_TAIL:
 			# Tiefer, runder Zopf im Nacken mit Haargummi (bow_color)
 			head.ellipsoid(Transform3D(Basis(Vector3.RIGHT, 0.5), Vector3(0.0, -0.2, 0.27)), Vector3(0.085, 0.1, 0.075), 10, 6, hair)
@@ -899,6 +984,22 @@ func _build_hat(hat: CharacterAppearance.HatStyle) -> void:
 			head.lathe(brim_xf, [Vector2(0.285, -0.01), Vector2(0.31, -0.022), Vector2(0.435, -0.142), Vector2(0.45, -0.14),
 				Vector2(0.44, -0.124), Vector2(0.31, 0.0), Vector2(0.285, 0.012)], 10, _solid(look.hat_color.lightened(0.06)),
 				true, 1.0, 1.0, -0.11, 0.11)
+		CharacterAppearance.HatStyle.CHEF_HAT:
+			# Kochmütze (baker): gerades Band mit Zierstreifen (hat_color2), darüber eine
+			# große, bauschige, facettierte Haube; leicht nach hinten gekippt. Vorlage: Band
+			# 0,1–0,29 m über der Kopfmitte, Haube bis 0,53 m, 0,7 m breit.
+			var white := _solid(look.hat_color)
+			var hat_xf := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(12.0)), Vector3(0, 0.06, 0.0))
+			head.lathe(hat_xf, [Vector2(0.27, 0.0), Vector2(0.276, 0.1), Vector2(0.272, 0.2)], 18, white, true, 1.0, 0.98)
+			if look.hat_color2.a > 0.0:
+				head.lathe(hat_xf, [Vector2(0.279, 0.11), Vector2(0.281, 0.14)], 18, _solid(look.hat_color2), true, 1.0, 0.98)
+			# Haube: flach facettierte Kuppel, die rundum über das Band hinausquillt
+			head.lathe(hat_xf, [Vector2(0.255, 0.17), Vector2(0.33, 0.195), Vector2(0.355, 0.245), Vector2(0.35, 0.305), Vector2(0.31, 0.36),
+				Vector2(0.23, 0.4), Vector2(0.12, 0.42), Vector2(0.0, 0.425)], 13, white, true, 1.0, 0.95)
+			for k in 5:
+				var a := TAU * (float(k) + 0.2) / 5.0
+				head.ellipsoid(hat_xf * Transform3D(Basis(Vector3.UP, a), Vector3(sin(a) * 0.17, 0.37, -cos(a) * 0.16)),
+					Vector3(0.15, 0.07, 0.13), 7, 4, white)
 		CharacterAppearance.HatStyle.STRAW_HAT:
 			# Strohhut (gardener): runde Kuppel, breite leicht hängende Krempe, farbiges Band
 			# Maße aus der Vorlage: Krempe 0,1 m über der Kopfmitte, Krone 0,22 m hoch,
@@ -960,16 +1061,22 @@ func _puff(at: Vector3, radii: Vector3, paint: CharacterKit.Paint) -> void:
 
 ## Schleife: Knoten, zwei flache, facettierte Schlaufen (Pyramiden mit der Spitze zum
 ## Knoten) und zwei kurze Zipfel. [param yaw] dreht sie zur Seite, [param roll] kippt sie.
-func _bow(center: Vector3, yaw: float, roll: float, paint: CharacterKit.Paint) -> void:
-	var frame := Transform3D(Basis(Vector3.UP, yaw) * Basis(Vector3.FORWARD, roll), center)
-	head.ellipsoid(frame, Vector3(0.036, 0.038, 0.03), 8, 5, paint)
+func _bow(kit: CharacterKit, center: Vector3, yaw: float, roll: float, paint: CharacterKit.Paint, size := 1.0, tail := 1.0,
+		ribbon := false) -> void:
+	var frame := Transform3D(Basis(Vector3.UP, yaw) * Basis(Vector3.FORWARD, roll) * Basis.from_scale(Vector3.ONE * size), center)
+	kit.ellipsoid(frame, Vector3(0.036, 0.038, 0.03), 8, 5, paint)
 	for side: float in [-1.0, 1.0]:
 		var outer := Vector3(side * 0.185, 0.012, 0.0)
 		var lobe := Basis.looking_at(Vector3(-side, -0.08, 0.0).normalized(), Vector3.UP)
 		lobe.x = lobe.x * 0.6
-		head.pyramid(frame * Transform3D(lobe, outer), 0.1, 0.172, 6, paint)
-		head.scale_tuft(frame * Transform3D(Basis(Vector3.FORWARD, side * 0.45), Vector3(side * 0.03, -0.065, -0.004)),
-			0.06, 0.12, 0.025, paint)
+		kit.pyramid(frame * Transform3D(lobe, outer), 0.1, 0.172, 6, paint)
+		if ribbon:
+			# Breite Bänder mit gerade abgeschnittenem Ende (Schürzenschleife)
+			kit.box(frame * Transform3D(Basis(Vector3.FORWARD, side * 0.22), Vector3(side * 0.035, -0.06 * tail, 0.004)),
+				Vector3(0.075, 0.12 * tail, 0.014), paint)
+			continue
+		kit.scale_tuft(frame * Transform3D(Basis(Vector3.FORWARD, side * 0.45 / tail), Vector3(side * 0.03, -0.065 * tail, -0.004)),
+			0.06, 0.12 * tail, 0.025, paint)
 
 
 ## Punkt auf der Kopfform (Superellipsoid wie CharacterKit.head_shape) in Richtung
