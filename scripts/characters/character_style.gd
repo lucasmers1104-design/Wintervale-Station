@@ -254,19 +254,22 @@ func _build_neckline() -> void:
 			var dress := look.top_style == CharacterAppearance.TopStyle.DRESS
 			var collar := _solid(look.shirt_line_color if dress and look.shirt_line_color.a > 0.0 else look.shirt_color.lightened(0.12))
 			torso.torus(Transform3D(Basis.IDENTITY, Vector3(0, NECK_Y, 0)), 0.085, 0.022, 14, 5, collar, 1.0, 0.9)
-			var count := 6 if dress else 12
+			var count := 2 if dress else 12
 			for k in count:
 				var t := (float(k) + 0.5) / count
+				if dress:
+					# nur zwei runde Lappen vorne, hinten liegt der Kragen als Band an
+					t = -0.055 if k == 0 else 0.055
 				var n := torso_normal(t)
 				var out := (n + Vector3.UP * 0.35).normalized()
 				var x_axis := Vector3.UP.cross(n).normalized()
 				var y_axis := out.cross(x_axis).normalized()
 				var size := 0.7 + 0.3 * absf(cos(t * TAU))
 				if dress:
-					size = 1.05
+					size = 1.0
 				torso.ellipsoid(Transform3D(Basis(x_axis, y_axis, out), torso_point(t, 0.712, 0.026)), Vector3(0.058, 0.05, 0.014) * size,
 					12, 6, collar)
-			for k in (0 if dress else 2):
+			for k in (3 if look.outer_open else (0 if dress else 2)):
 				var y := NECK_Y - 0.055 - k * 0.05
 				torso.ellipsoid(Transform3D(Basis.looking_at(torso_normal(0.0)), torso_point(0.0, y, 0.01)), Vector3(0.016, 0.016, 0.008),
 					6, 3, _solid(look.shirt_color.darkened(0.45).lerp(Color(0.45, 0.26, 0.14), 0.6)))
@@ -603,37 +606,49 @@ func _v_half(y: float, tip: float) -> float:
 ## drei Holzknöpfe, zwei aufgesetzte Taschen, Rippbund unten.
 func _cardigan() -> void:
 	var knit := CharacterKit.paint(look.outer_color, P.RIBS, 34.0)
+	if look.outer_pattern != CharacterAppearance.Pattern.SOLID:
+		knit = _fabric(look.outer_color, look.outer_pattern, look.outer_color2, 0.8)
 	var rib := CharacterKit.paint(look.outer_color.darkened(0.12), P.KNIT_CUFF, 40.0)
 	var xf := Transform3D.IDENTITY
-	var hem := 0.36
+	var open := look.outer_open
+	# Offene Strickjacke (granny_gingham): kurz bis 0,42 m, vorne ganz offen
+	var hem := 0.42 if open else 0.36
 	# Rumpf bis zur V-Spitze geschlossen, darüber in Scheiben vorne immer weiter offen
-	var v_tip := 0.56
-	torso.lathe(xf, [Vector2(0.255, hem), Vector2(0.258, 0.42)] + torso_profile(0.45, v_tip, 3), 20, knit, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.016)
+	var v_tip := hem if open else 0.56
+	if not open:
+		torso.lathe(xf, [Vector2(0.255, hem), Vector2(0.258, 0.42)] + torso_profile(0.45, v_tip, 3), 20, knit, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.016)
 	var slices := 6
 	for k in slices:
 		var y0 := lerpf(v_tip, NECK_Y - 0.01, float(k) / slices)
 		var y1 := lerpf(v_tip, NECK_Y - 0.01, float(k + 1) / slices)
-		var half := _v_half((y0 + y1) * 0.5, v_tip)
+		var half := _open_half((y0 + y1) * 0.5) if open else _v_half((y0 + y1) * 0.5, v_tip)
 		torso.lathe(xf, torso_profile(y0, y1, 1), 20, knit, true, 1.0, TORSO_DEPTH, half, 1.0 - half, 0.016)
+	var rib_gap := _open_half(hem) if open else 0.0
 	torso.lathe(xf, [Vector2(0.25, hem - 0.03), Vector2(0.262, hem), Vector2(0.262, hem + 0.035), Vector2(0.256, hem + 0.045)], 20, rib,
-		true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.018)
+		true, 1.0, TORSO_DEPTH, rib_gap, 1.0 - rib_gap, 0.018)
 	# Rippenblende am V und Knopfleiste
 	for side: float in [-1.0, 1.0]:
 		var points: Array = []
 		var outward: Array = []
 		for k in 6:
 			var y := lerpf(hem, NECK_Y - 0.01, float(k) / 5.0)
-			var angle := side * maxf(_v_half(y, v_tip), 0.012)
+			var angle := side * (_open_half(y) if open else maxf(_v_half(y, v_tip), 0.012))
 			points.append(torso_point(angle, y, 0.022))
 			outward.append(torso_normal(angle))
 		torso.strip(points, outward, 0.032, 0.008, rib)
-		var pocket_at := torso_profile(0.41, 0.5, 2)
+		var pocket_at := torso_profile(hem + 0.05, hem + 0.14, 2)
 		torso.panel(xf, pocket_at, 3, knit, 1.0, TORSO_DEPTH, side * 0.13 - 0.05, side * 0.13 + 0.05, 0.03, 0.012,
 			CharacterKit.paint(look.outer_color.darkened(0.15), P.SOLID))
-	for k in 3:
-		var y := 0.42 + k * 0.065
-		torso.ellipsoid(Transform3D(Basis.looking_at(torso_normal(0.0)), torso_point(0.0, y, 0.034)), Vector3(0.016, 0.016, 0.009),
+	for k in (2 if open else 3):
+		var y := (hem + 0.12 + k * 0.08) if open else (0.42 + k * 0.065)
+		var angle := -_open_half(y) - 0.012 if open else 0.0
+		torso.ellipsoid(Transform3D(Basis.looking_at(torso_normal(angle)), torso_point(angle, y, 0.034)), Vector3(0.016, 0.016, 0.009),
 			8, 4, CharacterKit.paint(look.accent_color, P.GLOSS))
+
+
+## Halbe Öffnung (Winkelanteil) einer offenen Jacke in Höhe [param y]: unten schmal, oben weiter.
+func _open_half(y: float) -> float:
+	return 0.03 + 0.025 * clampf((y - 0.4) / (NECK_Y - 0.4), 0.0, 1.0)
 
 
 ## Hand in der Vorlage bei 670 px (0,405 m), Schulter bei 0,68 m.
@@ -892,15 +907,18 @@ func _build_hair() -> void:
 			# Kappe hinten tief bis in den Nacken (unter dem Tuch rund statt kantig)
 			_hair_cap(hair, 10.0, 0.16, 1.0, 1.0)
 			var fringe := [[-48.0, 16.0, 0.22, 0.22], [-18.0, 20.0, 0.21, 0.24], [14.0, 20.0, 0.26, 0.3], [46.0, 16.0, 0.22, 0.22]]
+			if look.middle_part:
+				# Mittelscheitel (granny_gingham): zwei große Strähnen links und rechts der Mitte
+				fringe = [[-54.0, 16.0, 0.22, 0.18], [-20.0, 24.0, 0.26, 0.19], [20.0, 24.0, 0.26, 0.19], [54.0, 16.0, 0.22, 0.18]]
 			for f: Array in fringe:
 				_scale(f[0], f[1], f[2], f[3], hair_dark if int(f[0]) == 14 else hair, -0.15, 0.97, 0.34, 0.45)
 			# Seitliches Volumen unter dem Tuch: rahmt das Gesicht bis über die Ohren
 			# (unter einem Hut mit Krempe würde es durch die Krempe stechen)
 			for side: float in ([] if hat == CharacterAppearance.HatStyle.STRAW_HAT else [-1.0, 1.0]):
 				for k in 3:
-					_scale(side * (78.0 + k * 26.0), 6.0 - k * 4.0, 0.22, 0.24, hair if k % 2 == 0 else hair_dark, 0.12 if hat == CharacterAppearance.HatStyle.HEADSCARF else -0.05,
-						1.07 if hat == CharacterAppearance.HatStyle.HEADSCARF else 1.0, 0.6)
-			for side: float in [-1.0, 1.0]:
+					_scale(side * (78.0 + k * 26.0), 6.0 - k * 4.0, 0.22 * look.hair_volume, 0.24 * look.hair_volume, hair if k % 2 == 0 else hair_dark, 0.04 if hat == CharacterAppearance.HatStyle.HEADSCARF else -0.05,
+						1.03 if hat == CharacterAppearance.HatStyle.HEADSCARF else 1.0, 0.6)
+			for side: float in ([-1.0, 1.0] if look.face_strands else []):
 				var root: Array = _hair_point(side * 64.0, 4.0, 1.0)
 				var p: Vector3 = root[0]
 				head.scale_tuft(Transform3D(Basis(Vector3.UP, side * 0.95), p + Vector3(side * 0.012, -0.14, -0.005)),
@@ -974,20 +992,21 @@ func _build_hat(hat: CharacterAppearance.HatStyle) -> void:
 			# Kopftuch (player_female): Band über Scheitel und Hinterkopf – vorne sieht der
 			# Pony darunter hervor, seitlich die Haare bis knapp über dem Ohr, hinten reicht
 			# es bis zum Nacken und ist rechts unten verknotet (zwei Zipfel).
-			var shell := HAIR * Vector3(1.1, 1.06, 1.12)
+			var shell := HAIR * Vector3(1.1, 1.06, 1.12) * look.hat_scale
 			# 26°: Vorderrand über der Stirn (y ≈ 0,1), hinten unter der Ohroberkante
-			var band := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(26.0)), Vector3(0, HAIR_LIFT + 0.03, 0.02))
+			var band := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(26.0 + look.hat_tilt)), Vector3(0, HAIR_LIFT + 0.03, 0.02))
 			head.ellipsoid(band, shell, 18, 10, cloth, true, 0.43, 0.94)
 			# Gerollter Saum am Tuchrand
 			var rim_y := -cos(PI * 0.43)
 			var rim_r := sin(PI * 0.43)
 			head.torus(band * Transform3D(Basis.IDENTITY, Vector3(0, shell.y * rim_y, 0)), shell.x * rim_r * 0.99, 0.017, 24, 6, cloth,
 				1.0, shell.z / shell.x)
-			var knot_at := Vector3(0.13, -0.03, 0.26)
+			var ks := look.hat_knot_side
+			var knot_at := Vector3(0.13 * ks, -0.03, 0.26)
 			head.ellipsoid(Transform3D(Basis.IDENTITY, knot_at), Vector3(0.058, 0.052, 0.045), 8, 6, cloth)
-			head.scale_tuft(Transform3D(Basis(Vector3.FORWARD, 1.2) * Basis(Vector3.RIGHT, -0.3), knot_at + Vector3(-0.1, -0.04, 0.02)),
+			head.scale_tuft(Transform3D(Basis(Vector3.FORWARD, 1.2 * ks) * Basis(Vector3.RIGHT, -0.3), knot_at + Vector3(-0.1 * ks, -0.04, 0.02)),
 				0.12, 0.22, 0.045, cloth)
-			head.scale_tuft(Transform3D(Basis(Vector3.FORWARD, -2.0) * Basis(Vector3.RIGHT, -0.3), knot_at + Vector3(0.08, -0.03, 0.01)),
+			head.scale_tuft(Transform3D(Basis(Vector3.FORWARD, -2.0 * ks) * Basis(Vector3.RIGHT, -0.3), knot_at + Vector3(0.08 * ks, -0.03, 0.01)),
 				0.09, 0.16, 0.04, cloth)
 		CharacterAppearance.HatStyle.FLAT_CAP:
 			# Schiebermütze (newsboy): weiche, bauschige Kuppel aus Segmenten, die seitlich

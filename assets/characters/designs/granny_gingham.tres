@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="CharacterAppearance" format=3]
+
+[ext_resource type="Script" path="res://scripts/characters/character_appearance.gd" id="1_look"]
+
+[resource]
+resource_name = "Granny Gingham"
+script = ExtResource("1_look")
+skin_color = Color(0.95, 0.64, 0.47, 1)
+glasses = true
+glasses_color = Color(0.36, 0.2, 0.12, 1)
+brow_color = Color(0.5, 0.47, 0.47, 1)
+hair_style = 9
+hair_extra = 5
+hair_color = Color(0.6, 0.56, 0.56, 1)
+hat_style = 4
+hat_color = Color(0.8, 0.72, 0.62, 1)
+hat_color2 = Color(0.64, 0.53, 0.42, 1)
+hat_pattern = 2
+hat_knot_side = -1.0
+top_style = 6
+shirt_color = Color(0.86, 0.78, 0.68, 1)
+shirt_line_color = Color(0.88, 0.8, 0.7, 1)
+sleeves = 1
+accent_color = Color(0.68, 0.48, 0.26, 1)
+outer = 6
+outer_color = Color(0.62, 0.3, 0.26, 1)
+outer_color2 = Color(0.54, 0.25, 0.21, 1)
+outer_pattern = 2
+outer_open = true
+bottom = 2
+pants_color = Color(0.45, 0.37, 0.2, 1)
+bottom_color2 = Color(0.3, 0.23, 0.12, 1)
+bottom_pattern = 2
+tights_color = Color(0.86, 0.78, 0.67, 1)
+shoes = 3
+shoe_color = Color(0.4, 0.24, 0.14, 1)
+hair_volume = 0.7
+middle_part = true
+face_strands = false
+hat_tilt = 12.0
+hat_scale = 1.07

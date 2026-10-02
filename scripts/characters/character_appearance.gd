@@ -44,6 +44,12 @@ enum Outfit { WINTER, SUMMER }
 @export var hair_style := HairStyle.NONE
 @export var hair_extra := HairExtra.NONE
 @export var hair_color := Color(0.45, 0.25, 0.15)
+## Fülle der seitlichen Haare (1 = wie Vorlage player_female; kleiner = enger am Kopf).
+@export_range(0.4, 1.2, 0.05) var hair_volume := 1.0
+## Pony mittig gescheitelt statt Seitenscheitel (FRINGE).
+@export var middle_part := false
+## Lange Strähnen vor den Ohren bis unters Kinn (FRINGE, BOB).
+@export var face_strands := true
 ## Schleife im Haar (Alpha 0 = keine).
 @export var bow_color := Color(0, 0, 0, 0)
 
@@ -55,6 +61,12 @@ enum Outfit { WINTER, SUMMER }
 ## Bommel, Feder, Knopf.
 @export var hat_color3 := Color(0, 0, 0, 0)
 @export var hat_pattern := Pattern.SOLID
+## Seite des Kopftuchknotens hinten (1 = rechts, −1 = links).
+@export var hat_knot_side := 1.0
+## Zusätzliche Neigung der Kopfbedeckung in Grad (negativ = vorne tiefer).
+@export var hat_tilt := 0.0
+## Größe der Kopfbedeckung (1 = Standard).
+@export_range(0.8, 1.3, 0.01) var hat_scale := 1.0
 
 @export_group("Oberteil")
 @export var top_style := TopStyle.TURTLENECK
@@ -74,6 +86,8 @@ enum Outfit { WINTER, SUMMER }
 ## Besatz, Fell, Schürzenstreifen, Muster.
 @export var outer_color2 := Color(0, 0, 0, 0)
 @export var outer_pattern := Pattern.SOLID
+## Offene Jacke (Strickjacke ohne V: Kanten gerade, vorne offen, granny_gingham).
+@export var outer_open := false
 
 @export_group("Hose & Schuhe")
 @export var bottom := Bottom.SHORTS
