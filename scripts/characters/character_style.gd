@@ -242,7 +242,27 @@ func _build_neckline() -> void:
 			# Dicker, gerollter Rollkragen, der breit auf den Schultern liegt
 			torso.torus(Transform3D(Basis.IDENTITY, Vector3(0, NECK_Y, 0)), 0.1, 0.048, 18, 7,
 				CharacterKit.paint(look.shirt_color.darkened(0.02), P.KNIT_CUFF, 34.0), 1.0, 0.88, 0.95)
-		CharacterAppearance.TopStyle.COLLAR_SHIRT, CharacterAppearance.TopStyle.PLAID_SHIRT, CharacterAppearance.TopStyle.BLOUSE:
+		CharacterAppearance.TopStyle.BLOUSE:
+			# Bubikragen mit Bogenkante (bow_girl): zwölf flache Bögen rundum auf den
+			# Schultern (Vorlage: 0,70–0,77 m hoch, ±0,145 m breit), vorne mittig geteilt;
+			# zwei braune Knöpfe darunter
+			var collar := _solid(look.shirt_color.lightened(0.12))
+			torso.torus(Transform3D(Basis.IDENTITY, Vector3(0, NECK_Y, 0)), 0.085, 0.022, 14, 5, collar, 1.0, 0.9)
+			var count := 12
+			for k in count:
+				var t := (float(k) + 0.5) / count
+				var n := torso_normal(t)
+				var out := (n + Vector3.UP * 0.35).normalized()
+				var x_axis := Vector3.UP.cross(n).normalized()
+				var y_axis := out.cross(x_axis).normalized()
+				var size := 0.7 + 0.3 * absf(cos(t * TAU))
+				torso.ellipsoid(Transform3D(Basis(x_axis, y_axis, out), torso_point(t, 0.712, 0.026)), Vector3(0.058, 0.05, 0.014) * size,
+					12, 6, collar)
+			for k in 2:
+				var y := NECK_Y - 0.055 - k * 0.05
+				torso.ellipsoid(Transform3D(Basis.looking_at(torso_normal(0.0)), torso_point(0.0, y, 0.01)), Vector3(0.016, 0.016, 0.008),
+					6, 3, _solid(look.shirt_color.darkened(0.45).lerp(Color(0.45, 0.26, 0.14), 0.6)))
+		CharacterAppearance.TopStyle.COLLAR_SHIRT, CharacterAppearance.TopStyle.PLAID_SHIRT:
 			# Hemdkragen: zwei dicke Kragenflügel vorne (Vorlage: vom Hals bis 0,68 m, Spitzen
 			# 0,07 m neben der Mitte), Kante etwas dunkler, damit der Kragen sich abhebt
 			var collar_color := look.shirt_color if look.top_style == CharacterAppearance.TopStyle.PLAID_SHIRT else look.shirt_color.lightened(0.04)
@@ -310,6 +330,8 @@ func _build_outer() -> void:
 			_cardigan()
 		CharacterAppearance.Outer.SUSPENDERS:
 			_suspenders()
+		CharacterAppearance.Outer.PINAFORE:
+			_pinafore()
 
 
 ## Latzhose: Hosenteil, Latz mit großer Brusttasche, Träger mit Messingknöpfen,
@@ -396,6 +418,45 @@ func _suspenders() -> void:
 		torso.strip(points, outward, 0.048, 0.012, cloth, seam)
 		torso.ellipsoid(Transform3D(Basis.looking_at(torso_normal(front_angle)), torso_point(front_angle, waist - 0.02, 0.036)),
 			Vector3(0.022, 0.022, 0.011), 10, 5, CharacterKit.paint(look.accent_color, P.GLOSS))
+
+
+## Trägerrock (bow_girl): Faltenrock von der Taille (0,535 m) bis übers Knie (0,235 m),
+## breiter Bund, Träger vorne mit Messingknöpfen am Bund, hinten parallel nach unten.
+func _pinafore() -> void:
+	var cloth := _fabric(look.outer_color, look.outer_pattern, look.outer_color2)
+	var seam := _solid(look.outer_color.darkened(0.25))
+	var waist := 0.535
+	# Ringe: [Höhe, Radius, Faltentiefe, Tiefenfaktor]; jede zweite Kante steht als Falte vor
+	var rings: Array = [[0.235, 0.278, 1.0, 0.88], [0.27, 0.274, 1.0, 0.87], [0.4, 0.262, 0.75, 0.8], [0.5, 0.25, 0.4, 0.74],
+		[waist, torso_radius(waist) + 0.014, 0.0, TORSO_DEPTH]]
+	var segments := 36
+	var skirt_point := func(t: float, ring: Array) -> Vector3:
+		var angle := t * TAU
+		var fold := 0.04 * float(ring[2]) if roundi(t * segments) % 2 == 0 else 0.0
+		var r := float(ring[1]) + fold
+		return Vector3(sin(angle) * r, float(ring[0]), -cos(angle) * r * float(ring[3]))
+	torso.warped_lathe(rings, segments, cloth, skirt_point, Vector3(0, 0.42, 0))
+	# Bund
+	torso.lathe(Transform3D.IDENTITY, torso_profile(waist - 0.035, waist + 0.012, 1), 18, cloth, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.02)
+	torso.lathe(Transform3D.IDENTITY, torso_profile(waist - 0.037, waist - 0.033, 1), 18, seam, true, 1.0, TORSO_DEPTH, 0.0, 1.0, 0.022)
+	for side: float in [-1.0, 1.0]:
+		var points: Array = []
+		var outward: Array = []
+		var front_angle := side * 0.085
+		var back_angle := 0.5 - side * 0.085
+		for y: float in [waist - 0.01, 0.62, 0.7]:
+			points.append(torso_point(front_angle, y, 0.02))
+			outward.append(torso_normal(front_angle))
+		points.append(Vector3(side * 0.135, 0.752, -0.04))
+		outward.append(Vector3.UP + torso_normal(front_angle))
+		points.append(Vector3(side * 0.13, 0.756, 0.04))
+		outward.append(Vector3.UP + torso_normal(back_angle))
+		for y: float in [0.7, 0.62, waist - 0.01]:
+			points.append(torso_point(back_angle, y, 0.02))
+			outward.append(torso_normal(back_angle))
+		torso.strip(points, outward, 0.05, 0.012, cloth, seam)
+		torso.ellipsoid(Transform3D(Basis.looking_at(torso_normal(front_angle)), torso_point(front_angle, waist - 0.016, 0.04)),
+			Vector3(0.024, 0.024, 0.012), 10, 5, CharacterKit.paint(look.accent_color, P.GLOSS))
 
 
 ## Halbe Breite des V-Ausschnitts (Winkelanteil) in Höhe [param y].
@@ -666,6 +727,25 @@ func _build_hair() -> void:
 				var p: Vector3 = root[0]
 				head.scale_tuft(Transform3D(Basis(Vector3.UP, side * 0.95), p + Vector3(side * 0.012, -0.14, -0.005)),
 					0.075, 0.3, 0.055, hair_dark)
+		CharacterAppearance.HairStyle.BOB:
+			# Halblanger Bob (bow_girl): glatte, facettierte Haarschale – vorne knapp über den
+			# Brauen, hinten bis zur Ohrmitte (die Ohren schauen darunter hervor) –, an den
+			# Schläfen nach außen stehende Spitzen, Pony aus vier großen Strähnen, je eine
+			# lange Strähne vor dem Ohr bis unters Kinn und zwei kleine im Nacken.
+			_hair_cap(hair, 27.5, 0.39, 1.06, 1.0)
+			# Fülle am Hinterkopf bis in den Nacken (die Ohren bleiben frei)
+			head.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(0, 0.0, 0.06)), Vector3(0.255, 0.25, 0.235), 14, 10, hair, true, 0.1, 0.75)
+			for side: float in [-1.0, 1.0]:
+				_scale(side * 86.0, -2.0, 0.12, 0.2, hair_dark, 0.25, 1.06)
+				_scale(side * 128.0, 4.0, 0.16, 0.22, hair, 0.25, 1.06)
+				_scale(180.0 + side * 22.0, -26.0, 0.12, 0.16, hair_dark, 0.12, 1.0)
+				var root: Array = _hair_point(side * 66.0, 4.0, 1.05)
+				var p: Vector3 = root[0]
+				head.scale_tuft(Transform3D(Basis(Vector3.UP, side * 0.95), p + Vector3(side * 0.01, -0.15, -0.005)),
+					0.085, 0.32, 0.06, hair_dark)
+			var fringe := [[-50.0, 24.0, 0.22, 0.24], [-34.0, 30.0, 0.22, 0.26], [-12.0, 32.0, 0.24, 0.28], [40.0, 28.0, 0.24, 0.26], [14.0, 34.0, 0.28, 0.34]]
+			for fr: Array in fringe:
+				_scale(fr[0], fr[1], fr[2], fr[3], hair_dark if int(fr[0]) == 14 else hair, -0.18, 1.07, 0.45, 0.3)
 		CharacterAppearance.HairStyle.BALD_RING:
 			# Glatze mit Haarkranz (grandpa_cardigan): große, facettierte Wolkenbüschel über
 			# den Ohren, ein Band davon um den Hinterkopf, oben blanker Schädel.
@@ -684,7 +764,12 @@ func _build_hair_extra(hair: CharacterKit.Paint, _hair_dark: CharacterKit.Paint)
 	match look.hair_extra:
 		CharacterAppearance.HairExtra.BUN_TOP:
 			# Dutt oben am Hinterkopf
-			head.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(0.03, 0.34, 0.12)), Vector3(0.125, 0.115, 0.12), 10, 7, hair)
+			# (beim Bob etwas tiefer, weiter hinten und zur linken Seite – Vorlage bow_girl)
+			var bun_at := Vector3(-0.06, 0.3, 0.13) if look.hair_style == CharacterAppearance.HairStyle.BOB else Vector3(0.03, 0.34, 0.12)
+			head.ellipsoid(Transform3D(Basis.IDENTITY, bun_at), Vector3(0.125, 0.115, 0.12), 10, 7, hair)
+			if look.bow_color.a > 0.0:
+				# Große Schleife vorne links am Dutt (Vorlage: 0,38 m breit, leicht schräg)
+				_bow(Vector3(-0.11, 0.29, 0.0), 0.7, -0.22, _solid(look.bow_color))
 		CharacterAppearance.HairExtra.BUN_BACK:
 			head.ellipsoid(Transform3D(Basis.IDENTITY, Vector3(0.0, 0.12, 0.27)), Vector3(0.1, 0.095, 0.085), 10, 7, hair)
 		CharacterAppearance.HairExtra.TWIN_BUNS:
@@ -800,3 +885,17 @@ func _build_glasses() -> void:
 ## Wolkenbüschel (graues Haar, Bart): grob facettiertes Ellipsoid.
 func _puff(at: Vector3, radii: Vector3, paint: CharacterKit.Paint) -> void:
 	head.ellipsoid(Transform3D(Basis.IDENTITY, at), radii, 7, 5, paint, true)
+
+
+## Schleife: Knoten, zwei flache, facettierte Schlaufen (Pyramiden mit der Spitze zum
+## Knoten) und zwei kurze Zipfel. [param yaw] dreht sie zur Seite, [param roll] kippt sie.
+func _bow(center: Vector3, yaw: float, roll: float, paint: CharacterKit.Paint) -> void:
+	var frame := Transform3D(Basis(Vector3.UP, yaw) * Basis(Vector3.FORWARD, roll), center)
+	head.ellipsoid(frame, Vector3(0.036, 0.038, 0.03), 8, 5, paint)
+	for side: float in [-1.0, 1.0]:
+		var outer := Vector3(side * 0.185, 0.012, 0.0)
+		var lobe := Basis.looking_at(Vector3(-side, -0.08, 0.0).normalized(), Vector3.UP)
+		lobe.x = lobe.x * 0.6
+		head.pyramid(frame * Transform3D(lobe, outer), 0.1, 0.172, 6, paint)
+		head.scale_tuft(frame * Transform3D(Basis(Vector3.FORWARD, side * 0.45), Vector3(side * 0.03, -0.065, -0.004)),
+			0.06, 0.12, 0.025, paint)
