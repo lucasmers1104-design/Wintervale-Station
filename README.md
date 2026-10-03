@@ -49,6 +49,7 @@ Voraussetzung: Eine Grafikkarte mit aktuellem Vulkan-Treiber (Forward+).
 | 4 Entfernen | Klick auf Gleis, Signal oder Dorf-Objekt |
 | 5 Test | Klick auf Gleis: belegen/freigeben · auf Signal: Halt ein/aus · auf Weiche: umstellen |
 | 6–0 Dorf | Häuser · Wege · Natur · Licht · Deko – Objekt per Button oder F, R drehen, C Farbe, Klick setzen (Linien: Start und Ende). Kosten stehen mit Icons unter der Leiste; Häuser entstehen als Baustelle |
+| Wege | C: Gerade/Kurve · R: Kurvenrichtung · Shift: 45°-Winkel · Alt: ohne Einrasten. Klick setzt den nächsten Abschnitt; Vorschau zeigt Bogenlänge und Preis |
 | Alt (halten) | Freier Winkel und freie Länge statt 15°-/Meter-Raster |
 | Strg+Z / Strg+Y | Rückgängig / Wiederholen |
 | Rechtsklick / Esc | Abbrechen (zweites Esc beendet den Build-Mode) |
@@ -80,6 +81,8 @@ Exit-Code 0 = alle Prüfungen bestanden.
 
 ## Weitere Doku
 
+- [docs/BUGFIX_2026-10-03.md](docs/BUGFIX_2026-10-03.md) – Bahnhofskorrekturen, begehbare Treppen, flacheres Gelände, dauerhafte Haushalte und neue Physiktests
+- [docs/POLISH_2026-10-03.md](docs/POLISH_2026-10-03.md) – Kurvenwege, verbesserte Platzierung, echte Kreuzungen, Ausbauprüfung, mehr sichtbare Bewohner und geprüfter Einstieg
 - [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md) – Aufbau, Gleisnetz, Stellwerk, Geländeanpassung, Dateien
 - [docs/ZUEGE.md](docs/ZUEGE.md) – Züge, Fahrplan, Bahnhofsbetrieb, neue Züge erstellen
 - [docs/NPCS.md](docs/NPCS.md) – Figuren, Bewohner, Tagesablauf, neue Bewohner erstellen

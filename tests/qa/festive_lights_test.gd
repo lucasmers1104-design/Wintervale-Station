@@ -35,12 +35,22 @@ func _run() -> void:
 			root.add_child(car)
 			car.call("build", consist[i], train_type, i == 0, i == consist.size() - 1, materials, i)
 			var lights := car.find_child("FestiveLights", true, false) as MeshInstance3D
+			var reference := false
+			if lights == null:
+				lights = car.find_child("WinterLights",true,false) as MeshInstance3D
+				reference = lights != null
 			_check(lights != null, "%s %s has fairy lights" % [code, consist[i]])
 			if lights == null:
+				car.queue_free()
 				continue
 			var box := lights.mesh.get_aabb()
 			var front_limit := -float(car.get("length")) * 0.5 + (nose if consist[i] == "railcar_front" else 0.5)
 			var rear_limit := float(car.get("length")) * 0.5 - (nose if consist[i] == "railcar_rear" else 0.5)
+			if reference:
+				# The reference winter train also carries fitted lights on the cab
+				# nose. They must remain inside the actual vehicle, not old roof limits.
+				front_limit = -float(car.get("length"))*0.5
+				rear_limit = float(car.get("length"))*0.5
 			_check(box.position.z >= front_limit and box.end.z <= rear_limit,
 				"%s %s: lights stay on the roof edge (z %.2f..%.2f within %.2f..%.2f)" % [code,
 				consist[i], box.position.z, box.end.z, front_limit, rear_limit])

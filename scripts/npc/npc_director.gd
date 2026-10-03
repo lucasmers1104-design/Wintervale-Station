@@ -741,7 +741,7 @@ func ground_height(point: Vector3, reference_y: float) -> float:
 
 ## Steht die Spielfigur (oder ein stehender Bewohner) direkt im Weg?
 func is_path_blocked(npc: Npc, direction: Vector3, space: float) -> bool:
-	if player and player.visible and player.is_inside_tree():
+	if player and player.visible and player.is_inside_tree() and absf(player.global_position.y-npc.global_position.y)<0.8:
 		var to_player := RailGeometry.flat(player.global_position - npc.global_position)
 		if to_player.length() < space and to_player.normalized().dot(direction) > 0.55:
 			return true
@@ -758,7 +758,7 @@ func is_path_blocked(npc: Npc, direction: Vector3, space: float) -> bool:
 
 
 func _blocks(npc: Npc, other: Npc, direction: Vector3, reach: float) -> bool:
-	if other == npc or not other.is_present() or other.is_moving() or other.is_seated() or other.is_busy():
+	if other == npc or not other.is_present() or other.is_moving() or other.is_seated() or other.is_busy() or absf(other.global_position.y-npc.global_position.y)>0.8:
 		return false
 	var to_other := RailGeometry.flat(other.global_position - npc.global_position)
 	var distance := to_other.length()

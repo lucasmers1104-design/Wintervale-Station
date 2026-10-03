@@ -178,10 +178,10 @@ static func add_canopy(st: SurfaceTool, center: Vector3, length: float, width: f
 	for side: float in [-1.0, 1.0]:
 		var inner := Vector3(center.x, roof_y, 0.0)
 		var outer := Vector3(center.x + side * half_w, roof_y + slope * half_w, 0.0)
-		var planks := int(length / 0.5)
+		var planks := maxi(1,ceili(length / 0.5))
 		for i in planks:
-			var z0 := center.z - half_l + i * 0.5
-			var z1 := z0 + 0.5
+			var z0 := center.z - half_l + i * length/planks
+			var z1 := center.z - half_l + (i+1) * length/planks
 			LowPolyBuilder.add_quad_facing(st, inner + Vector3(0, 0, z0), outer + Vector3(0, 0, z0), outer + Vector3(0, 0, z1),
 				inner + Vector3(0, 0, z1), _vary(WOOD.lightened(0.1), rng, 0.04), Vector3.DOWN)
 		var lift := Vector3(0.0, 0.12, 0.0)

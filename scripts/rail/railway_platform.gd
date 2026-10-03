@@ -13,6 +13,8 @@ extends StaticBody3D
 @export var height := 0.55
 @export var station_name := "Wintervale"
 @export var with_bench := true
+## +1: track on +X; -1: track on -X (regional side platforms).
+@export var track_side := 1.0
 @export var variation_seed := 3
 @export var material: Material
 @export_group("Bahnsteigdach")
@@ -63,11 +65,14 @@ func rebuild() -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.append_from(platform_mesh, 0, Transform3D.IDENTITY)
-	var back_x := -width * 0.5 + 0.55
+	var back_x := -track_side*(width * 0.5 - 0.55)
 	var sign_z := length * 0.17
 	var board_y := StationMeshes.add_sign(st, Vector3(back_x, height, sign_z), 2.2)
 	if with_bench:
-		StationMeshes.add_bench(st, Vector3(back_x + 0.1, height, -length * 0.17), rng)
+		var bench := SurfaceTool.new()
+		bench.begin(Mesh.PRIMITIVE_TRIANGLES)
+		StationMeshes.add_bench(bench,Vector3.ZERO,rng)
+		st.append_from(bench.commit(),0,Transform3D(Basis(Vector3.UP,PI if track_side<0 else 0.0),Vector3(back_x,height,-length*0.17)))
 	var lamps: Array[Vector3] = []
 	if canopy_length > 0.0:
 		lamps = StationMeshes.add_canopy(st, Vector3(0.0, height, 0.0), canopy_length, width + 0.6, canopy_height, rng)
@@ -118,7 +123,7 @@ func rebuild() -> void:
 	_add_generated(mesh_instance)
 
 	var collision := CollisionShape3D.new()
-	collision.shape = mesh.create_trimesh_shape()
+	collision.shape = LowPolyBuilder.solid_collision(mesh)
 	_add_generated(collision)
 
 	for facing in [1.0, -1.0]:

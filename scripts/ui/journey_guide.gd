@@ -19,7 +19,7 @@ const TOUR := [
 	{"page":"_build","target":"build","title":"Mit Ruhe bauen","text":"B öffnet die Werkzeuge. Vorschau und Kosten zeigen, was passt. Einrasten und Bestätigung helfen beim Platzieren. R dreht, C wechselt Varianten; Strg+Z nimmt den letzten Bauschritt zurück."},
 ]
 const EPOCH_TIPS := {
-	2:"Weichen und Signale erweitern dein Netz. Der nostalgische Regionalzug hat eine Lok an jedem Ende. Baue deinen Haltepunkt zum Landbahnhof aus; Bauernhäuser, Lichterketten und Dorfdeko kommen hinzu.",
+	2:"Weichen und Signale erweitern dein Netz. Der nostalgische Regionalzug hat eine Lok an jedem Ende. Baue deinen Haltepunkt zum Landbahnhof aus; Bauernhäuser, Lichterketten und Dorfdeko kommen hinzu. Ein bedienter Bahnhof genügt bis zur dritten Epoche – entwickle erst dein Dorf in Ruhe.",
 	3:"Güterverkehr, Dorfbahnhof und der Tunnel nach Südtal sind neu. Steinwege, Dorfplatz und weitere Hausformen erweitern dein Dorf. Bestellte Waren zählen erst nach dem sichtbaren Umschlag.",
 	4:"Der moderne Nahverkehr verbindet größere Nachbarschaften. Kleinstadtbahnhöfe, Straßen und neue Häuser geben deinen Orten einen städtischen Charakter.",
 	5:"Der Intercity, Stadtbahnhöfe und zusätzliche Bahnsteige verbinden die Region. Verlängere auch die Gleise hinter den Haltepunkten, damit längere Züge Platz haben.",

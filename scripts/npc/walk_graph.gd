@@ -93,7 +93,7 @@ func get_point_count() -> int:
 func find_path(from: Vector3, to: Vector3) -> PackedVector3Array:
 	var path := PackedVector3Array()
 	path.append(_flat(from))
-	if _ids.is_empty():
+	if _astar.get_point_count()==0:
 		path.append(_flat(to))
 		return path
 	var start := _astar.get_closest_point(_flat(from))
@@ -102,6 +102,9 @@ func find_path(from: Vector3, to: Vector3) -> PackedVector3Array:
 		# Nicht verbunden (z.B. ein Weg ohne Anschluss): über das feste Netz gehen
 		start = _closest_base(from)
 		goal = _closest_base(to)
+		if start<0 or goal<0 or _astar.get_id_path(start,goal).is_empty():
+			path.append(_flat(to))
+			return path
 	# Liegt das Ziel näher als der nächste Wegpunkt, direkt hingehen.
 	if _flat(from).distance_to(_flat(to)) < _flat(from).distance_to(_astar.get_point_position(start)) \
 			and start == goal:

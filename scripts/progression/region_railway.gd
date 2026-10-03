@@ -189,7 +189,11 @@ func placement(point: Vector3) -> Dictionary:
 	var basis := Basis(Vector3.UP,angle)
 	if basis.x.dot(point-axis) < 0:
 		angle += PI
-	var data := {"id":_next_station,"name":"Wintervale" if stations.is_empty() else ["Tannenau","Birkenhain","Sonnenfeld","Bergblick","Seetal","Eichenruh"][(stations.size()-1)%7]+(" %d" % _next_station if stations.size()>7 else ""),"pos":SaveUtils.vec3_to_array(axis),"angle":angle,"level":1,"reason":""}
+	var names := ["Tannenau","Birkenhain","Sonnenfeld","Bergblick","Seetal","Eichenruh"]
+	var label := "Wintervale" if stations.is_empty() else String(names[(stations.size()-1)%names.size()])
+	if station_by_name(label) != null:
+		label += " %d" % _next_station
+	var data := {"id":_next_station,"name":label,"pos":SaveUtils.vec3_to_array(axis),"angle":angle,"level":1,"reason":""}
 	var footprint := VillageFootprint.make(axis+Basis(Vector3.UP,angle).x*10.7,Vector2(9.3,float(EpochCatalog.epoch(1)["length"])/2+1),angle)
 	for station in stations:
 		if RailGeometry.flat(axis-station.global_position).length() < 32:
@@ -673,7 +677,7 @@ func serving_portal(station: RegionStation) -> RegionPortal:
 
 ## Wartende Familien steigen aus dem Zug, der gerade aus dem Tunnel angekommen ist.
 func deliver_families(station: RegionStation, train: Train) -> void:
-	if station.waiting_houses.is_empty():
+	if station.waiting_houses.is_empty() or train.train_type.category != TrainType.Category.PASSENGER:
 		return
 	for id in station.waiting_houses.duplicate():
 		var house := village.get_object(id) as VillageHouse

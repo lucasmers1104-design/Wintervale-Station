@@ -6,6 +6,6 @@
 resource_name = "PathStone"
 shader = ExtResource("1_path")
 shader_parameter/style = 1
-shader_parameter/base_color = Color(0.6, 0.56, 0.52, 1)
-shader_parameter/dark_color = Color(0.44, 0.41, 0.39, 1)
-shader_parameter/light_color = Color(0.74, 0.68, 0.6, 1)
+shader_parameter/base_color = Color(0.57, 0.55, 0.50, 1)
+shader_parameter/dark_color = Color(0.40, 0.41, 0.38, 1)
+shader_parameter/light_color = Color(0.72, 0.69, 0.62, 1)

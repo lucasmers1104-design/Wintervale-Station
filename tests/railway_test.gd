@@ -32,6 +32,11 @@ func _ready() -> void:
 	add_child(main)
 	_use_empty_map(main)
 	terrain = main.get_node("World/Terrain")
+	# This test deliberately exercises hills; gameplay now has a flatter valley.
+	terrain.hill_height = 5.0
+	terrain.mountain_height = 30.0
+	terrain.flat_radius = 38.0
+	terrain.generate()
 	network = main.get_node("World/Railway/RailNetwork")
 	interlocking = main.get_node("World/Railway/RailInterlocking")
 	view = main.get_node("World/Railway/RailNetworkView")

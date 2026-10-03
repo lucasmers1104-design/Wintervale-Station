@@ -504,6 +504,10 @@ func go_home() -> void:
 
 ## Reisender geht ins Dorf und verschwindet dort.
 func leave_to_village() -> void:
+	# Residents retain their home and identity, including after a missed train.
+	if profile != null:
+		go_home()
+		return
 	_leave_spot()
 	state = State.LEAVING
 	walk_to(director.get_exit_point(), _vanish.bind(State.LEAVING), 1.0)
@@ -1273,6 +1277,12 @@ func _walk_path(points: Array, on_arrive: Callable, pace := 1.0) -> void:
 	_path_index = 1 if _path.size() > 1 else 0
 	_on_arrive = on_arrive
 	_pace = pace
+	if _path.is_empty():
+		_moving = false
+		_on_arrive = Callable()
+		if on_arrive.is_valid():
+			on_arrive.call_deferred()
+		return
 	_moving = true
 	if model.pose != CharacterModel.Pose.HANDS_BEHIND or _rng.randf() < 0.5:
 		model.set_pose(CharacterModel.Pose.STAND)

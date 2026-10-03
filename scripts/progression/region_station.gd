@@ -69,6 +69,16 @@ func rebuild() -> void:
 	mesh.mesh = parts["paint"]
 	mesh.material_override = region.village.material
 	_visual.add_child(mesh)
+	if level>=2:
+		var access := StationAccess.describe(level)
+		var beginning := float(access["back"])+StationAccess.RISERS*StationAccess.TREAD
+		var paving := MeshInstance3D.new()
+		paving.name = "ForecourtPaving"
+		paving.mesh = PathMeshes.paved_rect(20.5-beginning,3.2)
+		paving.position = Vector3((beginning+20.5)*0.5,0.029,float(access["z"]))
+		paving.material_override = PathMeshes.material("path_stone")
+		paving.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_visual.add_child(paving)
 	mesh.visibility_range_end = 210
 	mesh.visibility_range_end_margin = 20
 	var body := StaticBody3D.new()
@@ -76,7 +86,7 @@ func rebuild() -> void:
 	body.set_meta("station_id",station_id)
 	_visual.add_child(body)
 	var collider := CollisionShape3D.new()
-	collider.shape = mesh.mesh.create_trimesh_shape()
+	collider.shape = LowPolyBuilder.solid_collision(mesh.mesh)
 	body.add_child(collider)
 	_glow = StandardMaterial3D.new()
 	_glow.vertex_color_use_as_albedo = true
@@ -150,7 +160,11 @@ func rebuild() -> void:
 					npc.walk_to(npc._path[-1],npc._on_arrive,npc._pace)
 					break
 	_access_level = level
+	if director:
+		director.max_travellers = 4+level*2
 	set_dark(WorldClock.is_dark())
+	if region and region.village and director:
+		region.village.rebuild_walk_network.call_deferred()
 
 func _add_extra_platform(data: Dictionary, number: int) -> void:
 	var axis := SaveUtils.array_to_vec3(data.get("pos"))
@@ -161,6 +175,7 @@ func _add_extra_platform(data: Dictionary, number: int) -> void:
 	platform.height = TrainCar.RAIL_TOP+TrainMeshes.STEP_UPPER_Y
 	platform.canopy_length = platform.length*0.45
 	platform.station_name = station_name
+	platform.track_side = -1.0
 	platform.material = region.village.material
 	_visual.add_child(platform)
 	platform.global_transform = Transform3D(Basis(Vector3.UP,angle),axis)
@@ -174,7 +189,7 @@ func _add_extra_platform(data: Dictionary, number: int) -> void:
 	stair_body.collision_layer = GameDefs.LAYER_OBJECTS
 	stairs.add_child(stair_body)
 	var stair_shape := CollisionShape3D.new()
-	stair_shape.shape = stairs.mesh.create_trimesh_shape()
+	stair_shape.shape = LowPolyBuilder.solid_collision(stairs.mesh)
 	stair_body.add_child(stair_shape)
 	var extra_stop: PlatformStop
 	for candidate in get_stops():
@@ -222,7 +237,7 @@ func _create_passenger_director() -> void:
 	director.access_route = walk_route
 	director.access_height = walk_height
 	director.player = region.get_parent().get_node("Player") as PlayerController
-	director.max_travellers = 6
+	director.max_travellers = 4+level*2
 	director.travellers_per_train = Vector2i(0,0)
 	add_child(director)
 	director.passenger_alighted.connect(region.passenger_arrived)
@@ -279,9 +294,20 @@ func walk_route(from: Vector3, to: Vector3) -> PackedVector3Array:
 		for point in StationAccess.local_path(frame.affine_inverse()*start,frame.affine_inverse()*destination,data):
 			result.append(frame*point)
 		start = destination
+	if target<0 and source>=0 and _access_graph:
+		for point in _access_graph.find_path(start,to):
+			if point.distance_to(result[-1])>0.05:
+				result.append(point)
+		return result
 	if target>=0 and target!=source:
 		var data := descriptors[target]
 		var frame: Transform3D = data["frame"]
+		var outside := frame*Vector3(float(data["outside_x"]),0,float(data["z"]))
+		if _access_graph:
+			for point in _access_graph.find_path(start,outside):
+				if point.distance_to(result[-1])>0.05:
+					result.append(point)
+			start = outside
 		for point in StationAccess.local_path(frame.affine_inverse()*start,frame.affine_inverse()*to,data):
 			result.append(frame*point)
 	elif source<0 and target<0:
@@ -296,6 +322,26 @@ func walk_route(from: Vector3, to: Vector3) -> PackedVector3Array:
 			return path
 	result.append(to)
 	return result
+
+## Each station shares village paths, but keeps its own safe stair entrances.
+func set_village_routes(points: PackedVector3Array, edges: Array) -> void:
+	if _access_graph==null:
+		return
+	var local_edges: Array = []
+	for edge: Array in edges:
+		if edge[0] is int and edge[1] is int:
+			local_edges.append(edge)
+	var outside := _access_graph.get_point("Dorfausgang")
+	var nearest := -1
+	var distance := 30.0
+	for i in points.size():
+		var d := RailGeometry.flat(points[i]-outside).length()
+		if d<distance and region.village.is_walkable(outside,points[i]):
+			distance = d
+			nearest = i
+	if nearest>=0:
+		local_edges.append([nearest,"Dorfausgang",WalkGraph.COST_CONNECTOR])
+	_access_graph.set_dynamic(points,local_edges)
 
 func _update_access_graph() -> void:
 	if _access_graph==null:
@@ -339,11 +385,12 @@ func _set_pad(index: int, area: Dictionary, height: float) -> void:
 	region.terrain.set_station_pad(id,area,height)
 	_pad_ids.append(id)
 
-func occupied_footprints() -> Array[Dictionary]:
-	var length := float(EpochCatalog.epoch(level)["length"])
-	var width := float(EpochCatalog.epoch(level)["width"])
+func occupied_footprints(at_level := 0) -> Array[Dictionary]:
+	var target := at_level if at_level>0 else level
+	var length := float(EpochCatalog.epoch(target)["length"])
+	var width := float(EpochCatalog.epoch(target)["width"])
 	var result: Array[Dictionary] = [VillageFootprint.make(to_global(Vector3(11,0,0)),Vector2(9.5,length/2+2),global_rotation.y)]
-	if level>=3:
+	if target>=3:
 		result.append(VillageFootprint.make(to_global(Vector3(10.5,0,length*0.57)),Vector2(6,9),global_rotation.y))
 	for track in platform_tracks:
 		var frame := Transform3D(Basis(Vector3.UP,float(track["angle"])),SaveUtils.array_to_vec3(track["pos"]))
@@ -390,16 +437,53 @@ func upgrade_reason() -> String:
 	if region.progression.epoch <= level:
 		return "Epoche %d wird benötigt" % (level+1)
 	var data := EpochCatalog.epoch(level+1)
-	var footprint := VillageFootprint.make(to_global(Vector3(10.7,0,0)),Vector2(9.3,float(data["length"])/2+1),rotation.y)
-	for other in region.stations:
-		if other==self:
-			continue
-		var occupied := VillageFootprint.make(other.to_global(Vector3(10.7,0,0)),Vector2(9.3,float(EpochCatalog.epoch(other.level)["length"])/2+1),other.rotation.y)
-		if VillageFootprint.overlaps(footprint,occupied,0.2):
-			return "Für den Ausbau mehr Abstand zu %s einplanen" % other.station_name
+	var blocked := upgrade_space_reason()
+	if blocked!="":
+		return blocked
 	if services < int(data["upgrade_services"]):
 		return "Noch %d erfolgreiche Ankünfte" % (int(data["upgrade_services"])-services)
 	return Economy.describe_missing({"money":int(data["cost"])})
+
+func upgrade_space_reason() -> String:
+	if level>=6:
+		return ""
+	var future := occupied_footprints(level+1)
+	var current := occupied_footprints()
+	for other in region.stations:
+		if other==self:
+			continue
+		for footprint in future:
+			for occupied in other.occupied_footprints():
+				if VillageFootprint.overlaps(footprint,occupied,0.2):
+					return "Für den Ausbau mehr Abstand zu %s einplanen" % other.station_name
+	for obj in region.village.get_objects():
+		if obj is VillagePath:
+			var samples := PackedVector3Array()
+			for leg in range(1,obj.route_points.size()):
+				var a: Vector3 = obj.route_points[leg-1]
+				var b: Vector3 = obj.route_points[leg]
+				var steps := maxi(1,ceili(a.distance_to(b)/1.0))
+				for i in steps+1:
+					samples.append(a.lerp(b,float(i)/steps))
+			for point in samples:
+				for i in future.size():
+					if level+1>=3 and i==1:
+						continue # The walkable forecourt may cover an existing path.
+					if not VillageFootprint.contains(future[i],Vector2(point.x,point.z),obj.get_width()*0.5):
+						continue
+					var already_reserved := false
+					for old in current:
+						already_reserved = already_reserved or VillageFootprint.contains(old,Vector2(point.x,point.z),obj.get_width()*0.5)
+					if not already_reserved:
+						return "Ausbau würde %s überbauen · Weg vorher verlegen" % VillageCatalog.get_label(obj.item_id)
+			continue
+		for footprint in future:
+			if VillageFootprint.overlaps(footprint,obj.get_footprint(),0.15):
+				return "Ausbau braucht Platz für %s · Objekt vorher versetzen" % VillageCatalog.get_label(obj.item_id)
+	return ""
+
+func resident_visual_limit() -> int:
+	return [6,8,10,12,16,20][clampi(level-1,0,5)]
 
 func upgrade(debug := false) -> bool:
 	if debug and not OS.is_debug_build():
@@ -410,6 +494,7 @@ func upgrade(debug := false) -> bool:
 		return false
 	level += 1
 	rebuild()
+	region.village.refresh_station_residents(self)
 	var build := region.get_parent().get_node_or_null("BuildMode") as BuildMode
 	if build and build.context.feedback and not debug:
 		build.context.feedback.confirm("station",global_position,PackedVector3Array(),EpochCatalog.epoch(level)["station"])
@@ -443,9 +528,11 @@ func set_highlight(material: Material) -> void:
 		(node as GeometryInstance3D).material_overlay = material
 
 func clears(x: float, z: float) -> bool:
-	var p := to_local(Vector3(x,global_position.y,z))
-	var length := float(EpochCatalog.epoch(level)["length"])
-	return (p.x > 1.4 and p.x < 20 and absf(p.z) < length/2+2) or (level>=3 and p.x>5 and p.x<16 and absf(p.z-length*0.57)<9)
+	# Includes parallel platforms and stairs, not only the main building.
+	for footprint in occupied_footprints():
+		if VillageFootprint.contains(footprint,Vector2(x,z),0.35):
+			return true
+	return false
 
 func get_data() -> Dictionary:
 	return {"id":station_id,"name":station_name,"level":level,"pos":SaveUtils.vec3_to_array(position),"angle":rotation.y,"population":population,"passengers":passenger_total,"services":services,"goods":delivered_goods,"houses":house_ids.duplicate(),"waiting":waiting_houses.duplicate(),"growth_mark":_growth_mark,"platforms":platform_tracks.duplicate(true),"public_space":public_space.duplicate()}

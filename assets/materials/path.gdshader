@@ -66,49 +66,63 @@ vec3 ground_color(out float snow) {
 
 void fragment() {
 	float across = abs(UV.x);
-	// Unregelmäßiger Rand: kleine Buchten und Vorsprünge statt einer Linie
-	float edge = 1.0 + (ws_noise(world_pos.xz * 2.2) - 0.5) * 0.22 + (ws_noise(world_pos.xz * 7.0) - 0.5) * 0.08;
+	vec2 p = world_pos.xz;
+	float soil = ws_noise(p * 0.65);
+	float grain = ws_noise(p * 37.0);
+	// Broad worn patches, small loose stones and irregular, softened shoulders.
+	float edge = 0.98 + (ws_noise(p * 1.3) - 0.5) * 0.28 + (ws_noise(p * 6.0) - 0.5) * 0.10;
+	float detail = 1.0 - smoothstep(0.045, 0.16, length(fwidth(p)));
 	vec3 color;
-	float rough = 0.9;
+	float relief = 0.0;
+	float rough = 0.94;
 	float snow = 0.0;
 
 	if (style == 1) {
-		// Natursteinpflaster: unregelmäßige Steine, Fugen, leicht gewölbt
-		vec3 v = voronoi(world_pos.xz * 3.1);
-		float joint = 1.0 - smoothstep(0.03, 0.09, v.y);
-		vec3 stone = mix(base_color, mix(dark_color, light_color, v.z), 0.55);
-		stone *= 0.92 + 0.16 * ws_noise(world_pos.xz * 9.0);
-		vec3 mortar = dark_color * 0.72;
+		// Rounded natural stones: individual colour, recessed joints and worn crowns.
+		vec3 v = voronoi(p * 3.5 + vec2(ws_noise(p * 0.7), ws_noise(p * 0.7 + 8.0)) * 0.22);
+		float joint = 1.0 - smoothstep(0.018, 0.070, v.y);
+		vec3 stone = mix(base_color, mix(dark_color, light_color, v.z), 0.72);
+		stone *= 0.94 + 0.10 * soil + (grain - 0.5) * 0.07 * detail;
+		vec3 mortar = dark_color * 0.77;
 		color = mix(stone, mortar, joint);
-		rough = mix(0.72, 0.95, joint);
-		// Schnee in den Fugen, ein wenig auf den Steinen
+		relief = (1.0 - joint) * (0.010 + 0.008 * (1.0 - smoothstep(0.0, 0.55, v.x)));
+		rough = mix(0.82, 0.98, joint);
 		float in_joints = joint * smoothstep(0.2, 0.7, snow_cover);
-		float dust = smoothstep(0.55, 0.85, ws_noise(world_pos.xz * 1.3)) * snow_cover * 0.5;
-		snow = clamp(in_joints * 0.9 + dust, 0.0, 1.0);
+		float dust = smoothstep(0.58, 0.86, ws_noise(p * 1.3)) * snow_cover * 0.32;
+		snow = clamp(in_joints * 0.85 + dust, 0.0, 1.0);
 	} else if (style == 2) {
-		// Kleine Straße: festgefahrener Kies, zwei Fahrspuren, in der Mitte heller
-		// Vertexfarbe R = Spurstärke: an Knotenscheiben laufen die Spuren aus (keine Ringe)
-		float rut = smoothstep(0.16, 0.0, abs(across - 0.48)) * COLOR.r;
-		float n = ws_noise(world_pos.xz * 5.0) * 0.6 + ws_noise(world_pos.xz * 17.0) * 0.4;
-		color = mix(base_color, dark_color, rut * 0.55) * (0.88 + n * 0.24);
-		float speck = step(0.93, ws_hash(floor(world_pos.xz * 14.0)));
-		color = mix(color, light_color, speck * 0.5);
-		rough = mix(0.88, 0.7, rut);
-		// Winter: festgefahrener Schnee außerhalb der Spuren
-		float packed = (1.0 - rut) * smoothstep(0.3, 0.8, snow_cover) * (0.35 + 0.45 * ws_noise(world_pos.xz * 0.8));
-		snow = clamp(packed, 0.0, 0.85);
+		// Packed gravel with softly wandering wheel tracks; fade them at junctions.
+		float wander = (ws_noise(p * 0.8) - 0.5) * 0.055;
+		float rut = (1.0 - smoothstep(0.045, 0.19, abs(across - 0.48 + wander))) * COLOR.r;
+		vec3 v = voronoi(p * 13.0);
+		float pebble = (1.0 - smoothstep(0.25, 0.44, v.x)) * smoothstep(0.01, 0.07, v.y);
+		color = base_color * (0.91 + 0.14 * soil);
+		color = mix(color, mix(dark_color, light_color, v.z), pebble * 0.48 * detail);
+		color = mix(color, dark_color * (0.94 + 0.10 * soil), rut * 0.42);
+		color *= 1.0 + (grain - 0.5) * 0.09 * detail;
+		relief = pebble * 0.004 * detail - rut * 0.010;
+		rough = mix(0.96, 0.84, rut);
+		float packed = (1.0 - rut * 0.8) * smoothstep(0.3, 0.8, snow_cover) * (0.22 + 0.33 * soil);
+		snow = clamp(packed, 0.0, 0.65);
 	} else {
-		// Kies: Kiesel in mehreren Größen, helle und dunkle Steinchen
-		vec3 v = voronoi(world_pos.xz * 11.0);
-		float pebble = smoothstep(0.34, 0.1, v.x);
+		// Mixed angular pebbles on an earthy bed, with a subtly compacted walking lane.
+		vec3 v = voronoi(p * vec2(10.5, 12.0));
+		float radius = mix(0.22, 0.47, v.z);
+		float pebble = (1.0 - smoothstep(radius * 0.65, radius, v.x)) * smoothstep(0.012, 0.085, v.y);
+		vec2 fine_cell = floor(p * 29.0);
+		float chip_id = ws_hash(fine_cell);
+		float chip = 1.0 - smoothstep(0.09, 0.21, length(fract(p * 29.0) - (hash2(fine_cell) * 0.5 + 0.25)));
 		vec3 stone = mix(dark_color, light_color, v.z);
-		color = mix(base_color * (0.9 + 0.2 * ws_noise(world_pos.xz * 3.0)), stone, pebble * 0.65);
-		vec3 fine = voronoi(world_pos.xz * 26.0);
-		color *= 0.92 + 0.14 * smoothstep(0.3, 0.05, fine.x) * fine.z;
-		rough = 0.95;
-		// Winter: eine dünne, fleckige Schneedecke, durch die die Kiesel schauen
-		float cover = mix(0.5, 0.9, smoothstep(0.3, 0.75, ws_noise(world_pos.xz * 1.1 + 3.0)));
-		snow = cover * smoothstep(0.1, 0.8, snow_cover) * (1.0 - pebble * 0.4);
+		stone = mix(stone, vec3(0.55, 0.57, 0.56), step(0.78, v.z) * 0.35);
+		float wear = (1.0 - smoothstep(0.20, 0.85, across)) * COLOR.r;
+		color = base_color * (0.87 + 0.20 * soil);
+		color = mix(color, stone, pebble * (0.78 - wear * 0.12) * detail);
+		color = mix(color, mix(dark_color, light_color, chip_id), chip * 0.38 * detail);
+		color *= 1.0 + (grain - 0.5) * 0.15 * detail;
+		color = mix(color, base_color * 0.91, wear * 0.10);
+		relief = (pebble * (0.007 + 0.004 * v.z) + chip * 0.002 + grain * 0.0015) * detail;
+		float cover = mix(0.24, 0.58, smoothstep(0.3, 0.75, ws_noise(p * 1.1 + 3.0)));
+		snow = cover * smoothstep(0.1, 0.8, snow_cover) * (1.0 - pebble * 0.48);
 	}
 	// In der Wegmitte liegt weniger Schnee (dort wird gelaufen und gefahren)
 	snow *= 0.6 + 0.4 * smoothstep(0.2, 0.9, across);
@@ -117,15 +131,27 @@ void fragment() {
 	// Rand und Bankett: sanft in die Geländefarbe übergehen
 	float ground_snow;
 	vec3 ground = ground_color(ground_snow);
-	float shoulder = smoothstep(edge - 0.06, edge + 0.22, across);
+	float shoulder = smoothstep(edge - 0.12, edge + 0.28, across);
+	// Small earth pockets interrupt the transition into grass without a painted stripe.
+	float verge = smoothstep(edge - 0.20, edge + 0.03, across) * (1.0 - shoulder);
+	color = mix(color, season_bare.rgb * (0.88 + 0.16 * soil), verge * 0.32 * (1.0 - snow_cover));
 	// Am Rand bleibt geräumter Schnee liegen (kleiner Wall)
 	float bank = smoothstep(edge - 0.1, edge + 0.05, across) * (1.0 - smoothstep(edge + 0.1, edge + 0.3, across)) * snow_cover;
 	color = mix(color, ws_soft_snow(vec3(0.9, 0.93, 0.97)), bank * 0.7);
 	color = mix(color, ground, shoulder);
 	snow = max(mix(snow, ground_snow, shoulder), bank * 0.7);
 
+	// Derivative relief works without mesh tangents or extra geometry on every path.
+	float height = relief * (1.0 - shoulder) * (1.0 - snow);
+	vec3 dx = dFdx(VERTEX);
+	vec3 dy = dFdy(VERTEX);
+	vec3 rx = cross(dy, NORMAL);
+	vec3 ry = cross(NORMAL, dx);
+	float determinant = dot(dx, rx);
+	vec3 gradient = (rx * dFdx(height) + ry * dFdy(height)) * sign(determinant) / max(abs(determinant), 0.000001);
+	NORMAL = normalize(NORMAL - gradient / max(1.0, length(gradient) / 0.45));
 	float wet = wetness * (1.0 - snow);
-	ALBEDO = color * (1.0 - wet * 0.3);
-	ROUGHNESS = mix(mix(rough, 0.3, wet), 0.95, snow);
-	SPECULAR = mix(0.35, 0.2, snow);
+	ALBEDO = color * (1.0 - wet * 0.24);
+	ROUGHNESS = mix(mix(rough, 0.48, wet), 0.95, snow);
+	SPECULAR = mix(0.28, 0.2, snow);
 }

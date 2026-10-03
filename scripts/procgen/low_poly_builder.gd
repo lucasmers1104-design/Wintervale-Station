@@ -8,6 +8,29 @@ class_name LowPolyBuilder
 extends RefCounted
 
 
+## Seasonal snow is visual decoration, never a permanent invisible obstacle.
+static func solid_collision(mesh: Mesh) -> ConcavePolygonShape3D:
+	var faces := PackedVector3Array()
+	for surface in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(surface)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var colors: PackedColorArray = arrays[Mesh.ARRAY_COLOR] if arrays[Mesh.ARRAY_COLOR]!=null else PackedColorArray()
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX]!=null else PackedInt32Array()
+		var count := indices.size() if not indices.is_empty() else vertices.size()
+		for i in range(0,count,3):
+			var a := indices[i] if not indices.is_empty() else i
+			var b := indices[i+1] if not indices.is_empty() else i+1
+			var c := indices[i+2] if not indices.is_empty() else i+2
+			if not colors.is_empty() and colors[a].a<0.6 and colors[b].a<0.6 and colors[c].a<0.6:
+				continue
+			faces.append(vertices[a])
+			faces.append(vertices[b])
+			faces.append(vertices[c])
+	var shape := ConcavePolygonShape3D.new()
+	shape.set_faces(faces)
+	return shape
+
+
 ## Normale der Vorderseite eines Dreiecks.
 ## Godot rendert Dreiecke im Uhrzeigersinn als Vorderseite.
 static func face_normal(a: Vector3, b: Vector3, c: Vector3) -> Vector3:

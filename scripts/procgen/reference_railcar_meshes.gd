@@ -532,8 +532,10 @@ static func _decorate(p: SurfaceTool, glow: SurfaceTool, rng: RandomNumberGenera
 			var z := lerpf(start, end - 0.18, (i + 0.5) / count)
 			_sphere(p, Vector3(side * 1.355, 3.34 - 0.06 * absf(sin((z - start) * 2.4)), z), 0.082,
 				GREEN if i % 3 else GREEN.lightened(0.05), Vector3(0.65, 0.80, 1.55))
-		for i in ceili((end - start) / 0.42):
-			_sphere(glow, Vector3(side * 1.407, 3.30 - 0.035 * sin((start + i * 0.42) * 2.4), start + 0.18 + i * 0.42), 0.027, WARM)
+		var bulb_count := maxi(2,ceili((end-start)/0.42))
+		for i in bulb_count:
+			var bulb_z := lerpf(start+0.18,end-0.18,float(i)/(bulb_count-1))
+			_sphere(glow,Vector3(side*1.407,3.30-0.035*sin(bulb_z*2.4),bulb_z),0.027,WARM)
 		var basis := Basis(Vector3(0, 0, -side), Vector3.UP, Vector3(side, 0, 0))
 		for z: float in [(-2.61 if cab else start + 0.33), end - 0.33]:
 			_wreath(p, Transform3D(basis, Vector3(side * 1.412, 2.43, z)), 0.25)
