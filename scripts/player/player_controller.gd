@@ -31,6 +31,8 @@ var character := "male"
 @export var acceleration := 10.0
 @export var jump_velocity := 4.6
 @export var turn_speed := 8.0
+## Highest walkable riser. Check headroom and the landing before stepping up.
+@export var max_step_height := 0.42
 
 @export_group("Kamera")
 @export var mouse_sensitivity := 0.0025
@@ -125,11 +127,57 @@ func _physics_process(delta: float) -> void:
 	velocity.x = horizontal.x
 	velocity.z = horizontal.z
 
+	_try_step_up(delta)
 	move_and_slide()
 	_turn_model(direction, delta)
 
 	if global_position.y < RESPAWN_DEPTH:
 		respawn()
+
+
+func _try_step_up(delta: float) -> void:
+	if velocity.y > 0.0:
+		return
+	# A capsule touching the rounded corner of a riser can report a wall
+	# instead of a floor. Accept nearby support under the feet in that case.
+	if not is_on_floor():
+		var support := PhysicsRayQueryParameters3D.create(global_position+Vector3.UP*0.04,global_position-Vector3.UP*0.18,collision_mask)
+		support.exclude = [get_rid()]
+		var hit := get_world_3d().direct_space_state.intersect_ray(support)
+		if hit.is_empty() or (hit["normal"] as Vector3).dot(Vector3.UP)<cos(floor_max_angle):
+			return
+	var motion := Vector3(velocity.x,0,velocity.z)*delta
+	if motion.length_squared() < 0.000001:
+		return
+	var obstacle := KinematicCollision3D.new()
+	if not test_move(global_transform,motion,obstacle):
+		return
+	# Other characters are never treated as stairs.
+	if obstacle.get_collider() is CharacterBody3D:
+		return
+	var lift := Vector3.UP*max_step_height
+	if test_move(global_transform,lift):
+		return
+	var raised := global_transform
+	raised.origin += lift
+	if test_move(raised,motion):
+		return
+	raised.origin += motion
+	var landing := KinematicCollision3D.new()
+	if not test_move(raised,-lift,landing):
+		return
+	# Capsule contact at a tread's outer corner has a slanted normal. Confirm
+	# the tread itself with a downward ray instead of rejecting its rounded contact.
+	var probe := global_position+motion+motion.normalized()*0.32+lift
+	var query := PhysicsRayQueryParameters3D.create(probe,probe-lift,collision_mask)
+	query.exclude = [get_rid()]
+	var floor_hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if floor_hit.is_empty() or (floor_hit["normal"] as Vector3).dot(Vector3.UP)<cos(floor_max_angle):
+		return
+	var rise := max_step_height+landing.get_travel().y
+	if rise>0.01 and rise<=max_step_height:
+		global_position.y += rise
+		velocity.y = 0.0
 
 
 func _process(delta: float) -> void:
@@ -145,8 +193,22 @@ func _process(delta: float) -> void:
 	if first_person:
 		_camera_yaw.global_position = anchor
 	else:
-		_camera_yaw.global_position = _camera_yaw.global_position.lerp(anchor, 1.0 - exp(-camera_follow * delta))
+		var following := _camera_yaw.global_position.lerp(anchor,1.0-exp(-camera_follow*delta))
+		following.y = lerpf(_camera_yaw.global_position.y,anchor.y,1.0-exp(-camera_follow*2*delta))
+		_camera_yaw.global_position = _safe_camera_anchor(anchor,following)
 	_animate_walk(delta)
+
+
+## The smoothed camera pivot must not lag through a wall or a passing train.
+func _safe_camera_anchor(anchor: Vector3, following: Vector3) -> Vector3:
+	if anchor.distance_squared_to(following)<0.0001:
+		return following
+	var query := PhysicsRayQueryParameters3D.create(anchor,following,_spring_arm.collision_mask)
+	query.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if not hit.is_empty():
+		return hit["position"]+(hit["normal"] as Vector3)*0.23
+	return following
 
 
 func get_camera() -> Camera3D:

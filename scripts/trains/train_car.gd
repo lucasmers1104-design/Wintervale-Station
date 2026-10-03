@@ -203,6 +203,30 @@ func build(p_kind: String, train_type: TrainType, is_first: bool, is_last: bool,
 	collision.position = Vector3(0.0, 2.0, 0.0)
 	_pick_area.add_child(collision)
 	add_child(_pick_area)
+	# Picking areas do not stop a CharacterBody or a SpringArm. Give the
+	# vehicle a separate moving solid body so exploration cannot pass through it.
+	var solid := AnimatableBody3D.new()
+	solid.name = "VehicleCollision"
+	solid.sync_to_physics = false
+	solid.collision_layer = GameDefs.LAYER_TRAINS
+	solid.collision_mask = GameDefs.LAYER_PLAYER
+	# Chamfered corners leave room at wagon ends; roof height follows the model.
+	var vehicle_shape := ConvexPolygonShape3D.new()
+	var bounds: AABB = (parts["paint"] as Mesh).get_aabb()
+	var half_width := clampf(bounds.size.x*0.5,1.2,1.4)
+	var half_length := maxf(0.25,length*0.5-0.10)
+	var top := clampf(bounds.end.y,2.6,4.5)
+	var hull := PackedVector3Array()
+	for y: float in [0.25,top]:
+		for side: float in [-1,1]:
+			for end: float in [-1,1]:
+				hull.append(Vector3(side*half_width,y,end*(half_length-0.35)))
+				hull.append(Vector3(side*(half_width-0.28),y,end*half_length))
+	vehicle_shape.points = hull
+	var vehicle_collision := CollisionShape3D.new()
+	vehicle_collision.shape = vehicle_shape
+	solid.add_child(vehicle_collision)
+	add_child(solid)
 
 	_clack_player = _make_player(SoundLibrary.get_sound("clack"), -8.0, 45.0)
 	if not _doors.is_empty():

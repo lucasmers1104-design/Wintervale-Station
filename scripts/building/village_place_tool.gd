@@ -32,6 +32,12 @@ var _ghost_key := ""
 var _check_key := ""
 var _ghost: Node3D
 var _marker: MeshInstance3D
+var _path_label: Label3D
+var _path_curved := false
+var _bend := 1.0
+var _incoming := Vector3.ZERO
+var _preview_route := PackedVector3Array()
+var _preview_timer := 0.0
 
 
 func _on_setup() -> void:
@@ -41,6 +47,15 @@ func _on_setup() -> void:
 	_marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_marker.material_override = marker_material
 	add_child(_marker)
+	_path_label = Label3D.new()
+	_path_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_path_label.fixed_size = true
+	_path_label.font_size = 40
+	_path_label.pixel_size = 0.0015
+	_path_label.outline_size = 6
+	_path_label.no_depth_test = true
+	_path_label.hide()
+	add_child(_path_label)
 	Events.village_item_requested.connect(_on_item_requested)
 
 
@@ -58,7 +73,9 @@ func deactivate() -> void:
 func cancel() -> bool:
 	if _start != Vector3.INF:
 		_start = Vector3.INF
+		_incoming = Vector3.ZERO
 		_ghost_key = ""
+		_check_key = ""
 		return true
 	return false
 
@@ -78,6 +95,7 @@ func select_item(item_id: String) -> void:
 	_index = index
 	_variant = 0
 	_start = Vector3.INF
+	_incoming = Vector3.ZERO
 	_ghost_key = ""
 	_announce_items()
 
@@ -86,6 +104,11 @@ func handle_input(event: InputEvent) -> bool:
 	if _items.is_empty():
 		return false
 	if event.is_action_pressed(&"build_rotate"):
+		if VillageCatalog.get_kind(get_item())=="path":
+			_bend *= -1
+			_incoming = Vector3.ZERO
+			_check_key = ""
+			return true
 		_angle = fposmod(_angle - deg_to_rad(rotate_step), TAU)
 		_auto_orient = false
 		return true
@@ -93,6 +116,9 @@ func handle_input(event: InputEvent) -> bool:
 		select_item(_items[(_index + 1) % _items.size()])
 		return true
 	if event.is_action_pressed(&"build_variant"):
+		if VillageCatalog.get_kind(get_item())=="path":
+			set_path_curved(not _path_curved)
+			return true
 		_variant = (_variant + 1) % VillageCatalog.get_variant_count(get_item())
 		_ghost_key = ""
 		return true
@@ -104,8 +130,11 @@ func handle_input(event: InputEvent) -> bool:
 	return false
 
 
-func update_tool(_delta: float) -> void:
-	preview_at(context.get_mouse_ground_point())
+func update_tool(delta: float) -> void:
+	_preview_timer -= delta
+	if _preview_timer<=0:
+		_preview_timer = 0.075 if category==&"paths" else 0.0
+		preview_at(context.get_mouse_ground_point())
 
 
 # --- Öffentlich (auch für Tests) --------------------------------------------------------
@@ -128,6 +157,21 @@ func click_at(point: Vector3) -> bool:
 				context.feedback.reject(point,get_status())
 			return false
 		var finish := _clamp_length(item_id,_start,point)
+		if VillageCatalog.get_kind(item_id)=="path":
+			var route := _path_route(point)
+			finish = route[-1]
+			var path_data := village.prepare(item_id,_start,0,0,finish)
+			if route.size()>2:
+				var saved: Array = []
+				for waypoint in route:
+					saved.append(SaveUtils.vec3_to_array(waypoint))
+				path_data["points"] = saved
+			_commit(path_data)
+			if village.get_object(int(path_data["id"]))==null:
+				return false
+			_incoming = RailGeometry.flat(route[-1]-route[-2]).normalized()
+			_start = SaveUtils.array_to_vec3(path_data["end"])
+			return true
 		var data := village.prepare(item_id, _start, 0.0, _variant, finish)
 		_commit(data)
 		_start = SaveUtils.array_to_vec3(data["end"])  # includes terrain height
@@ -152,8 +196,8 @@ func preview_at(point: Vector3) -> void:
 		return
 	point = _snap(point)
 	# Nur neu prüfen, wenn sich etwas geändert hat (die Prüfung kostet Physik- und Wegetests)
-	var check_key := "%s|%d|%s|%s|%.3f|%d" % [item_id, _variant, point.snapped(Vector3.ONE * 0.05), _start,
-		_current_angle(point), village.get_object_count() * 100000 + Economy.revision % 100000]
+	var check_key := "%s|%d|%s|%s|%.3f|%d|%s|%s|%s" % [item_id, _variant, point.snapped(Vector3.ONE * 0.05), _start,
+		_current_angle(point), village.get_object_count() * 100000 + Economy.revision % 100000,_path_curved,_bend,_incoming]
 	if check_key == _check_key and _ghost:
 		return
 	_check_key = check_key
@@ -161,13 +205,18 @@ func preview_at(point: Vector3) -> void:
 	var reason := ""
 	if VillageCatalog.is_line(item_id):
 		if _start == Vector3.INF:
-			_show_marker(point, 0.5)
 			_clear_ghost()
-			set_status("Startpunkt setzen")
+			_show_marker(point, 0.5)
+			set_status("Startpunkt setzen · " + ("Sanfte Kurve" if _path_curved else "Gerade") if VillageCatalog.get_kind(item_id)=="path" else "Startpunkt setzen")
 			_valid = false
 			return
 		var end := _clamp_length(item_id, _start, point)
-		reason = village.check_placement(item_id, _start, 0.0, _variant, end)
+		if VillageCatalog.get_kind(item_id)=="path":
+			_preview_route = _path_route(point)
+			end = _preview_route[-1]
+			reason = village.check_path_route(item_id,_preview_route)
+		else:
+			reason = village.check_placement(item_id, _start, 0.0, _variant, end)
 		_show_ghost(item_id, _start, 0.0, end)
 	else:
 		var angle := _current_angle(point)
@@ -181,6 +230,12 @@ func preview_at(point: Vector3) -> void:
 	_valid = reason == ""
 	set_status(reason)
 	_set_ghost_material(valid_material if _valid else invalid_material)
+	if VillageCatalog.get_kind(item_id)=="path" and _start!=Vector3.INF:
+		var end := _preview_route[-1]
+		_path_label.position = Vector3(end.x,context.terrain.get_surface_height(end.x,end.z)+1.5,end.z)
+		_path_label.text = "%.1f m · %s\n%s" % [PathMeshes.route_length(_preview_route),"Sanfte Kurve" if _path_curved else "Gerade",_path_cost_text(cost) if _valid else reason]
+		_path_label.modulate = Color(0.88,1.0,0.86) if _valid else Color(1.0,0.55,0.45)
+		_path_label.show()
 
 
 ## Was das gewählte Objekt an dieser Stelle kostet (Linien: je nach Länge).
@@ -188,8 +243,11 @@ func get_cost_at(point: Vector3) -> Dictionary:
 	var item_id := get_item()
 	var length := 0.0
 	if VillageCatalog.is_line(item_id) and _start != Vector3.INF and point != Vector3.INF:
-		var end := _clamp_length(item_id, _start, point)
-		length = Vector2(_start.x, _start.z).distance_to(Vector2(end.x, end.z))
+		if VillageCatalog.get_kind(item_id)=="path":
+			length = PathMeshes.route_length(_path_route(_snap(point)))
+		else:
+			var end := _clamp_length(item_id, _start, point)
+			length = Vector2(_start.x, _start.z).distance_to(Vector2(end.x, end.z))
 	return VillageCatalog.get_cost(item_id, length)
 
 
@@ -199,6 +257,29 @@ func is_valid() -> bool:
 
 func has_start() -> bool:
 	return _start != Vector3.INF
+
+
+func set_path_curved(curved: bool) -> void:
+	_path_curved = curved
+	_check_key = ""
+	_ghost_key = ""
+	if _point.is_finite():
+		preview_at(_point)
+
+
+func _path_route(point: Vector3) -> PackedVector3Array:
+	var finish := _clamp_length(get_item(),_start,point)
+	var route := PathMeshes.curve_route(_start,finish,_incoming,_bend) if _path_curved else PackedVector3Array([_start,finish])
+	var length := PathMeshes.route_length(route)
+	var limit := float(VillageCatalog.get_item(get_item()).get("max_length",30))
+	if length>limit:
+		for i in range(1,route.size()):
+			route[i] = _start+(route[i]-_start)*(limit/length)
+	return route
+
+
+func _path_cost_text(cost: Dictionary) -> String:
+	return "%d Münzen · %d Stein%s" % [int(cost.get("money",0)),int(cost.get("stone",0))," · Klick zum Bauen"]
 
 
 # --- Intern ---------------------------------------------------------------------------
@@ -218,7 +299,12 @@ func _commit(data: Dictionary) -> void:
 	if village.get_object(id) and context.feedback:
 		var at := SaveUtils.array_to_vec3(data["pos"])
 		var points := PackedVector3Array()
-		if data.has("end"):
+		if data.has("points"):
+			for waypoint in data["points"]:
+				var p := SaveUtils.array_to_vec3(waypoint)
+				p.y = context.terrain.get_surface_height(p.x,p.z)+0.05
+				points.append(p)
+		elif data.has("end"):
 			var finish := SaveUtils.array_to_vec3(data["end"])
 			for i in range(17):
 				var p := at.lerp(finish,i/16.0)
@@ -245,6 +331,12 @@ func _current_angle(point: Vector3) -> float:
 func _snap(point: Vector3) -> Vector3:
 	var item_id := get_item()
 	if VillageCatalog.get_kind(item_id) == "path":
+		if Input.is_key_pressed(KEY_ALT):
+			return point
+		if _start.is_finite() and Input.is_key_pressed(KEY_SHIFT):
+			var offset := RailGeometry.flat(point-_start)
+			var angle := snappedf(atan2(offset.z,offset.x),PI/4)
+			point = _start+Vector3(cos(angle),0,sin(angle))*offset.length()
 		var snapped := village.snap_path_point(point)
 		if context.feedback:
 			context.feedback.snapped(snapped,snapped.distance_to(point)>0.08)
@@ -269,7 +361,7 @@ func _show_ghost(item_id: String, position: Vector3, angle: float, end: Vector3)
 		length = snappedf(Vector2(position.x, position.z).distance_to(Vector2(end.x, end.z)), 0.1)
 	var key := "%s|%d|%.1f" % [item_id, _variant, length]
 	if VillageCatalog.get_kind(item_id) == "path":
-		key += "|%s|%s" % [position.snapped(Vector3.ONE * 0.1), end.snapped(Vector3.ONE * 0.1)]
+		key += "|%s|%s|%s" % [position.snapped(Vector3.ONE * 0.1), end.snapped(Vector3.ONE * 0.1),hash(_preview_route)]
 	if key != _ghost_key:
 		_clear_ghost()
 		_ghost_key = key
@@ -278,7 +370,7 @@ func _show_ghost(item_id: String, position: Vector3, angle: float, end: Vector3)
 		if VillageCatalog.get_kind(item_id) == "path":
 			var mesh := MeshInstance3D.new()
 			var terrain := context.terrain
-			mesh.mesh = PathMeshes.build(item_id, position, end, func(x: float, z: float) -> float: return terrain.get_surface_height(x, z) + 0.02)
+			mesh.mesh = PathMeshes.build_route(item_id, _preview_route, func(x: float, z: float) -> float: return terrain.get_surface_height(x, z) + 0.02)
 			mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_ghost.add_child(mesh)
 		else:
@@ -298,6 +390,9 @@ func _show_ghost(item_id: String, position: Vector3, angle: float, end: Vector3)
 			if kind == "house" or kind == "plaza" else context.terrain.get_height(position.x, position.z)
 		_ghost.transform = Transform3D(Basis(Vector3.UP, angle), Vector3(position.x, y, position.z))
 	# Grundfläche als flacher Rahmen
+	if VillageCatalog.get_kind(item_id)=="path":
+		_show_marker(end,0.28)
+		return
 	var fp := VillageFootprint.for_item(item_id, position, angle, _variant, end)
 	var half: Vector2 = fp["half"]
 	var box := BoxMesh.new()
@@ -339,6 +434,8 @@ func _clear_ghost() -> void:
 	_ghost_key = ""
 	if _marker:
 		_marker.visible = false
+	if _path_label:
+		_path_label.hide()
 
 
 func _announce_items() -> void:

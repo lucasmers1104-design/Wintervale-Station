@@ -51,6 +51,69 @@ static func material(item_id: String) -> Material:
 	return MATERIALS.get(item_id, MATERIALS["path_gravel"])
 
 
+static func route_length(points: PackedVector3Array) -> float:
+	var length := 0.0
+	for i in range(1,points.size()):
+		length += Vector2(points[i].x-points[i-1].x,points[i].z-points[i-1].z).length()
+	return length
+
+
+## Shared paving for forecourts and door aprons, in the path shader's world pattern.
+static func paved_rect(width: float, length: float) -> ArrayMesh:
+	var st := _new_st()
+	_quad(st,Vector3(-width/2,0,-length/2),Vector3(width/2,0,-length/2),Vector3(width/2,0,length/2),Vector3(-width/2,0,length/2),[Vector2.ZERO,Vector2.ZERO,Vector2.ZERO,Vector2.ZERO],[0,0,0,0])
+	return st.commit()
+
+static func paved_disc(radius: float) -> ArrayMesh:
+	var st := _new_st()
+	for i in 48:
+		var a := TAU*i/48
+		var b := TAU*(i+1)/48
+		_triangle(st,Vector3.ZERO,Vector3(cos(a),0,sin(a))*radius,Vector3(cos(b),0,sin(b))*radius,[Vector2.ZERO,Vector2.ZERO,Vector2.ZERO],[0,0,0])
+	return st.commit()
+
+
+## A sampled quadratic bend, optionally continuing the preceding path's tangent.
+static func curve_route(a: Vector3, b: Vector3, incoming := Vector3.ZERO, bend := 1.0) -> PackedVector3Array:
+	var chord := Vector3(b.x-a.x,0,b.z-a.z)
+	var length := chord.length()
+	if length<2.0:
+		return PackedVector3Array([a,b])
+	var control := a+chord*0.5+chord.cross(Vector3.UP)*bend*0.28
+	if incoming.length_squared()>0.01 and incoming.normalized().dot(chord.normalized())>0.15:
+		control = a+incoming.normalized()*length*0.50
+	var points := PackedVector3Array()
+	var count := clampi(ceili(length/2.0),2,24)
+	for i in count+1:
+		var t := float(i)/count
+		var point := a*(1-t)*(1-t)+control*2*(1-t)*t+b*t*t
+		point.y = lerpf(a.y,b.y,t)
+		points.append(point)
+	return points
+
+
+## Curves stay one saved object, one price and one undo action.
+static func build_route(item_id: String, points: PackedVector3Array, height: Callable, caps := [true,true], blocked := Callable()) -> ArrayMesh:
+	if points.size()==2:
+		return build(item_id,points[0],points[1],height,caps,blocked)
+	var surface := _new_st()
+	var details := _new_st()
+	for i in range(1,points.size()):
+		var part := build(item_id,points[i-1],points[i],height,[caps[0] and i==1,caps[1] and i==points.size()-1],blocked)
+		if part.get_surface_count()>0:
+			surface.append_from(part,0,Transform3D.IDENTITY)
+		if part.get_surface_count()>1:
+			details.append_from(part,1,Transform3D.IDENTITY)
+		if i<points.size()-1:
+			var style: Dictionary = STYLES.get(item_id,STYLES["path_gravel"])
+			_disc(surface,points[i],float(style["width"])*0.5,float(style["lift"])-0.004,height)
+	var mesh := ArrayMesh.new()
+	if points.size()>1:
+		surface.commit(mesh)
+		details.commit(mesh)
+	return mesh
+
+
 ## Baut ein Wegstück von [param a] nach [param b]. [param height] liefert die
 ## Geländehöhe an (x, z). [param caps] = [Scheibe am Anfang, Scheibe am Ende].
 ## [param blocked] (optional) liefert für einen Punkt true, wenn dort ein anderer Weg

@@ -126,6 +126,13 @@ const LEGENDS := {
 		{"actions": [&"interact_primary"], "text": "Neben dem Gleis: Haltepunkt errichten"},
 		{"actions": [&"build_tool_remove"], "text": "Falsch gesetzt? Entfernen"},
 	],
+	&"build_paths": [
+		{"actions": [&"interact_primary"], "text": "Start / Ende · danach weiterbauen"},
+		{"actions": [&"build_variant"], "text": "Gerade / sanfte Kurve"},
+		{"actions": [&"build_rotate"], "text": "Kurvenrichtung wechseln"},
+		{"literal": ["Shift"], "text": "45°-Winkel"},
+		{"literal": ["Alt"], "text": "Ohne Einrasten"},
+	],
 	&"build_village": [
 		{"actions": [&"interact_primary"], "text": "Setzen / Linie: Start und Ende"},
 		{"actions": [&"build_rotate"], "text": "Drehen"},

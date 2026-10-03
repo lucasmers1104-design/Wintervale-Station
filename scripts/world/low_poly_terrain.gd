@@ -38,10 +38,10 @@ const PREVIEW_ID := -1
 @export_range(0.0, 0.45, 0.01) var vertex_jitter := 0.3
 
 @export_group("Höhen")
-@export var hill_height := 5.0
-@export var mountain_height := 30.0
+@export var hill_height := 1.5
+@export var mountain_height := 12.0
 ## Radius der flachen Mitte in Metern.
-@export var flat_radius := 38.0
+@export var flat_radius := 72.0
 
 @export_group("Zugefrorener See")
 @export var lake_center := Vector2(52.0, -38.0)
@@ -173,7 +173,7 @@ func get_base_height(x: float, z: float) -> float:
 
 	# Berge am quadratischen Kartenrand
 	var edge_distance := maxf(absf(x), absf(z)) / get_half_extent()
-	var edge := smoothstep(0.55, 0.95, edge_distance)
+	var edge := smoothstep(0.72, 0.98, edge_distance)
 	var ridge := 1.0 - absf(_detail_noise.get_noise_2d(x * 0.6, z * 0.6))
 	height += edge * mountain_height * (0.45 + 0.55 * ridge)
 

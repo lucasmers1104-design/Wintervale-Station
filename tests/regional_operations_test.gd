@@ -127,17 +127,17 @@ func _run() -> void:
 	check(region.lines[0]["passengers"]==saved["lines"][0]["passengers"],"completed transport counters restored without duplication")
 	# Requirements progress in sequence from measurable metrics, not a timer.
 	region.progression.epoch = 1
-	region.progression.passengers = 19
+	region.progression.passengers = int(EpochCatalog.epoch(2)["requirements"]["passengers"])-1
 	region.progression.goods = 120
 	region.progression.services = 50
 	for station in region.stations:
 		station.population = 16 # deterministic census fixture for milestone boundary tests
 	region.progression.refresh()
 	check(region.progression.epoch==1,"one missing passenger keeps epoch two locked")
-	for milestone in [[20,2],[60,3],[100,4],[220,5],[450,6]]:
-		region.progression.passengers = milestone[0]
+	for level in range(2,7):
+		region.progression.passengers = int(EpochCatalog.epoch(level)["requirements"]["passengers"])
 		region.progression.refresh()
-		check(region.progression.epoch==milestone[1],"milestone boundary unlocks epoch %d" % milestone[1])
+		check(region.progression.epoch==level,"milestone boundary unlocks epoch %d" % level)
 	check(region.progression.is_train_unlocked("diesel_heritage") and region.progression.is_train_unlocked("high_speed"),"all earlier vehicles persist at final epoch")
 	SaveManager.delete_save("regional_restart")
 	print("REGIONAL OPERATIONS RESULTS: %d checks, %d failures" % [checks,failures])

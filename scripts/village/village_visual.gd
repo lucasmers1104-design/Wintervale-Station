@@ -25,6 +25,15 @@ static func attach(parent: Node3D, item_id: String, variant: int, length: float,
 	var small := float(VillageCatalog.get_item(item_id).get("radius", 1.0)) < 0.6 and VillageCatalog.get_kind(item_id) == "point"
 	var body_material := VillageCatalog.body_material(item_id, material)
 	_add(parent, data["body"], preview_material if preview else body_material, result)
+	if item_id=="plaza" or VillageCatalog.get_kind(item_id)=="house":
+		var paving := MeshInstance3D.new()
+		paving.mesh = PathMeshes.paved_disc(5.94) if item_id=="plaza" else PathMeshes.paved_rect(1.55,1.1)
+		paving.material_override = preview_material if preview else PathMeshes.material("path_stone")
+		paving.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		paving.name = "Paving"
+		paving.position = Vector3(0,0.066,0) if item_id=="plaza" else Vector3((data["door"] as Vector3).x,0.024,(data["door"] as Vector3).z-0.65)
+		parent.add_child(paving)
+		result["meshes"].append(paving)
 	_add(parent, data["glow"], preview_material if preview else VillageCatalog.GLOW_MATERIAL, result)
 	if data["glass"]:
 		var windows: Material = preview_material

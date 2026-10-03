@@ -210,7 +210,7 @@ func _refresh_progression_tools(progress: RegionProgression) -> void:
 func _update_legend() -> void:
 	if _build_active:
 		var tool_name := String(_build_tool)
-		_legend.show_mode(&"build_village" if tool_name.begins_with("village_") else StringName("build_" + tool_name))
+		_legend.show_mode(&"build_paths" if tool_name=="village_paths" else (&"build_village" if tool_name.begins_with("village_") else StringName("build_" + tool_name)))
 	elif _view_mode == GameDefs.ViewMode.BIRD_EYE:
 		_legend.show_mode(&"bird_eye")
 	else:

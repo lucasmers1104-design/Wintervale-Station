@@ -14,6 +14,7 @@ extends RefCounted
 static func make_curve(points: PackedVector3Array, heights := PackedFloat32Array()) -> Curve3D:
 	if heights.size() < 2:
 		var linear := Curve3D.new()
+		linear.up_vector_enabled = false
 		linear.bake_interval = 0.25
 		linear.add_point(points[0], Vector3.ZERO, points[1] - points[0])
 		linear.add_point(points[3], points[2] - points[3], Vector3.ZERO)
@@ -24,16 +25,22 @@ static func make_curve(points: PackedVector3Array, heights := PackedFloat32Array
 	var n := heights.size() - 1
 	var ds := length / n
 	var curve := Curve3D.new()
+	curve.up_vector_enabled = false
 	curve.bake_interval = 0.25
 	for i in n + 1:
 		var position := planar.sample_baked(ds * i, true)
 		position.y = heights[i]
-		var before := maxi(i - 1, 0)
-		var after := mini(i + 1, n)
-		var slope := (heights[after] - heights[before]) / (ds * (after - before))
 		var horizontal := tangent_at(planar, ds * i)
-		var handle := (horizontal + Vector3.UP * slope) * ds / 3.0
-		curve.add_point(position, -handle if i > 0 else Vector3.ZERO, handle if i < n else Vector3.ZERO)
+		# Independent vertical handles preserve the solved interval's slope.
+		# Averaged slopes caused cubic overshoot above the permitted grade at
+		# the transition between a level platform and an inclined approach.
+		var incoming := horizontal*ds/3.0
+		var outgoing := incoming
+		if i>0:
+			incoming.y = (heights[i]-heights[i-1])/3.0
+		if i<n:
+			outgoing.y = (heights[i+1]-heights[i])/3.0
+		curve.add_point(position,-incoming if i>0 else Vector3.ZERO,outgoing if i<n else Vector3.ZERO)
 	return curve
 
 
@@ -43,6 +50,9 @@ static func make_planar_curve(points: PackedVector3Array) -> Curve3D:
 	for p in points:
 		flat_points.append(flat(p))
 	var curve := Curve3D.new()
+	# Rail frames are computed by frame_at, without the engine's redundant
+	# up-vector rotation cache (which is unstable on some straight diagonals).
+	curve.up_vector_enabled = false
 	curve.bake_interval = 0.25
 	curve.add_point(flat_points[0], Vector3.ZERO, flat_points[1] - flat_points[0])
 	curve.add_point(flat_points[3], flat_points[2] - flat_points[3], Vector3.ZERO)

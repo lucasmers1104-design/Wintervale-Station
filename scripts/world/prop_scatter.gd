@@ -160,6 +160,8 @@ func _create_multimeshes(prefix: String, meshes: Array[Mesh], transforms: Array[
 		multimesh.transform_format = MultiMesh.TRANSFORM_3D
 		multimesh.mesh = meshes[i]
 		multimesh.instance_count = transforms[i].size()
+		var extent := terrain.get_half_extent()+8.0
+		multimesh.custom_aabb = AABB(Vector3(-extent,-4,-extent),Vector3(extent*2,terrain.mountain_height+terrain.hill_height+20,extent*2))
 		for j in transforms[i].size():
 			multimesh.set_instance_transform(j, transforms[i][j])
 
@@ -207,7 +209,10 @@ func _on_terrain_changed(region: Rect2) -> void:
 			if clearing.has_method("clears") and clearing.clears(xz.x, xz.y):
 				cleared = true
 		record["cleared"] = cleared
-		var shown := xform if not cleared else Transform3D(Basis().scaled(Vector3.ZERO), xform.origin)
+		# A singular zero-scale matrix can produce stray triangles in the
+		# Compatibility renderer. Keep it invertible and hide cleared props underground.
+		var shown := xform if not cleared else Transform3D(xform.basis.scaled(Vector3.ONE*0.0001),xform.origin+Vector3.DOWN*512)
+		record["render_transform"] = shown
 		_multimeshes[record["key"]].set_instance_transform(record["index"], shown)
 		var collider: CollisionShape3D = record["collider"]
 		collider.position.y = ground + float(record["lift"])

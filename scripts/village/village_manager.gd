@@ -28,6 +28,7 @@ const GROUP := &"village_manager"
 const CORRIDOR_BASE := 7000000
 ## Höchstens so viele erfundene Bewohner (Leistung, gemütliches Dorf statt Stadt).
 const MAX_GENERATED_RESIDENTS := 24
+const MAX_REGIONAL_RESIDENTS := 64
 ## Gebaut wird tagsüber (Spielstunden).
 const WORK_START := 6.0
 const WORK_END := 20.0
@@ -306,6 +307,11 @@ static func cost_key(id: int) -> String:
 
 
 func _data_length(data: Dictionary) -> float:
+	if data.has("points"):
+		var points := PackedVector3Array()
+		for entry in data["points"]:
+			points.append(SaveUtils.array_to_vec3(entry))
+		return PathMeshes.route_length(points)
 	if not data.has("end"):
 		return 0.0
 	var a := SaveUtils.array_to_vec3(data.get("pos"))
@@ -363,7 +369,7 @@ func pick(point: Vector3):
 # --- Platzierung prüfen ------------------------------------------------------------------
 
 ## Leerer Text = darf gebaut werden, sonst der Grund.
-func check_placement(item_id: String, position: Vector3, angle: float, variant := 0, end := Vector3.INF, organic := false) -> String:
+func check_placement(item_id: String, position: Vector3, angle: float, variant := 0, end := Vector3.INF, organic := false, route_piece := false) -> String:
 	var progress := RegionProgression.find(get_tree()) if is_inside_tree() else null
 	if progress and not organic and progress.epoch < EpochCatalog.item_epoch(item_id):
 		return "Freigeschaltet ab Epoche %d" % EpochCatalog.item_epoch(item_id)
@@ -373,7 +379,7 @@ func check_placement(item_id: String, position: Vector3, angle: float, variant :
 	var fp := VillageFootprint.for_item(item_id, position, angle, variant, end)
 	if VillageCatalog.is_line(item_id):
 		var length := Vector2(position.x, position.z).distance_to(Vector2(end.x, end.z))
-		if length < 1.0:
+		if length < (0.05 if route_piece else 1.0):
 			return "Zu kurz"
 		if length > float(VillageCatalog.get_item(item_id).get("max_length", 20.0)) + 0.01:
 			return "Zu lang (höchstens %d m)" % int(VillageCatalog.get_item(item_id)["max_length"])
@@ -414,14 +420,18 @@ func check_placement(item_id: String, position: Vector3, angle: float, variant :
 		var other_kind := VillageCatalog.get_kind(obj.item_id)
 		var other_fp: Dictionary = obj.get_footprint()
 		if kind == "path":
-			if (other_kind == "house" or other_kind == "plaza") and VillageFootprint.crosses_segment(other_fp,
+			if other_kind=="plaza":
+				var closest := Geometry2D.get_closest_point_to_segment(Vector2(obj.position.x,obj.position.z),Vector2(position.x,position.z),Vector2(end.x,end.z))
+				if closest.distance_to(Vector2(obj.position.x,obj.position.z))<1.6+PathMeshes.get_width(item_id)*0.5:
+					return "Brunnen auf dem Dorfplatz freihalten"
+				continue
+			if other_kind == "house" and VillageFootprint.crosses_segment(other_fp,
 					Vector2(position.x, position.z), Vector2(end.x, end.z), -0.4):
 				return "Weg führt durch %s" % VillageCatalog.get_label(obj.item_id)
 			continue
 		if other_kind == "path":
 			var other_path := obj as VillagePath
-			if (kind == "house" or kind == "plaza") and VillageFootprint.crosses_segment(fp,
-					Vector2(other_path.start_point.x, other_path.start_point.z), Vector2(other_path.end_point.x, other_path.end_point.z), -0.1):
+			if (kind == "house" or kind == "plaza") and other_path.crosses_footprint(fp,-0.1):
 				return "Steht auf einem Weg"
 			continue
 		var other_solid: bool = obj.is_solid() or other_kind == "house" or other_kind == "plaza"
@@ -467,6 +477,32 @@ func _hits_station_objects(fp: Dictionary) -> bool:
 
 # --- Wege ------------------------------------------------------------------------------
 
+func check_path_route(item_id: String, points: PackedVector3Array) -> String:
+	if points.size()<2 or points.size()>65:
+		return "Start und Ende setzen"
+	for point in points:
+		if not point.is_finite():
+			return "Ungültiger Wegpunkt"
+	var length := PathMeshes.route_length(points)
+	if length<1.0:
+		return "Zu kurz"
+	if length>float(VillageCatalog.get_item(item_id).get("max_length",30))+0.01:
+		return "Weg ist zu lang"
+	for obj in _objects.values():
+		if obj is VillagePath and obj.item_id==item_id:
+			var duplicate := true
+			for leg in range(1,points.size()):
+				var steps := maxi(1,ceili(points[leg-1].distance_to(points[leg])/0.5))
+				for i in steps+1:
+					duplicate = duplicate and obj.distance_to(points[leg-1].lerp(points[leg],float(i)/steps))<0.12
+			if duplicate:
+				return "Hier liegt bereits ein Weg"
+	for i in range(1,points.size()):
+		var reason := check_placement(item_id,points[i-1],0,0,points[i],false,true)
+		if reason!="":
+			return reason
+	return ""
+
 ## Fängt einen Wegpunkt an bestehenden Wegen: an einem Endpunkt oder mitten auf dem Weg.
 func snap_path_point(point: Vector3, radius := 1.6) -> Vector3:
 	var best := point
@@ -479,6 +515,12 @@ func snap_path_point(point: Vector3, radius := 1.6) -> Vector3:
 				if distance<best_distance:
 					best_distance = distance
 					best = entrance
+	for house in get_houses():
+		var door := house.get_front_point()
+		var distance := Vector2(point.x-door.x,point.z-door.z).length()
+		if distance<best_distance:
+			best_distance = distance
+			best = Vector3(door.x,_ground(door),door.z)
 	for obj in _objects.values():
 		if not obj is VillagePath:
 			continue
@@ -494,11 +536,18 @@ func snap_path_point(point: Vector3, radius := 1.6) -> Vector3:
 		if obj is VillagePath:
 			var path := obj as VillagePath
 			var d := path.distance_to(point)
-			if d < path.get_width() * 0.5 + 0.3:
-				var p := Geometry2D.get_closest_point_to_segment(Vector2(point.x, point.z),
-					Vector2(path.start_point.x, path.start_point.z), Vector2(path.end_point.x, path.end_point.z))
-				return Vector3(p.x, point.y, p.y)
-	return point
+			if d < minf(best_distance,path.get_width()*0.5+0.3):
+				best_distance = d
+				best = path.closest_point(point)
+		elif obj is VillageObject and obj.item_id=="plaza":
+			var offset := RailGeometry.flat(point-obj.position)
+			if offset.length()>0.1:
+				var rim: Vector3 = obj.position+offset.normalized()*5.8
+				var distance := RailGeometry.flat(point-rim).length()
+				if distance<best_distance:
+					best_distance = distance
+					best = Vector3(rim.x,_ground(rim),rim.z)
+	return best
 
 
 ## Liegt der Punkt auf einem gebauten Weg (für Schrittgeräusche)?
@@ -544,7 +593,8 @@ func _rebuild_paths_near(path: VillagePath) -> void:
 			var other := obj as VillagePath
 			var reach := other.get_width() * 0.5 + path.get_width() * 0.5 + 1.0
 			if path.distance_to(other.start_point) < reach or path.distance_to(other.end_point) < reach \
-					or other.distance_to(path.start_point) < reach or other.distance_to(path.end_point) < reach:
+					or other.distance_to(path.start_point) < reach or other.distance_to(path.end_point) < reach \
+					or VillageFootprint.overlaps(path.get_footprint(),other.get_footprint(),1.0):
 				other.rebuild()
 
 
@@ -555,12 +605,11 @@ func nearest_path_point(point: Vector3, max_distance := 14.0) -> Vector3:
 	for obj in _objects.values():
 		if obj is VillagePath:
 			var path := obj as VillagePath
-			var p := Geometry2D.get_closest_point_to_segment(Vector2(point.x, point.z),
-				Vector2(path.start_point.x, path.start_point.z), Vector2(path.end_point.x, path.end_point.z))
-			var d := p.distance_to(Vector2(point.x, point.z))
+			var p := path.closest_point(point)
+			var d := Vector2(p.x-point.x,p.z-point.z).length()
 			if d < best_distance:
 				best_distance = d
-				best = Vector3(p.x, point.y, p.y)
+				best = p
 	return best
 
 
@@ -570,6 +619,17 @@ func is_walkable(a: Vector3, b: Vector3) -> bool:
 	var b2 := Vector2(b.x, b.z)
 	for obj in _objects.values():
 		if obj is VillagePath:
+			continue
+		if obj is VillageObject and obj.item_id=="plaza":
+			var center := Vector2(obj.position.x,obj.position.z)
+			if Geometry2D.get_closest_point_to_segment(center,a2,b2).distance_to(center)<1.95:
+				return false
+			for k in 4:
+				var angle := PI*0.25+k*PI*0.5
+				var seat: Vector3 = obj.to_global(Vector3(cos(angle),0,sin(angle))*3.65)
+				var footprint := VillageFootprint.make(seat,Vector2(0.85,0.25),obj.rotation.y+angle)
+				if VillageFootprint.crosses_segment(footprint,a2,b2,0.2):
+					return false
 			continue
 		if (obj is VillageHouse or obj.is_solid()) and VillageFootprint.crosses_segment(obj.get_footprint(), a2, b2, 0.15):
 			return false
@@ -712,7 +772,7 @@ func _move_in(house: VillageHouse, arriving: bool) -> void:
 		var present: Array = _residents.get(house.object_id,[])
 		# Town census includes every household; only a bounded sample becomes NPCs.
 		for profile: NpcProfile in household:
-			if not present.has(profile) and station.director.get_npcs().size()<6:
+			if not present.has(profile) and can_show_regional_resident(station):
 				profile.came_from = station.station_name
 				station.director.add_resident(profile,"")
 				present.append(profile)
@@ -746,7 +806,7 @@ func _move_in(house: VillageHouse, arriving: bool) -> void:
 
 
 ## Epochen-Spiel: Die Familie eines fertigen Hauses steigt aus dem Zug aus
-## [param origin] (Tunnel) – höchstens sechs Bewohner je Ort werden zu Figuren.
+## [param origin] (Tunnel) – sichtbare Figuren wachsen mit der Bahnhofsstufe.
 func welcome_household(house: VillageHouse, origin: String) -> void:
 	var progress := RegionProgression.find(get_tree())
 	var station := progress.region.station_by_id(house.region_station_id) if progress else null
@@ -755,7 +815,7 @@ func welcome_household(house: VillageHouse, origin: String) -> void:
 	var household := get_household(house)
 	var present: Array = _residents.get(house.object_id, [])
 	for profile: NpcProfile in household:
-		if not present.has(profile) and station.director.get_npcs().size() < 6:
+		if not present.has(profile) and can_show_regional_resident(station):
 			profile.came_from = origin
 			station.director.add_resident(profile, origin)
 			present.append(profile)
@@ -764,6 +824,21 @@ func welcome_household(house: VillageHouse, origin: String) -> void:
 	if not Engine.is_editor_hint():
 		Events.notification_requested.emit("Familie %s ist in %s angekommen (%d)" % [house.home_name, station.station_name, household.size()])
 	changed.emit()
+
+func can_show_regional_resident(station: RegionStation) -> bool:
+	if station.director.get_npcs().size()>=station.resident_visual_limit():
+		return false
+	var total := 0
+	for place in station.region.stations:
+		if place.director:
+			total += place.director.get_npcs().size()
+	return total<MAX_REGIONAL_RESIDENTS
+
+func refresh_station_residents(station: RegionStation) -> void:
+	for id in station.house_ids:
+		var house := get_object(id) as VillageHouse
+		if house and house.is_finished() and not station.waiting_houses.has(id):
+			_move_in(house,false)
 
 
 func _move_out(house: VillageHouse) -> void:
@@ -790,7 +865,9 @@ func _move_out(house: VillageHouse) -> void:
 func _on_day_changed(_day: int) -> void:
 	for house in get_houses():
 		if house.is_finished() and house.finished_day > 0:
-			_move_in(house, true)
+			# Regional households arrive once. A new day must never put settled
+			# families back in the arrival queue or remove them from the census.
+			_move_in(house, house.region_station_id <= 0)
 
 
 ## Einwohner insgesamt (bekannte Familien und Zugezogene) und Haushalte.
@@ -822,10 +899,13 @@ func _assign_favourite_way(profile: NpcProfile, house: VillageHouse) -> void:
 				"street_lamp", "lantern":
 					name_text = "unter den Laternen entlang"
 			point = obj.position
+			if obj.item_id in ["plaza","fountain"]:
+				var approach := RailGeometry.flat(home-obj.position).normalized()
+				point += approach*(3.0 if obj.item_id=="plaza" else 2.3)
 		elif obj is VillagePath:
 			var path := obj as VillagePath
 			name_text = "den %s entlang" % VillageCatalog.get_label(path.item_id)
-			point = path.start_point.lerp(path.end_point, 0.5)
+			point = path.closest_point(path.start_point.lerp(path.end_point, 0.5))
 		if name_text == "" or point == Vector3.INF:
 			continue
 		var distance := Vector2(point.x, point.z).distance_to(Vector2(home.x, home.z))
@@ -886,13 +966,41 @@ func rebuild_walk_network() -> void:
 	for obj in _objects.values():
 		if obj is VillagePath:
 			var path := obj as VillagePath
-			var steps := maxi(1, ceili(path.get_length() / 6.0))
 			var chain: Array[int] = []
-			for s in steps + 1:
-				chain.append(index_of.call(path.start_point.lerp(path.end_point, float(s) / steps)))
-			for s in steps:
+			chain.append(index_of.call(path.start_point))
+			for leg in range(1,path.route_points.size()):
+				var a := path.route_points[leg-1]
+				var b := path.route_points[leg]
+				var steps := maxi(1,ceili(RailGeometry.flat(b-a).length()/4.0))
+				for s in range(1,steps+1):
+					var next: int = index_of.call(a.lerp(b,float(s)/steps))
+					if next!=chain[-1]:
+						chain.append(next)
+			for s in chain.size()-1:
 				edges.append([chain[s], chain[s + 1], WalkGraph.COST_PATH])
 			path_chains.append({"path": path, "chain": chain})
+	# Real geometric junctions, including X crossings and curved-path branches.
+	for i in path_chains.size():
+		for j in range(i+1,path_chains.size()):
+			var first: VillagePath = path_chains[i]["path"]
+			var second: VillagePath = path_chains[j]["path"]
+			if not VillageFootprint.overlaps(first.get_footprint(),second.get_footprint()):
+				continue
+			var a_chain: Array = path_chains[i]["chain"]
+			var b_chain: Array = path_chains[j]["chain"]
+			for a in range(1,a_chain.size()):
+				for b in range(1,b_chain.size()):
+					var a0: Vector3 = points[a_chain[a-1]]
+					var a1: Vector3 = points[a_chain[a]]
+					var b0: Vector3 = points[b_chain[b-1]]
+					var b1: Vector3 = points[b_chain[b]]
+					var junction: Variant = Geometry2D.segment_intersects_segment(Vector2(a0.x,a0.z),Vector2(a1.x,a1.z),Vector2(b0.x,b0.z),Vector2(b1.x,b1.z))
+					if junction==null:
+						continue
+					var idx: int = index_of.call(Vector3(junction.x,0,junction.y))
+					for neighbour: int in [a_chain[a-1],a_chain[a],b_chain[b-1],b_chain[b]]:
+						if idx!=neighbour and not _has_edge(edges,idx,neighbour):
+							edges.append([idx,neighbour,WalkGraph.COST_PATH])
 	# T-Kreuzungen: Wegende mitten auf einem anderen Weg
 	for entry: Dictionary in path_chains:
 		var chain: Array = entry["chain"]
@@ -964,6 +1072,10 @@ func rebuild_walk_network() -> void:
 			if best_name != "":
 				edges.append([door_index, best_name, WalkGraph.COST_CONNECTOR])
 	walk_graph.set_dynamic(points, edges)
+	var progress := RegionProgression.find(get_tree())
+	if progress:
+		for station in progress.region.stations:
+			station.set_village_routes(points,edges)
 
 
 static func _has_edge(edges: Array, a: int, b: int) -> bool:
