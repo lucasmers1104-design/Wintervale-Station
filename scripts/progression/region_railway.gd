@@ -393,6 +393,14 @@ func platform_placement(id: int, point: Vector3) -> Dictionary:
 	var angle := atan2(tangent.x,tangent.z)
 	if Basis(Vector3.UP,angle).x.dot(point-axis)<0:
 		angle += PI
+	var dimensions := EpochCatalog.epoch(station.level)
+	var width := float(dimensions["width"])
+	var frame := Transform3D(Basis(Vector3.UP,angle),axis)
+	var footprint := VillageFootprint.make(frame*Vector3(1.78+width/2+1.4,0,0),Vector2(width/2+1.5,float(dimensions["length"])/2+2),angle)
+	for other in stations:
+		for occupied in other.occupied_footprints():
+			if VillageFootprint.overlaps(footprint,occupied,0.2):
+				return {"pos":SaveUtils.vec3_to_array(axis),"angle":angle,"reason":"Bahnsteig überlappt %s · andere Gleisseite oder mehr Abstand wählen" % other.station_name}
 	return {"pos":SaveUtils.vec3_to_array(axis),"angle":angle,"reason":Economy.describe_missing({"money":120})}
 
 func add_platform(id: int, data: Dictionary, charge := true) -> bool:
@@ -675,6 +683,9 @@ func deliver_families(station: RegionStation, train: Train) -> void:
 	refresh()
 
 func _board_visitors(train: Train, origin: RegionStation, destination: RegionStation, platform: PlatformStop, count: int, rng: RandomNumberGenerator) -> void:
+	# Guests now use the actual entrance. Give the bounded queue time to reach it
+	# instead of closing the doors halfway through a longer station approach.
+	train.set_meta("boarding_grace",clampf(origin.director._walk_distance/1.1+18,Train.MAX_DOOR_HOLD,80))
 	var available := maxi(0,origin.director.max_travellers-origin.director.regular_traveller_count())
 	for i in mini(count,available):
 		var visitor := origin.director.spawn_traveller(rng)

@@ -13,6 +13,7 @@ static func build(level: int) -> Dictionary:
 	var definition := EpochCatalog.epoch(level)
 	var st := TrainMeshes._new_st()
 	var glow := TrainMeshes._new_st()
+	var glazing := TrainMeshes._new_st()
 	var length := float(definition["length"])
 	var width := float(definition["width"])
 	var height := TrainCar.RAIL_TOP + TrainMeshes.STEP_UPPER_Y
@@ -41,11 +42,11 @@ static func build(level: int) -> Dictionary:
 			"city":
 				for end: float in [-1,1]:
 					_house(st,glow,Vector3(x+width/2+4,height,end*12),Vector3(7.5,7,9),BRICK,ROOF)
-				_hall(st,glow,Vector3(x+width/2+4,height,0),7.5,16,7.0)
+				_hall(st,glazing,Vector3(x+width/2+4,height,0),7.5,16,7.0)
 				_clock_tower(st,glow,Vector3(x+width/2+4,height,-17),3.8,10.2)
 				StationMeshes.add_canopy(st,Vector3(x,height,0),44,width+0.8,4.2,rng)
 			"central":
-				_hall(st,glow,Vector3(x+width/2+6,height,0),11,36,10)
+				_hall(st,glazing,Vector3(x+width/2+6,height,0),11,36,10)
 				for end: float in [-1,1]:
 					_house(st,glow,Vector3(x+width/2+6,height,end*24),Vector3(11,8.6,10),CREAM,ROOF)
 					_clock_tower(st,glow,Vector3(x+width/2+6,height,end*30),4,12)
@@ -53,6 +54,9 @@ static func build(level: int) -> Dictionary:
 				for z: float in [-35,-18,0,18,35]:
 					LowPolyBuilder.add_beam(st,Vector3(x,height+4.6,z),Vector3(x+width+5,height+5.8,z),0.18,IRON)
 	var lamps: Array[Vector3] = []
+	_access_stairs(st,level)
+	if level>=2:
+		_forecourt(st,glow,level,x,width,length,height,rng)
 	for z: float in [-length*0.28,length*0.28]:
 		StationMeshes.add_bench(st,Vector3(x+width*0.25,height,z),rng)
 		if level >= 2:
@@ -80,7 +84,7 @@ static func build(level: int) -> Dictionary:
 		st.append_from(shed["body"],0,receiving)
 		if shed.get("glow"):
 			glow.append_from(shed["glow"],0,receiving)
-	return {"paint":st.commit(),"glow":glow.commit(),"center_x":x,"height":height,"lamps":lamps,"sign_at":sign_at,"sign_y":sign_y,"sign_face":sign_face}
+	return {"paint":st.commit(),"glow":glow.commit(),"glass":glazing.commit() if level>=5 else null,"center_x":x,"height":height,"lamps":lamps,"sign_at":sign_at,"sign_y":sign_y,"sign_face":sign_face,"access":StationAccess.describe(level)}
 
 static func _shelter(st: SurfaceTool, glow: SurfaceTool, at: Vector3, width: float, length: float) -> void:
 	for sx: float in [-1,1]:
@@ -91,7 +95,60 @@ static func _shelter(st: SurfaceTool, glow: SurfaceTool, at: Vector3, width: flo
 	_snow_roof(st,at+Vector3(0,2.5,0),width+0.42,length+0.3,0.5)
 	LowPolyBuilder.add_box(glow,at+Vector3(0,2.3,0),Vector3(0.3,0.15,0.3),GLASS)
 
+static func access_mesh(level: int) -> ArrayMesh:
+	var st := TrainMeshes._new_st()
+	_access_stairs(st,level)
+	return st.commit()
+
+static func _access_stairs(st: SurfaceTool, level: int) -> void:
+	var access := StationAccess.describe(level)
+	var back := float(access["back"])
+	var z := float(access["z"])
+	var height := float(access["height"])
+	var color := PLANK if level==1 else CREAM.darkened(0.12)
+	for step in StationAccess.RISERS:
+		var top := height*(StationAccess.RISERS-step)/StationAccess.RISERS
+		var at := Vector3(back+(step+0.5)*StationAccess.TREAD,top/2-0.04,z)
+		LowPolyBuilder.add_box(st,at,Vector3(StationAccess.TREAD+0.02,top+0.08,StationAccess.WIDTH),color.darkened(step*0.015))
+		LowPolyBuilder.add_box(st,Vector3(at.x,top+0.006,z),Vector3(0.05,0.013,StationAccess.WIDTH-0.14),CREAM.lightened(0.04))
+	for side: float in [-1,1]:
+		var a := Vector3(back-0.1,height+0.9,z+side*(StationAccess.WIDTH/2+0.08))
+		var b := Vector3(back+StationAccess.RISERS*StationAccess.TREAD+0.15,0.9,a.z)
+		LowPolyBuilder.add_beam(st,a,b,0.075,FASCIA if level==1 else IRON)
+		for fraction: float in [0,0.5,1]:
+			var p := a.lerp(b,fraction)
+			LowPolyBuilder.add_box(st,p-Vector3.UP*0.45,Vector3(0.07,0.9,0.07),FASCIA if level==1 else IRON)
+
+static func _forecourt(st: SurfaceTool, glow: SurfaceTool, level: int, x: float, width: float, length: float, height: float, rng: RandomNumberGenerator) -> void:
+	var access := StationAccess.describe(level)
+	var beginning := float(access["back"])+StationAccess.RISERS*StationAccess.TREAD
+	var z := float(access["z"])
+	# A clear approach beyond the station wings, leading to the official stairs.
+	for row in 4:
+		for col in maxi(1,ceili((20.5-beginning)/0.8)):
+			var px := beginning+(col+0.5)*0.8
+			LowPolyBuilder.add_box(st,Vector3(px,0.015,z-1.6+(row+0.5)*0.8),Vector3(0.77,0.05,0.77),CREAM.darkened(0.20+(row+col)%2*0.04))
+	for side: float in [-1,1]:
+		StationMeshes.add_planter(st,Vector3(beginning+1.1,0,z+side*2.1),rng)
+		_lantern_post(st,glow,Vector3(19.3,0,z+side*2.0))
+	var board := Vector3(x+width/2-0.14,height,-length*0.12)
+	for dz: float in [-0.62,0.62]:
+		LowPolyBuilder.add_box(st,board+Vector3(0,0.9,dz),Vector3(0.10,1.8,0.10),IRON)
+	LowPolyBuilder.add_box(st,board+Vector3(0,2.1,0),Vector3(0.18,0.94,1.62),WOOD)
+	LowPolyBuilder.add_box(st,board+Vector3(-0.10,2.1,0),Vector3(0.03,0.74,1.38),PAPER)
+	for line in 4:
+		LowPolyBuilder.add_box(st,board+Vector3(-0.12,2.36-line*0.13,0.05),Vector3(0.015,0.022,0.95),IRON.lightened(0.2))
+	LowPolyBuilder.add_box(st,board+Vector3(0,2.66,0),Vector3(0.48,0.10,1.90),ROOF)
+	if level>=3:
+		var ticket := board+Vector3(0.02,0,-2.0)
+		LowPolyBuilder.add_box(st,ticket+Vector3(0,0.8,0),Vector3(0.45,1.6,0.7),IRON)
+		LowPolyBuilder.add_box(glow,ticket+Vector3(-0.24,1.15,0),Vector3(0.025,0.38,0.45),Color(0.56,0.75,0.66))
+		LowPolyBuilder.add_box(st,ticket+Vector3(-0.25,0.63,0),Vector3(0.04,0.09,0.30),WOOD)
+
 static func _house(st: SurfaceTool, glow: SurfaceTool, at: Vector3, size: Vector3, color: Color, roof: Color) -> void:
+	# These buildings share the elevated station floor: a complete stone plinth
+	# supports that floor instead of leaving the walls floating above the terrain.
+	LowPolyBuilder.add_box(st,Vector3(at.x,(at.y-0.12)/2,at.z),Vector3(size.x+0.25,at.y+0.12,size.z+0.25),IRON.lightened(0.12))
 	LowPolyBuilder.add_box(st,at+Vector3(0,size.y/2,0),size,color)
 	LowPolyBuilder.add_box(st,at+Vector3(0,0.16,0),Vector3(size.x+0.3,0.32,size.z+0.3),IRON.lightened(0.2))
 	_roof(st,at+Vector3(0,size.y,0),size.x+0.6,size.z+0.6,1.25,roof)
@@ -104,6 +161,23 @@ static func _house(st: SurfaceTool, glow: SurfaceTool, at: Vector3, size: Vector
 	LowPolyBuilder.add_box(st,at+Vector3(-size.x/2-0.10,1.1,0),Vector3(0.12,2.2,1.3),WOOD.darkened(0.15))
 	LowPolyBuilder.add_box(st,at+Vector3(-size.x/2-0.8,0.10,0),Vector3(1.5,0.20,2.2),CREAM)
 	LowPolyBuilder.add_box(st,at+Vector3(size.x*0.22,size.y+0.8,size.z*0.28),Vector3(0.65,1.7,0.65),BRICK)
+	# Facade rhythm, corner stonework, cornice and glazed windows on the town side.
+	for side: float in [-1,1]:
+		for end: float in [-1,1]:
+			var corner := at+Vector3(side*(size.x/2+0.025),size.y/2,end*(size.z/2-0.18))
+			LowPolyBuilder.add_box(st,corner,Vector3(0.16,size.y,0.32),CREAM.lightened(0.05))
+		LowPolyBuilder.add_box(st,at+Vector3(side*(size.x/2+0.07),size.y-0.1,0),Vector3(0.22,0.24,size.z+0.22),CREAM)
+		for z in range(int(-size.z/2)+1,int(size.z/2),2):
+			var window := at+Vector3(side*(size.x/2+0.08),1.7,z)
+			if absf(float(z))<0.7 and side<0:
+				continue
+			LowPolyBuilder.add_box(st,window,Vector3(0.12,1.30,1.10),IRON)
+			LowPolyBuilder.add_box(glow,window+Vector3(side*0.075,0,0),Vector3(0.035,1.03,0.86),GLASS)
+			LowPolyBuilder.add_box(st,window+Vector3(side*0.10,0,0),Vector3(0.06,1.05,0.065),CREAM)
+			LowPolyBuilder.add_box(st,window+Vector3(side*0.11,-0.62,0),Vector3(0.32,0.12,1.26),CREAM)
+	for dz: float in [-0.75,0.75]:
+		LowPolyBuilder.add_box(st,at+Vector3(-size.x/2-0.14,1.18,dz),Vector3(0.22,2.4,0.16),CREAM)
+	LowPolyBuilder.add_box(st,at+Vector3(-size.x/2-0.2,2.48,0),Vector3(0.32,0.20,1.8),CREAM)
 
 static func _roof(st: SurfaceTool, at: Vector3, width: float, length: float, rise: float, color: Color) -> void:
 	for side: float in [-1,1]:
@@ -117,6 +191,7 @@ static func _roof(st: SurfaceTool, at: Vector3, width: float, length: float, ris
 		LowPolyBuilder.add_triangle_facing(st,at+Vector3(-width/2,0,end*length/2),at+Vector3(width/2,0,end*length/2),at+Vector3(0,rise,end*length/2),color.darkened(0.08),Vector3(0,0,end))
 
 static func _clock_tower(st: SurfaceTool, glow: SurfaceTool, at: Vector3, width: float, height: float) -> void:
+	LowPolyBuilder.add_box(st,Vector3(at.x,(at.y-0.12)/2,at.z),Vector3(width+0.2,at.y+0.12,width+0.2),IRON.lightened(0.12))
 	LowPolyBuilder.add_box(st,at+Vector3(0,height/2,0),Vector3(width,height,width),CREAM)
 	_roof(st,at+Vector3(0,height,0),width+0.6,width+0.6,1.1,ROOF)
 	_snow_roof(st,at+Vector3(0,height+0.06,0),width+0.5,width+0.5,1.1)
@@ -140,6 +215,7 @@ static func _hall(st: SurfaceTool, glow: SurfaceTool, at: Vector3, width: float,
 				LowPolyBuilder.add_triangle_facing(glow,a,b,b+Vector3(0,0,4),Color(0.39,0.53,0.54),Vector3.UP)
 				LowPolyBuilder.add_triangle_facing(glow,a,b+Vector3(0,0,4),a+Vector3(0,0,4),Color(0.39,0.53,0.54),Vector3.UP)
 	LowPolyBuilder.add_box(st,at+Vector3(0,0.14,0),Vector3(width,0.28,length),CREAM)
+	LowPolyBuilder.add_box(st,Vector3(at.x,(at.y-0.12)/2,at.z),Vector3(width,at.y+0.12,length),IRON.lightened(0.12))
 
 
 # --- Holz-Haltepunkt und Bahnsteig-Ausstattung ------------------------------
@@ -178,14 +254,7 @@ static func _timber_halt(st: SurfaceTool, glow: SurfaceTool, x: float, width: fl
 	LowPolyBuilder.add_box(st,Vector3(back-0.33,height+0.03,0),Vector3(0.5,0.06,length-1.2),SNOW)
 	_snow_patches(st,x,width,length,height,rng)
 	_fence(st,back-0.07,height,-length/2+0.45,length/2-0.45,Vector2(6.3,8.5))
-	# Treppe durch die Zaunlücke zum Ortsweg.
-	for step in 3:
-		var stair_height := height*(3-step)/3.0
-		LowPolyBuilder.add_box(st,Vector3(back+0.22+step*0.42,stair_height/2,7.4),Vector3(0.44,stair_height,1.7),PLANK.darkened(0.05*step))
-		LowPolyBuilder.add_box(st,Vector3(back+0.22+step*0.42,stair_height+0.012,7.4),Vector3(0.3,0.02,1.4),SNOW)
-	for side: float in [-1,1]:
-		LowPolyBuilder.add_beam(st,Vector3(back,height+0.9,7.4+side*0.9),Vector3(back+1.3,0.9,7.4+side*0.9),0.06,FASCIA)
-		LowPolyBuilder.add_box(st,Vector3(back+1.3,0.45,7.4+side*0.9),Vector3(0.08,0.9,0.08),FASCIA)
+	# The shared entrance below uses precisely the same seven risers as NPC routing.
 	# Endtreppen mit Handläufen.
 	for end: float in [-1,1]:
 		for step in 3:

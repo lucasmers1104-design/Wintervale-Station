@@ -58,6 +58,13 @@ var _traveller_count := 0
 var _walk_distance := 55.0
 var _exploring := false
 var _rng := RandomNumberGenerator.new()
+var access_route: Callable
+var access_height: Callable
+
+func find_walk_path(from: Vector3, to: Vector3) -> PackedVector3Array:
+	if access_route.is_valid():
+		return access_route.call(from,to)
+	return walk_graph.find_path(from,to) if walk_graph else PackedVector3Array([from,to])
 
 
 func _ready() -> void:
@@ -716,6 +723,10 @@ func get_exit_point() -> Vector3:
 ## Bodenhöhe unter [param point]: Gelände, Bahnsteig oder Holzübergang.
 ## Gesucht wird knapp über [param reference_y], damit Dächer nicht zählen.
 func ground_height(point: Vector3, reference_y: float) -> float:
+	if access_height.is_valid():
+		var access_y: float = access_height.call(point)
+		if not is_nan(access_y):
+			return access_y
 	var base := terrain.get_height(point.x, point.z) if terrain else 0.0
 	# Ein abgerissener Haltepunkt (Undo, Laden) räumt seine Bewohner erst im
 	# nächsten Frame ab – bis dahin gibt es keine Physikwelt mehr.

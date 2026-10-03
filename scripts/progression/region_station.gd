@@ -21,6 +21,9 @@ var _light: OmniLight3D
 var _platform_lights: Array[OmniLight3D] = []
 var _glow: StandardMaterial3D
 var _growth_mark := 0
+var _pad_ids: Array[int] = []
+var _access_graph: WalkGraph
+var _access_level := 0
 
 func configure(data: Dictionary, owner_region: RegionRailway) -> void:
 	region = owner_region
@@ -54,6 +57,7 @@ func _ready() -> void:
 	set_dark(WorldClock.is_dark())
 
 func rebuild() -> void:
+	_update_ground()
 	_platform_lights.clear()
 	if _visual:
 		remove_child(_visual)
@@ -84,6 +88,18 @@ func rebuild() -> void:
 	glass.material_override = _glow
 	glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_visual.add_child(glass)
+	if parts.get("glass"):
+		var glazing := MeshInstance3D.new()
+		glazing.mesh = parts["glass"]
+		var material := StandardMaterial3D.new()
+		material.vertex_color_use_as_albedo = true
+		material.roughness = 0.25
+		material.metallic = 0.12
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.albedo_color = Color(0.85,0.97,1.0,0.63)
+		glazing.material_override = material
+		glazing.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_visual.add_child(glazing)
 	# Ortsname auf beiden Seiten der Schildtafel (vorher steckte er in der Tafel).
 	var sign_at: Vector3 = parts["sign_at"]
 	var font := SystemFont.new()
@@ -120,6 +136,20 @@ func rebuild() -> void:
 		_platform_lights.append(lamp)
 	for i in platform_tracks.size():
 		_add_extra_platform(platform_tracks[i],i+2)
+	_update_access_graph()
+	if director and _access_level!=level:
+		var old_descriptors := access_descriptors(_access_level)
+		for npc in director.get_npcs()+director.get_travellers():
+			if not npc._moving or npc._path.is_empty() or not npc._climb.is_empty():
+				continue
+			for point in npc._path:
+				var touches_platform := false
+				for data in old_descriptors:
+					touches_platform = touches_platform or StationAccess.platform_local((data["frame"] as Transform3D).affine_inverse()*point,data)
+				if touches_platform:
+					npc.walk_to(npc._path[-1],npc._on_arrive,npc._pace)
+					break
+	_access_level = level
 	set_dark(WorldClock.is_dark())
 
 func _add_extra_platform(data: Dictionary, number: int) -> void:
@@ -135,6 +165,17 @@ func _add_extra_platform(data: Dictionary, number: int) -> void:
 	_visual.add_child(platform)
 	platform.global_transform = Transform3D(Basis(Vector3.UP,angle),axis)
 	platform.global_position += platform.global_basis.x*(1.78+platform.width/2)
+	var stairs := MeshInstance3D.new()
+	stairs.mesh = EpochStationMeshes.access_mesh(level)
+	stairs.material_override = region.village.material
+	_visual.add_child(stairs)
+	stairs.global_transform = Transform3D(Basis(Vector3.UP,angle),axis)
+	var stair_body := StaticBody3D.new()
+	stair_body.collision_layer = GameDefs.LAYER_OBJECTS
+	stairs.add_child(stair_body)
+	var stair_shape := CollisionShape3D.new()
+	stair_shape.shape = stairs.mesh.create_trimesh_shape()
+	stair_body.add_child(stair_shape)
 	var extra_stop: PlatformStop
 	for candidate in get_stops():
 		if candidate.platform_number==number:
@@ -162,15 +203,8 @@ func _add_extra_platform(data: Dictionary, number: int) -> void:
 
 func _create_passenger_director() -> void:
 	var graph := WalkGraph.new()
-	var center := Marker3D.new()
-	center.name = "BahnsteigMitte"
-	center.position = Vector3(2.7,TrainCar.RAIL_TOP+TrainMeshes.STEP_UPPER_Y,0)
-	graph.add_child(center)
-	var exit := Marker3D.new()
-	exit.name = "Dorfausgang"
-	exit.position = Vector3(5.5,0,10)
-	graph.add_child(exit)
-	graph.links = PackedStringArray(["Dorfausgang-BahnsteigMitte"])
+	_access_graph = graph
+	_update_access_graph()
 	add_child(graph)
 	for z: float in [-6,-3,0,3,6]:
 		var spot := StationSpot.new()
@@ -185,11 +219,141 @@ func _create_passenger_director() -> void:
 	director.dispatcher = region.dispatcher
 	director.walk_graph = graph
 	director.terrain = region.terrain
+	director.access_route = walk_route
+	director.access_height = walk_height
 	director.player = region.get_parent().get_node("Player") as PlayerController
 	director.max_travellers = 6
 	director.travellers_per_train = Vector2i(0,0)
 	add_child(director)
 	director.passenger_alighted.connect(region.passenger_arrived)
+
+func access_descriptors(at_level := 0) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var description_level := at_level if at_level>0 else level
+	var main := StationAccess.describe(description_level)
+	main["frame"] = global_transform
+	main["outside_x"] = 20.8
+	result.append(main)
+	for track in platform_tracks:
+		var extra := StationAccess.describe(description_level)
+		extra["frame"] = Transform3D(Basis(Vector3.UP,float(track["angle"])),SaveUtils.array_to_vec3(track["pos"]))
+		extra["outside_x"] = float(extra["back"])+4.2
+		result.append(extra)
+	return result
+
+func path_entrances() -> PackedVector3Array:
+	var result := PackedVector3Array()
+	for data in access_descriptors():
+		result.append((data["frame"] as Transform3D)*Vector3(float(data["back"])+StationAccess.RISERS*StationAccess.TREAD+0.3,0,float(data["z"])))
+	return result
+
+func permits_path(point: Vector3) -> bool:
+	var p := to_local(point)
+	var data := StationAccess.describe(level)
+	return p.x>=float(data["back"])+StationAccess.RISERS*StationAccess.TREAD-0.15 and absf(p.z-float(data["z"]))<=2.4
+
+func walk_height(point: Vector3) -> float:
+	for data in access_descriptors():
+		var frame: Transform3D = data["frame"]
+		var height := StationAccess.ground_local(frame.affine_inverse()*point,data)
+		if not is_nan(height):
+			return frame.origin.y+height
+	return NAN
+
+func walk_route(from: Vector3, to: Vector3) -> PackedVector3Array:
+	var descriptors := access_descriptors()
+	var source := -1
+	var target := -1
+	for i in descriptors.size():
+		var frame: Transform3D = descriptors[i]["frame"]
+		if StationAccess.platform_local(frame.affine_inverse()*from,descriptors[i]):
+			source = i
+		if StationAccess.platform_local(frame.affine_inverse()*to,descriptors[i]):
+			target = i
+	var result := PackedVector3Array([from])
+	var start := from
+	if source>=0:
+		var data := descriptors[source]
+		var frame: Transform3D = data["frame"]
+		var destination := to if source==target else frame*Vector3(float(data["outside_x"]),0,float(data["z"]))
+		for point in StationAccess.local_path(frame.affine_inverse()*start,frame.affine_inverse()*destination,data):
+			result.append(frame*point)
+		start = destination
+	if target>=0 and target!=source:
+		var data := descriptors[target]
+		var frame: Transform3D = data["frame"]
+		for point in StationAccess.local_path(frame.affine_inverse()*start,frame.affine_inverse()*to,data):
+			result.append(frame*point)
+	elif source<0 and target<0:
+		var path := _access_graph.find_path(from,to) if _access_graph else PackedVector3Array([from,to])
+		var crosses_platform := false
+		for point in path:
+			crosses_platform = crosses_platform or StationAccess.platform_local(to_local(point),descriptors[0])
+		if crosses_platform:
+			result.append(to_global(Vector3(maxf(to_local(from).x,20.8),0,to_local(from).z)))
+			result.append(to_global(Vector3(maxf(to_local(to).x,20.8),0,to_local(to).z)))
+		else:
+			return path
+	result.append(to)
+	return result
+
+func _update_access_graph() -> void:
+	if _access_graph==null:
+		return
+	var data := StationAccess.describe(level)
+	var z := float(data["z"])
+	var points := {"Dorfausgang":Vector3(20.8,0,z),"TreppenFuss":Vector3(float(data["back"])+2.9,0,z),"TreppenKopf":Vector3(float(data["back"])-0.25,float(data["height"]),z),"BahnsteigZugang":Vector3(2.65,float(data["height"]),z),"BahnsteigMitte":Vector3(2.65,float(data["height"]),0)}
+	for key: String in points:
+		var marker := _access_graph.get_node_or_null(key) as Marker3D
+		if marker==null:
+			marker = Marker3D.new()
+			marker.name = key
+			_access_graph.add_child(marker)
+		marker.position = points[key]
+	_access_graph.links = PackedStringArray(["Dorfausgang-TreppenFuss","TreppenFuss-TreppenKopf","TreppenKopf-BahnsteigZugang","BahnsteigZugang-BahnsteigMitte"])
+	if _access_graph.is_inside_tree():
+		_access_graph.rebuild()
+	if director:
+		director._platform_points.assign([to_global(points["BahnsteigMitte"]),to_global(points["BahnsteigZugang"])])
+		director._walk_distance = 20.8-2.65+absf(z)
+
+func _update_ground() -> void:
+	if region==null or region.terrain==null or is_portal():
+		return
+	for id in _pad_ids:
+		region.terrain.remove_station_pad(id)
+	_pad_ids.clear()
+	var length := float(EpochCatalog.epoch(level)["length"])
+	var area := VillageFootprint.make(to_global(Vector3(11.0,0,0)),Vector2(9.5,length/2+2),global_rotation.y)
+	_set_pad(0,area,global_position.y-TerrainDeformer.GROUND_OFFSET)
+	if level>=3:
+		_set_pad(1,VillageFootprint.make(to_global(Vector3(10.5,0,length*0.57)),Vector2(6,9),global_rotation.y),global_position.y-TerrainDeformer.GROUND_OFFSET)
+	for i in platform_tracks.size():
+		var track := platform_tracks[i]
+		var frame := Transform3D(Basis(Vector3.UP,float(track["angle"])),SaveUtils.array_to_vec3(track["pos"]))
+		var width := float(EpochCatalog.epoch(level)["width"])
+		_set_pad(i+2,VillageFootprint.make(frame*Vector3(1.78+width/2+1.4,0,0),Vector2(width/2+1.5,length/2+2),float(track["angle"])),frame.origin.y-TerrainDeformer.GROUND_OFFSET)
+
+func _set_pad(index: int, area: Dictionary, height: float) -> void:
+	var id := station_id*16+index
+	region.terrain.set_station_pad(id,area,height)
+	_pad_ids.append(id)
+
+func occupied_footprints() -> Array[Dictionary]:
+	var length := float(EpochCatalog.epoch(level)["length"])
+	var width := float(EpochCatalog.epoch(level)["width"])
+	var result: Array[Dictionary] = [VillageFootprint.make(to_global(Vector3(11,0,0)),Vector2(9.5,length/2+2),global_rotation.y)]
+	if level>=3:
+		result.append(VillageFootprint.make(to_global(Vector3(10.5,0,length*0.57)),Vector2(6,9),global_rotation.y))
+	for track in platform_tracks:
+		var frame := Transform3D(Basis(Vector3.UP,float(track["angle"])),SaveUtils.array_to_vec3(track["pos"]))
+		result.append(VillageFootprint.make(frame*Vector3(1.78+width/2+1.4,0,0),Vector2(width/2+1.5,length/2+2),float(track["angle"])))
+	return result
+
+func _exit_tree() -> void:
+	if is_instance_valid(region) and is_instance_valid(region.terrain):
+		for id in _pad_ids:
+			region.terrain.remove_station_pad(id)
 
 func set_dark(dark: bool) -> void:
 	if _light:
@@ -246,6 +410,9 @@ func upgrade(debug := false) -> bool:
 		return false
 	level += 1
 	rebuild()
+	var build := region.get_parent().get_node_or_null("BuildMode") as BuildMode
+	if build and build.context.feedback and not debug:
+		build.context.feedback.confirm("station",global_position,PackedVector3Array(),EpochCatalog.epoch(level)["station"])
 	region.refresh()
 	Events.notification_requested.emit("%s · %s" % [station_name,EpochCatalog.epoch(level)["station"]])
 	return true

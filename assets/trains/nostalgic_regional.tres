@@ -7,7 +7,7 @@ script = ExtResource("1")
 type_code = "NR"
 display_name = "Nostalgischer Regionalzug"
 category = 0
-consist = PackedStringArray("heritage_loco", "heritage_coach", "heritage_coach")
+consist = PackedStringArray("heritage_loco", "heritage_coach", "heritage_coach", "heritage_loco_rear")
 max_speed_kmh = 65.0
 acceleration = 0.38
 min_dwell_seconds = 8.0
@@ -21,7 +21,7 @@ passenger_capacity = 64
 cargo_capacity = 0
 purchase_price = 240
 comfort = 1.3
-service_role = "Landverbindung"
+service_role = "Landverbindung · Lok an beiden Enden"
 rolling_pitch = 0.9
 horn_pitch = 1.01
 

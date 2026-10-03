@@ -119,7 +119,7 @@ func build(p_kind: String, train_type: TrainType, is_first: bool, is_last: bool,
 		_add_festive_lights(materials["festive"], train_type.festive_colors, variant)
 	_cargo_material = materials.get("cargo", materials["paint"])
 	_build_cargo(variant)
-	if kind in ["loco_freight","reference_freight_loco","heritage_diesel","heritage_loco"]:
+	if kind in ["loco_freight","reference_freight_loco","heritage_diesel","heritage_loco","heritage_loco_rear"]:
 		_exhaust = _make_exhaust(materials.get("steam", materials["snow"]))
 		add_child(_exhaust)
 

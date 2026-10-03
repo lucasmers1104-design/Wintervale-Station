@@ -141,6 +141,8 @@ func _commit(candidate: RailCandidate) -> void:
 	undo_redo.add_do_method(network.build_switch.bind(split, branch))
 	undo_redo.add_undo_method(network.unbuild_switch.bind(split, branch))
 	undo_redo.commit_action()
+	if context.feedback:
+		context.feedback.confirm("rail",candidate.get_end(),RailGeometry.polyline(candidate.curve,2.0),"Weiche verbunden")
 
 	_branch_mode = false
 	_split = {}

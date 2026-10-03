@@ -7,6 +7,7 @@ extends RefCounted
 const SPECS := {
 	"heritage_diesel":{"length":16.0,"bogie":5.5,"wheel_base":1.9},
 	"heritage_loco":{"length":10.0,"bogie":3.2,"wheel_base":2.0},
+	"heritage_loco_rear":{"length":10.0,"bogie":3.2,"wheel_base":2.0},
 	"heritage_coach":{"length":13.0,"bogie":4.6,"wheel_base":1.9},
 	"reference_freight_loco":{"length":13.0,"bogie":4.3,"wheel_base":2.1},
 	"reference_boxcar":{"length":10.0,"bogie":3.4,"wheel_base":1.8},
@@ -35,7 +36,7 @@ static func build(kind: String, l: Dictionary, variant: int) -> Dictionary:
 	var result: Dictionary
 	match kind:
 		"heritage_diesel": result = _diesel(l)
-		"heritage_loco": result = _nostalgic_loco(l)
+		"heritage_loco", "heritage_loco_rear": result = _nostalgic_loco(l)
 		"heritage_coach": result = _nostalgic_coach(l)
 		"reference_freight_loco": result = _freight_loco(l)
 		"reference_boxcar": result = _boxcar()

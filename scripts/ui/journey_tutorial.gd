@@ -51,6 +51,15 @@ var _snow: Control
 var _progress_bar: JourneyStyle.TrackBar
 var _progress_label: Label
 var _goal_signature := ""
+var guide: JourneyGuide
+var _guide_active := false
+
+func set_guide_active(value: bool) -> void:
+	_guide_active = value
+	if value:
+		_pointer.target = null
+		_update_markers(NO_POINTS)
+	_update_ribbon()
 
 
 func _ready() -> void:
@@ -118,6 +127,8 @@ func _process(delta: float) -> void:
 
 ## Prüft den aktuellen Schritt gegen den Spielzustand.
 func _evaluate() -> void:
+	if _guide_active:
+		return
 	if _shown_step != _step():
 		_show_current()
 	if is_finished() or _advancing:
@@ -321,7 +332,10 @@ func _build_step_card(step: Dictionary) -> void:
 		var id := String(step["id"])
 		S.button(footer, String(step["button"]), func() -> void:
 			if id == "grow":
-				panel.open_page("epochs")
+				if guide:
+					guide.start_tour()
+				else:
+					panel.open_page("epochs")
 			_complete_step(), true, "", 20)
 
 
@@ -473,6 +487,10 @@ func _fit_card() -> void:
 
 ## Ist das Reisebuch offen, spricht Ilse in dessen Kopfzeile; die Karte ruht.
 func _update_ribbon() -> void:
+	if _guide_active:
+		_card.hide()
+		_snow.hide()
+		return
 	var open := panel.is_open()
 	_card.visible = not open
 	_snow.visible = not open
@@ -510,7 +528,7 @@ func _update_pointer() -> void:
 
 
 func _pointer_target() -> Control:
-	if is_finished() or _advancing:
+	if is_finished() or _advancing or _guide_active:
 		return null
 	var id := String(STEPS[_step()]["id"])
 	var current_tool := build_mode.get_current_tool()

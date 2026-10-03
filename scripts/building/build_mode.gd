@@ -39,6 +39,9 @@ func _ready() -> void:
 	context.terrain_adapter = terrain_adapter
 	context.undo_redo = undo_redo
 	context.village = village
+	context.feedback = BuildFeedback.new()
+	context.feedback.name = "BuildFeedback"
+	add_child(context.feedback)
 
 	for child in get_children():
 		var tool := child as BuildTool
@@ -130,6 +133,7 @@ func get_current_tool() -> BuildTool:
 func undo() -> void:
 	if undo_redo.has_undo():
 		undo_redo.undo()
+		Events.notification_requested.emit("Letzter Bauschritt zurückgenommen · wiederherstellbar mit Strg+Y")
 
 
 func redo() -> void:

@@ -56,6 +56,8 @@ var _preview_camera: Camera3D
 var _preview_length := 16.0
 var _debug := false
 var _refresh_pending := false
+var _guide_targets := {}
+var _guide_space := false
 
 
 func _ready() -> void:
@@ -98,6 +100,8 @@ func _build_launcher() -> void:
 	_launcher.theme = _canvas.theme
 	_epoch_button = _sign_button("Reise · Epoche 1", "journey", func() -> void: open_page("epochs"))
 	_fleet_button = _sign_button("Fuhrpark", "trips", func() -> void: open_page("fleet"))
+	var help := _sign_button("Hilfe", "conductor", Events.journey_guide_requested.emit)
+	help.tooltip_text = "Ilse erklärt dir alle Menüs und Werkzeuge"
 
 
 func _sign_button(text: String, icon_name: String, action: Callable) -> Button:
@@ -239,6 +243,10 @@ func get_page() -> String:
 
 ## Ziel für Tutorial-Hinweise (Knopf "Zug einsetzen", Fuhrpark-Schild …).
 func get_tutorial_target(id: String) -> Control:
+	if id.ends_with("_tab"):
+		return _tab_buttons.get(id.trim_suffix("_tab"))
+	if is_instance_valid(_guide_targets.get(id)):
+		return _guide_targets[id]
 	match id:
 		"fleet_sign":
 			return _fleet_button
@@ -250,13 +258,36 @@ func get_tutorial_target(id: String) -> Control:
 			return _tab_buttons.get("fleet")
 	return null
 
+func guide_host() -> Control:
+	return _panel
+
+func reserve_guide_space(value: bool, footer := 192.0) -> void:
+	_guide_space = value
+	_scroll.size.y = BOARD_SIZE.y-146-(footer if value else 88)
+
+func show_epoch(level: int) -> void:
+	open_page("epochs")
+	_selected_epoch = level
+	_refresh()
+
+func show_train(id: String) -> void:
+	_selected_train = id
+	open_page("fleet")
+
+func show_station(id: int) -> void:
+	_station_id = id
+	open_page("station")
+
 
 ## Scrollt ein Tutorial-Ziel (z.B. "assign") einmal pro Seitenaufbau ins Bild.
 func reveal_tutorial_target(id: String) -> void:
+	_reveal_current_target.call_deferred(id)
+
+func _reveal_current_target(id: String) -> void:
 	var target := get_tutorial_target(id)
-	if target and not target.has_meta("revealed"):
+	if target and _scroll.is_ancestor_of(target) and not target.has_meta("revealed"):
 		target.set_meta("revealed", true)
-		_scroll.ensure_control_visible.call_deferred(target)
+		_scroll.ensure_control_visible(target)
 
 
 ## Satz der Tutorial-Begleiterin anstelle des Untertitels ("" = Untertitel).
@@ -344,6 +375,7 @@ func _update_launcher() -> void:
 # --- Seiten ----------------------------------------------------------------
 
 func _refresh() -> void:
+	_guide_targets.clear()
 	_refresh_pending = false
 	if not _panel.visible:
 		return
@@ -593,6 +625,7 @@ func _station() -> void:
 				S.play_chime()
 			_refresh(), true, "upgrade", 20)
 		upgrade.disabled = reason != ""
+		_guide_targets["station_upgrade"] = upgrade
 		upgrade.tooltip_text = reason
 		var status := S.paragraph(reason if reason != "" else "Bereit für den nächsten Schritt", 18, S.RED.lightened(0.1) if reason != "" else S.GREEN)
 		status.size_flags_vertical = Control.SIZE_SHRINK_CENTER

@@ -79,6 +79,8 @@ func place_at(point: Vector3) -> bool:
 	undo_redo.add_do_method(network.build_signal.bind(split, signal_data))
 	undo_redo.add_undo_method(network.unbuild_signal.bind(split, signal_data))
 	undo_redo.commit_action()
+	if context.feedback:
+		context.feedback.confirm("signal",(_plan["transform"] as Transform3D).origin,PackedVector3Array(),"Signal gesetzt")
 	return true
 
 

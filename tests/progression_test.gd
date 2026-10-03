@@ -202,7 +202,7 @@ func _test_models() -> void:
 					for normal in normals:
 						valid = valid and normal.is_finite() and normal.length()>0.8
 			check(valid,"finite authored geometry: "+kind)
-			if type.category==TrainType.Category.PASSENGER and not kind.ends_with("loco"):
+			if type.category==TrainType.Category.PASSENGER and not kind.trim_suffix("_rear").ends_with("loco"):
 				check(parts["doors"].size()>=4,"separate paired doors: "+kind)
 				check(parts.get("interior")!=null,"real cabin furniture: "+kind)
 		check(total_triangles<100000,"whole train geometry budget: %s (%d triangles)" % [id,total_triangles])

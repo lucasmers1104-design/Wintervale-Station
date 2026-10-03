@@ -133,6 +133,7 @@ func update_tool(delta: float) -> void:
 		_rebuild_markers()
 	var point := context.get_mouse_ground_point()
 	if point == Vector3.INF:
+		_clear_terrain_preview()
 		_cursor.visible = false
 		_ghost.visible = false
 		_label.visible = false
@@ -143,10 +144,14 @@ func update_tool(delta: float) -> void:
 ## Klick an einer Weltposition: Start setzen bzw. Gleis bauen.
 ## Gibt true zurück, wenn etwas passiert ist.
 func click_at(point: Vector3, free_angle := false) -> bool:
+	if not point.is_finite():
+		return false
 	if not _has_start:
 		return _begin_at(point)
 	preview_at(point, free_angle)
 	if _candidate == null or not _candidate_valid:
+		if context.feedback:
+			context.feedback.reject(point,get_status())
 		return false
 	_commit(_candidate)
 	return true
@@ -158,6 +163,8 @@ func preview_at(point: Vector3, free_angle := false) -> void:
 	var snap := _snap(point)
 	_cursor.visible = true
 	_cursor.global_position = snap["position"] + Vector3.UP * (RailConfig.RAIL_BASE + 0.2)
+	if context.feedback:
+		context.feedback.snapped(_cursor.global_position,int(snap["node_id"])>=0)
 
 	if not _has_start:
 		_ghost.visible = false
@@ -234,6 +241,8 @@ func _commit(candidate: RailCandidate) -> void:
 	undo_redo.add_do_method(network.restore_segment.bind(data))
 	undo_redo.add_undo_method(network.remove_segment.bind(int(data["id"])))
 	undo_redo.commit_action()
+	if context.feedback:
+		context.feedback.confirm("rail",candidate.get_end(),RailGeometry.polyline(candidate.curve,2.0),"%d m Gleis" % roundi(candidate.get_length()))
 	_continue_from(int(data["end_node"]))
 
 
@@ -334,7 +343,7 @@ func _update_label() -> void:
 		_label.visible = false
 		return
 	var grade := RailGeometry.max_grade(_candidate.curve) * 100.0
-	_label.text = "%d m  ·  %.1f %%" % [roundi(_candidate.get_length()), grade]
+	_label.text = "%d m  ·  %.1f %%\n%s" % [roundi(_candidate.get_length()), grade,get_status() if not _candidate_valid else ("✓ Anschluss" if _candidate.end_node_id>=0 else "Klick zum Bauen")]
 	_label.modulate = Color(0.85, 1.0, 0.88) if _candidate_valid else Color(1.0, 0.7, 0.62)
 	_label.global_position = _candidate.get_end() + Vector3.UP * 2.2
 	_label.visible = true
@@ -345,7 +354,7 @@ func _update_label() -> void:
 func _update_terrain_preview() -> void:
 	if context.terrain_adapter == null:
 		return
-	if _candidate == null or not _candidate.has_geometry():
+	if _candidate == null or not _candidate.has_geometry() or not _candidate_valid:
 		_clear_terrain_preview()
 		return
 	if _ghost_key != _last_key:

@@ -24,6 +24,7 @@ var _status_bar: Control
 var _clock_hands: HudClockHands
 var _money_tween: Tween
 var _shown_money := -1
+var _cost_signature := -1
 
 const COIN_ICON := preload("res://assets/ui/icons/coin.svg")
 const NOTEBOOK_ICON := preload("res://assets/ui/icons/notebook.svg")
@@ -192,6 +193,9 @@ func get_legend() -> KeyLegend:
 ## Werkzeug-Knopf im Baumenü (z.B. für Tutorial-Hinweise); null = gibt es nicht.
 func get_tool_button(id: StringName) -> Button:
 	return _tool_buttons.get(id)
+
+func get_tutorial_target(id: String) -> Control:
+	return _status_bar if id=="status" else _tool_row if id=="build" else null
 
 func bind_progression(progress: RegionProgression) -> void:
 	progress.changed.connect(_refresh_progression_tools.bind(progress))
@@ -392,7 +396,12 @@ func get_money_text() -> String:
 
 
 func _on_build_cost_changed(cost: Dictionary) -> void:
+	var signature := hash([cost,Economy.revision,_build_active])
+	if signature==_cost_signature:
+		return
+	_cost_signature = signature
 	for child in _cost_row.get_children():
+		_cost_row.remove_child(child)
 		child.queue_free()
 	_cost_row.visible = not cost.is_empty() and _build_active
 	if cost.is_empty():

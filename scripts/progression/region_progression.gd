@@ -16,6 +16,7 @@ var loading := false
 var debug_used := false
 ## Schritt des Einstiegs-Tutorials (JourneyTutorial); -1 = abgeschlossen.
 var tutorial_step := 0
+var guide_state := {"epoch_seen":1,"tour_done":false,"active_index":-1,"active_epoch":0,"pending":[]}
 
 static func find(tree: SceneTree) -> RegionProgression:
 	return tree.get_first_node_in_group(GROUP) as RegionProgression
@@ -106,7 +107,7 @@ func get_save_id() -> String:
 	return SAVE_ID
 
 func save_state() -> Dictionary:
-	return {"epoch":epoch,"passengers":passengers,"goods":goods,"services":services,"unlocked":unlocked.duplicate(),"debug_used":debug_used,"tutorial":tutorial_step}
+	return {"epoch":epoch,"passengers":passengers,"goods":goods,"services":services,"unlocked":unlocked.duplicate(),"debug_used":debug_used,"tutorial":tutorial_step,"guide":guide_state.duplicate(true)}
 
 func load_state(data: Dictionary) -> void:
 	loading = true
@@ -117,6 +118,7 @@ func load_state(data: Dictionary) -> void:
 	debug_used = bool(data.get("debug_used",false))
 	# Reisen von vor dem Tutorial: Wer schon Verkehr hat, braucht keine Einführung.
 	tutorial_step = int(data.get("tutorial", -1 if services > 0 or passengers > 0 else 0))
+	guide_state = data.get("guide",{"epoch_seen":epoch,"tour_done":false,"active_index":-1,"active_epoch":0,"pending":[]}).duplicate(true)
 	unlocked.assign(["diesel_heritage","special_winter","special_autumn","snowplough"])
 	for id: Variant in data.get("unlocked",[]):
 		if id is String and EpochCatalog.TRAIN_IDS.has(id) and not unlocked.has(id):

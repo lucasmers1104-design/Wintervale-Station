@@ -518,7 +518,7 @@ func _doors_held(dt: float) -> bool:
 		_hold_time = 0.0
 		return false
 	_hold_time += dt
-	return _hold_time < MAX_DOOR_HOLD
+	return _hold_time < float(get_meta("boarding_grace",MAX_DOOR_HOLD))
 
 
 ## Der Güterbahnhof lädt: Der Zug wartet mit der Abfahrt, bis [method release_departure]

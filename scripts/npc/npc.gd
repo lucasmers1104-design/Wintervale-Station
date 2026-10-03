@@ -1240,14 +1240,14 @@ func walk_to(target: Vector3, on_arrive := Callable(), pace := 1.0) -> void:
 	if director.walk_graph == null:
 		_walk_path(PackedVector3Array([global_position, target]), on_arrive, pace)
 		return
-	var path := director.walk_graph.find_path(global_position, target)
+	var path := director.find_walk_path(global_position, target)
 	# Lieblingsweg: auf längeren Wegen (Haus ↔ Bahnhof) gern über den Lieblingsplatz,
 	# solange der Umweg nicht zu groß ist
 	var via := profile.favourite_via if profile else Vector3.INF
 	if via != Vector3.INF and global_position.distance_to(target) > 22.0 \
 			and via.distance_to(global_position) > 4.0 and via.distance_to(target) > 4.0:
-		var first := director.walk_graph.find_path(global_position, via)
-		var second := director.walk_graph.find_path(via, target)
+		var first := director.find_walk_path(global_position, via)
+		var second := director.find_walk_path(via, target)
 		var combined := first.duplicate()
 		for i in range(1, second.size()):
 			combined.append(second[i])

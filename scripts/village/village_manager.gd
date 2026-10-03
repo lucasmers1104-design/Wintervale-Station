@@ -390,7 +390,7 @@ func check_placement(item_id: String, position: Vector3, angle: float, variant :
 				return "Gehört zum Güterbahnhof"
 		if progress:
 			for station in progress.region.stations:
-				if station.clears(p.x,p.y):
+				if station.clears(p.x,p.y) and not (kind=="path" and station.permits_path(Vector3(p.x,0,p.y))):
 					return "Platz für den Bahnhof freihalten"
 		if terrain and terrain.is_in_lake(p.x, p.y):
 			return "Im zugefrorenen See"
@@ -471,6 +471,14 @@ func _hits_station_objects(fp: Dictionary) -> bool:
 func snap_path_point(point: Vector3, radius := 1.6) -> Vector3:
 	var best := point
 	var best_distance := radius
+	var progress := RegionProgression.find(get_tree()) if is_inside_tree() else null
+	if progress:
+		for station in progress.region.stations:
+			for entrance in station.path_entrances():
+				var distance := Vector2(point.x,point.z).distance_to(Vector2(entrance.x,entrance.z))
+				if distance<best_distance:
+					best_distance = distance
+					best = entrance
 	for obj in _objects.values():
 		if not obj is VillagePath:
 			continue

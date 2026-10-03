@@ -100,6 +100,15 @@ func _ready() -> void:
 		tutorial.build_mode = get_node("BuildMode")
 		tutorial.hud = get_node("HUD")
 		add_child(tutorial)
+		var guide := JourneyGuide.new()
+		guide.name = "JourneyGuide"
+		guide.region = region
+		guide.panel = panel
+		guide.tutorial = tutorial
+		guide.build_mode = get_node("BuildMode")
+		guide.hud = get_node("HUD")
+		tutorial.guide = guide
+		add_child(guide)
 	else:
 		get_node("HUD")._tool_buttons[&"station"].hide()
 
