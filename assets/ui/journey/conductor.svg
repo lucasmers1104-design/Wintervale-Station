@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Bahnhofsvorsteherin: Figur im Spielzeugstil des Spiels (runder Kopf, Knopfaugen, Muetze, Karo) -->
+  <g stroke="#3b2a20" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M28 128 V104 C28 88 44 80 64 80 C84 80 100 88 100 104 V128 Z" fill="#a8321e"/>
+    <path d="M28 104 H100 M28 116 H100 M46 82 V128 M64 80 V128 M82 82 V128" fill="none" stroke="#6f1f14" stroke-width="2.4"/>
+    <path d="M54 80 L64 96 L74 80" fill="#f0e2c4"/>
+    <circle cx="64" cy="54" r="30" fill="#f2c9a0"/>
+    <circle cx="53" cy="56" r="3.6" fill="#3b2a20" stroke="none"/>
+    <circle cx="75" cy="56" r="3.6" fill="#3b2a20" stroke="none"/>
+    <circle cx="47" cy="66" r="5" fill="#f0a08a" stroke="none" opacity="0.7"/>
+    <circle cx="81" cy="66" r="5" fill="#f0a08a" stroke="none" opacity="0.7"/>
+    <path d="M58 68 C61 71 67 71 70 68" fill="none" stroke-width="2.6"/>
+    <path d="M32 44 C32 22 96 22 96 44 Z" fill="#2f4a6b"/>
+    <path d="M28 44 H100 C100 50 92 50 64 50 C36 50 28 50 28 44 Z" fill="#1f3350"/>
+    <circle cx="64" cy="36" r="5.5" fill="#f4c64a"/>
+    <path d="M96 92 L106 84 L110 90 L100 98 Z" fill="#d9a441"/>
+  </g>
+</svg>

@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="TrainType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trains/train_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+type_code = "VT"
+display_name = "Alter Dieseltriebwagen"
+category = 0
+consist = PackedStringArray("heritage_diesel")
+max_speed_kmh = 45.0
+acceleration = 0.5
+min_dwell_seconds = 8.0
+primary_color = Color(0.6, 0.12, 0.11, 1)
+secondary_color = Color(0.95, 0.9, 0.78, 1)
+accent_color = Color(0.8, 0.63, 0.34, 1)
+roof_color = Color(0.17, 0.175, 0.19, 1)
+required_epoch = 1
+required_station_level = 1
+passenger_capacity = 24
+cargo_capacity = 0
+purchase_price = 0
+comfort = 1.15
+service_role = "Nebenstrecke"
+horn_pitch = 1.0550000000000002
+rolling_pitch = 0.82
+

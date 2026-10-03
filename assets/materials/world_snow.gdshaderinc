@@ -6,6 +6,8 @@
 //             sinkender Schneedecke fleckig weg und gibt das Darunter frei
 //   a < 0.9   Bodenschnee (Schotter, Felsen, Pflasterreste) – wird zu blankem
 //             Boden in der Farbe der Jahreszeit (season_bare)
+//             Ausnahme Laub-Shader (foliage_sway): a < 0.75 ist Sommerlaub, das
+//             genau dort erscheint, wo die Schneeauflage geschmolzen ist
 //   sonst     normale Farbe
 // Die Werte setzt das Autoload "Seasons" (Projekt → Shader-Globals).
 

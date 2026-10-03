@@ -24,6 +24,8 @@ func _ready() -> void:
 	_test_geometry()
 
 	var main: Node3D = load("res://scenes/main/main.tscn").instantiate()
+	# Die Grundfunktionen prüfen die klassische Welt mit Testgelände und Laternen.
+	main.set("legacy_world", true)
 	add_child(main)
 	_use_empty_map(main)
 	var player: PlayerController = main.get_node("Player")
@@ -35,7 +37,7 @@ func _ready() -> void:
 	check(vmc.mode == GameDefs.ViewMode.BIRD_EYE, "game starts in bird eye view")
 	check(get_viewport().get_camera_3d() == bird.camera, "bird camera current at start")
 	var model: CharacterModel = player.get_node("Model")
-	check(model.get_mesh_count() >= 15, "character model built (%d parts)" % model.get_mesh_count())
+	check(model.get_mesh_count() >= 6 and model.get_vertex_count() > 3000, "character model built (%d parts)" % model.get_mesh_count())
 
 	vmc.set_mode(GameDefs.ViewMode.EXPLORE, true)
 	await frames(120)

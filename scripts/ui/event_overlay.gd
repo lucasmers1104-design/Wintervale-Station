@@ -140,7 +140,8 @@ func _next_banner() -> void:
 	_banner.visible = true
 	_banner.reset_size()
 	var size := _banner.get_combined_minimum_size()
-	var target := Vector2((get_viewport_rect().size.x - size.x) * 0.5, 92.0)
+	var target := Vector2((get_viewport_rect().size.x - size.x) * 0.5,
+		get_viewport_rect().size.y * 0.34)
 	_banner.position = target - Vector2(0, 26)
 	_banner.modulate.a = 0.0
 	_banner_tween = create_tween()

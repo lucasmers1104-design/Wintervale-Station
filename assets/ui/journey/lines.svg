@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Linien: Strecke zwischen zwei Orten -->
+  <g stroke="#3b2a20" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M14 46 C22 20 42 44 50 18" fill="none" stroke="#3b2a20" stroke-width="7"/>
+    <path d="M14 46 C22 20 42 44 50 18" fill="none" stroke="#f0e2c4" stroke-width="2.6" stroke-dasharray="4 4"/>
+    <circle cx="14" cy="46" r="8" fill="#3f6a4c"/>
+    <circle cx="14" cy="46" r="3" fill="#f0e2c4" stroke="none"/>
+    <circle cx="50" cy="18" r="8" fill="#a8321e"/>
+    <circle cx="50" cy="18" r="3" fill="#f0e2c4" stroke="none"/>
+  </g>
+</svg>

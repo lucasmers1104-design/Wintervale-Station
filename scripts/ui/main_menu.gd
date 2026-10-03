@@ -1,0 +1,453 @@
+## The title screen is composed at the 1672x941 reference size and scaled uniformly.
+## Artwork never contains the interactive labels: every menu entry is a real Button.
+extends Control
+
+const DESIGN_SIZE := Vector2(1672.0, 941.0)
+const BACKGROUND := preload("res://assets/ui/main_menu/station_background.png")
+const LOGO := preload("res://assets/ui/main_menu/wood_logo.png")
+const PARCHMENT := preload("res://assets/ui/main_menu/parchment_panel.png")
+const GALLERY_SCENE := preload("res://scenes/ui/menu_gallery.tscn")
+const SELECTION := preload("res://assets/ui/main_menu/selection_frame.svg")
+const SIGN_STATION := preload("res://assets/ui/main_menu/signs/station_name.png")
+const SIGN_DIRECTION := preload("res://assets/ui/main_menu/signs/direction.png")
+const SIGN_TRAIN := preload("res://assets/ui/main_menu/signs/train_display.png")
+const SIGN_BOARD := preload("res://assets/ui/main_menu/signs/chalkboard.png")
+const ICONS := [
+	preload("res://assets/ui/main_menu/icons/continue_train.svg"),
+	preload("res://assets/ui/main_menu/icons/new_game_watch.svg"),
+	preload("res://assets/ui/main_menu/icons/load_folder.svg"),
+	preload("res://assets/ui/main_menu/icons/settings_gear.svg"),
+	preload("res://assets/ui/main_menu/icons/achievements_cup.svg"),
+	preload("res://assets/ui/main_menu/icons/credits_book.svg"),
+	preload("res://assets/ui/main_menu/icons/quit_door.svg"),
+]
+const ENTRIES := ["Continue", "New Game", "Load Save", "Settings", "Achievements", "Credits", "Quit"]
+const INK := Color("4b3025")
+const GOLD := Color("d7924a")
+
+var _canvas: Control
+var _buttons: Array[Button] = []
+var _notice: PanelContainer
+var _notice_text: Label
+var _snow: MenuSnow
+var _gallery: Node
+var _starting_game := false
+var _hover_sound: AudioStreamPlayer
+
+
+class MenuSnow extends Control:
+	var flakes: Array[Vector3] = []
+	var rng := RandomNumberGenerator.new()
+
+	func _ready() -> void:
+		rng.seed = 71217
+		for i in 70:
+			flakes.append(Vector3(rng.randf_range(0, 1672), rng.randf_range(0, 941), rng.randf_range(1.0, 2.8)))
+		set_process(true)
+
+	func _process(delta: float) -> void:
+		for i in flakes.size():
+			var p := flakes[i]
+			p.y += delta * (13.0 + p.z * 8.0)
+			p.x -= delta * (3.0 + p.z * 2.0)
+			if p.y > 945.0:
+				p.y = -5.0
+			if p.x < -5.0:
+				p.x = 1677.0
+			flakes[i] = p
+		queue_redraw()
+
+	func _draw() -> void:
+		for p in flakes:
+			draw_circle(Vector2(p.x, p.y), p.z, Color(1.0, 0.95, 0.88, 0.27))
+
+
+func _ready() -> void:
+	_build()
+	_rescale()
+	get_viewport().size_changed.connect(_rescale)
+	_refresh_continue()
+	(_buttons[0] if not _buttons[0].disabled else _buttons[1]).grab_focus.call_deferred()
+
+
+func _build() -> void:
+	var matte := ColorRect.new()
+	matte.color = Color("17131b")
+	matte.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	matte.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(matte)
+
+	_canvas = Control.new()
+	_canvas.name = "ReferenceCanvas"
+	_canvas.custom_minimum_size = DESIGN_SIZE
+	_canvas.size = DESIGN_SIZE
+	_canvas.mouse_filter = Control.MOUSE_FILTER_PASS
+	add_child(_canvas)
+
+	_add_image(BACKGROUND, Vector2.ZERO, DESIGN_SIZE, "WinterStation")
+	# The clean plate keeps the train, clock, lanterns and platform in their reference positions.
+	_add_station_signs()
+	var paper := AtlasTexture.new()
+	paper.atlas = PARCHMENT
+	paper.region = Rect2(0, 260, 1172, 1082)
+	_add_image(paper, Vector2(195, 278), Vector2(500, 580), "Parchment")
+	_add_image(LOGO, Vector2(188, 43), Vector2(552, 263), "WoodLogo")
+
+	_snow = MenuSnow.new()
+	_snow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_snow.position = Vector2.ZERO
+	_snow.size = DESIGN_SIZE
+	_canvas.add_child(_snow)
+	_hover_sound = AudioStreamPlayer.new()
+	_hover_sound.stream = SoundLibrary.get_sound("page")
+	_hover_sound.bus = &"WintervaleUI"
+	_hover_sound.volume_db = -23.0
+	_canvas.add_child(_hover_sound)
+
+	for i in ENTRIES.size():
+		_add_entry(i)
+
+	var card := PanelContainer.new()
+	card.position = Vector2(595, 665)
+	card.size = Vector2(116, 161)
+	card.rotation = -0.105
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var card_style := StyleBoxFlat.new()
+	card_style.bg_color = Color("c9aa83")
+	card_style.border_color = Color("826047")
+	card_style.set_border_width_all(2)
+	card_style.set_corner_radius_all(5)
+	card_style.shadow_color = Color(0.12, 0.06, 0.03, 0.45)
+	card_style.shadow_size = 8
+	card.add_theme_stylebox_override("panel", card_style)
+	_canvas.add_child(card)
+	var card_text := Label.new()
+	card_text.text = "Good\nJourneys\nAhead\n\n♠"
+	card_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	card_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	card_text.add_theme_color_override("font_color", INK)
+	card_text.add_theme_font_size_override("font_size", 18)
+	card_text.add_theme_font_override("font", _serif())
+	card_text.position = Vector2(601, 673)
+	card_text.size = Vector2(108, 144)
+	card_text.rotation = -0.105
+	card_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_canvas.add_child(card_text)
+
+	var motto := Label.new()
+	motto.text = "Small Stations\nBrighter Stories"
+	motto.position = Vector2(34, 821)
+	motto.size = Vector2(190, 74)
+	motto.rotation = -0.11
+	var script_font := SystemFont.new()
+	script_font.font_names = PackedStringArray(["Segoe Script", "Bradley Hand", "Georgia"])
+	script_font.font_italic = true
+	motto.add_theme_font_override("font", script_font)
+	motto.add_theme_font_size_override("font_size", 23)
+	motto.add_theme_color_override("font_color", Color("f6dfbd"))
+	motto.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.65))
+	motto.add_theme_constant_override("shadow_offset_x", 2)
+	motto.add_theme_constant_override("shadow_offset_y", 3)
+	motto.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_canvas.add_child(motto)
+
+	var version := Label.new()
+	version.text = "v%s" % ProjectSettings.get_setting("application/config/version", "0.1.0")
+	version.position = Vector2(1588, 896)
+	version.size = Vector2(76, 34)
+	version.add_theme_font_override("font", _serif())
+	version.add_theme_font_size_override("font_size", 19)
+	version.add_theme_color_override("font_color", Color("f6e4cc"))
+	version.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_canvas.add_child(version)
+
+	_build_notice()
+	_gallery = GALLERY_SCENE.instantiate()
+	_canvas.add_child(_gallery)
+	_gallery.connect("closed", Callable(self, "_on_gallery_closed"))
+	_gallery.connect("start_requested", Callable(self, "_on_start_requested"))
+	_gallery.connect("load_requested", Callable(self, "_on_load_requested"))
+	_gallery.connect("action_requested", Callable(self, "_on_gallery_action"))
+
+
+func _add_image(texture: Texture2D, pos: Vector2, dimensions: Vector2, label: String) -> void:
+	var image := TextureRect.new()
+	image.name = label
+	image.texture = texture
+	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	image.stretch_mode = TextureRect.STRETCH_SCALE
+	image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_canvas.add_child(image)
+	image.position = pos
+	image.size = dimensions
+
+
+## Die Schilder sind die gemalten Originale aus der Ladescreen-Grafik
+## (tools/extract_menu_signs.gd) – dieselben Holzrahmen, Schrift und Schneekanten wie
+## dort. Früher standen hier flache, per Code gezeichnete Nachbauten.
+func _add_station_signs() -> void:
+	# Hängeschild: gleiche Lage zur Bahnhofsuhr wie im Ladescreen (Uhr dort 1470|242 r62,
+	# hier 1436|262 r53,5 → Maßstab 0,863).
+	_add_painted_sign("StationNameSign", SIGN_STATION, Vector2(1360, 312), 0.863)
+	_add_painted_sign("DirectionSign", SIGN_DIRECTION, Vector2(1216, 358), 0.7)
+	# Zielanzeige genau im leeren Anzeigefeld des Zugs (772–850 × 427–452)
+	_add_painted_sign("TrainDestination", SIGN_TRAIN, Vector2(772, 429), 0.81)
+	_add_painted_sign("Chalkboard", SIGN_BOARD, Vector2(1565, 393), 1.0)
+
+
+func _add_painted_sign(sign_name: String, texture: Texture2D, pos: Vector2, scale_factor: float) -> void:
+	var sign := TextureRect.new()
+	sign.name = sign_name
+	sign.texture = texture
+	sign.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	sign.stretch_mode = TextureRect.STRETCH_SCALE
+	sign.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	sign.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_canvas.add_child(sign)
+	sign.position = pos
+	sign.size = texture.get_size() * scale_factor
+
+
+func _add_entry(index: int) -> void:
+	var button := Button.new()
+	button.name = ENTRIES[index].replace(" ", "")
+	button.position = Vector2(233, 321 + index * 65)
+	button.size = Vector2(413, 60)
+	button.focus_mode = Control.FOCUS_ALL
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.add_theme_stylebox_override("normal", _button_style())
+	button.add_theme_stylebox_override("hover", _button_style())
+	button.add_theme_stylebox_override("focus", _button_style())
+	button.add_theme_stylebox_override("pressed", _button_style())
+	button.add_theme_stylebox_override("hover_pressed", _button_style())
+	button.pressed.connect(_activate.bind(index))
+	button.mouse_entered.connect(button.grab_focus)
+	button.mouse_entered.connect(func() -> void: SoundLibrary.play(_hover_sound))
+	_canvas.add_child(button)
+	_buttons.append(button)
+
+	var selection := TextureRect.new()
+	selection.name = "SelectionFrame"
+	selection.texture = SELECTION
+	selection.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	selection.stretch_mode = TextureRect.STRETCH_SCALE
+	selection.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(selection)
+	selection.size = button.size
+	selection.visible = false
+	button.focus_entered.connect(selection.show)
+	button.focus_exited.connect(selection.hide)
+
+	var icon := TextureRect.new()
+	icon.name = "Icon"
+	icon.texture = ICONS[index]
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(icon)
+	icon.position = Vector2(29, 10)
+	icon.size = Vector2(42, 42)
+
+	var title := Label.new()
+	title.text = ENTRIES[index]
+	title.position = Vector2(104, 5)
+	title.size = Vector2(280, 50)
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.add_theme_font_override("font", _serif())
+	title.add_theme_font_size_override("font_size", 29)
+	title.add_theme_color_override("font_color", INK)
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(title)
+
+	var arrow := Label.new()
+	arrow.name = "SelectionArrow"
+	arrow.text = "›"
+	arrow.position = Vector2(375, 4)
+	arrow.size = Vector2(28, 52)
+	arrow.add_theme_font_override("font", _serif())
+	arrow.add_theme_font_size_override("font_size", 43)
+	arrow.add_theme_color_override("font_color", INK)
+	arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	arrow.visible = false
+	button.add_child(arrow)
+	button.focus_entered.connect(arrow.show)
+	button.focus_exited.connect(arrow.hide)
+	if index < ENTRIES.size() - 1:
+		var separator := ColorRect.new()
+		separator.color = Color(0.43, 0.28, 0.20, 0.18)
+		separator.position = Vector2(19, 62)
+		separator.size = Vector2(365, 1)
+		separator.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		button.add_child(separator)
+
+
+func _button_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(1, 1, 1, 0)
+	return style
+
+
+func _serif() -> Font:
+	var font := SystemFont.new()
+	font.font_names = PackedStringArray(["Georgia", "Palatino Linotype", "Noto Serif", "Times New Roman"])
+	font.font_italic = false
+	return font
+
+
+func _rescale() -> void:
+	if _canvas == null:
+		return
+	var viewport := get_viewport_rect().size
+	var factor: float = minf(viewport.x / DESIGN_SIZE.x, viewport.y / DESIGN_SIZE.y)
+	_canvas.scale = Vector2.ONE * factor
+	_canvas.position = (viewport - DESIGN_SIZE * factor) * 0.5
+
+
+func _activate(index: int) -> void:
+	match index:
+		0:
+			var slot := SaveManager.most_recent_valid_slot()
+			if slot != "":
+				_start_game(true, slot)
+			else:
+				_show_notice("No saved journey yet. Start a New Game to visit Wintervale.")
+		1:
+			_gallery.call("show_page", "new_game")
+		2:
+			_gallery.call("show_page", "load_save")
+		3:
+			_gallery.call("show_page", "settings_graphics")
+		4:
+			_gallery.call("show_page", "achievements")
+		5:
+			_gallery.call("show_page", "credits")
+		6:
+			get_tree().quit()
+
+
+func _on_gallery_closed() -> void:
+	_refresh_continue()
+	(_buttons[0] if not _buttons[0].disabled else _buttons[1]).grab_focus()
+
+
+func _refresh_continue() -> void:
+	var slot := SaveManager.most_recent_valid_slot()
+	_buttons[0].disabled = slot == ""
+	_buttons[0].tooltip_text = "No valid saved journey yet. Choose New Game." if slot == "" else "Continue %s" % slot
+
+
+func _on_start_requested(name: String, season: int) -> void:
+	var slot := SaveManager.make_unique_slot(name)
+	SaveManager.journey_name = name
+	SaveManager.active_slot = slot
+	SaveManager.playtime_seconds = 0.0
+	Achievements.reset()
+	# Nach "Pausenmenü → Hauptmenü" dürfen Geld, Lager und Zeitraffer der
+	# vorigen Reise nicht in die neue übernommen werden.
+	Economy.reset()
+	WorldClock.load_state({"day": 1, "time_of_day": 15.0, "time_scale_index": 0})
+	Seasons.set_season(season, 0.5)
+	_start_game(false, slot)
+
+
+func _on_load_requested(slot: String) -> void:
+	_start_game(true, slot)
+
+
+func _on_gallery_action(action: String) -> void:
+	match action:
+		"continue": _activate(0)
+		"new_game": _gallery.call("show_page", "new_game")
+		"quit": get_tree().quit()
+
+
+func _start_game(load_save: bool, slot: String) -> void:
+	if _starting_game:
+		return
+	if load_save and not SaveManager.list_saves().any(func(entry: Dictionary) -> bool: return entry["slot"] == slot):
+		_show_notice("This journey cannot be loaded. Choose another save.")
+		return
+	_starting_game = true
+	WorldClock.paused = false
+	if load_save:
+		# Ältere Spielstände ohne Wirtschaftsdaten starten mit frischen Werten,
+		# nicht mit denen der zuletzt gespielten Reise.
+		Economy.reset()
+	var loading_screen := MenuLoadingScreen.new()
+	get_tree().root.add_child(loading_screen)
+	await loading_screen.reveal()
+	var shown_at := Time.get_ticks_msec()
+	loading_screen.set_progress(0.08)
+	await get_tree().process_frame
+	var scene := load("res://scenes/main/main.tscn") as PackedScene
+	if scene == null:
+		_show_notice("Unable to open the game world.")
+		await loading_screen.dismiss()
+		_starting_game = false
+		return
+	loading_screen.set_progress(0.70)
+	await get_tree().process_frame
+	if load_save:
+		Achievements.suspend(true)
+	var world := scene.instantiate()
+	if load_save:
+		world.set("legacy_world", not SaveManager.read_save_data(slot).get("objects",{}).has("progression"))
+	get_tree().root.add_child(world)
+	loading_screen.set_progress(0.88)
+	if load_save and not SaveManager.load_game(slot):
+		world.queue_free()
+		Achievements.suspend(false)
+		_show_notice("This journey could not be restored. Your save was not changed.")
+		await loading_screen.dismiss()
+		_starting_game = false
+		return
+	get_tree().current_scene = world
+	visible = false
+	loading_screen.set_progress(1.0)
+	var remaining := 650 - (Time.get_ticks_msec() - shown_at)
+	if remaining > 0:
+		await get_tree().create_timer(float(remaining) / 1000.0).timeout
+	await loading_screen.dismiss()
+	if not load_save:
+		await get_tree().process_frame
+		if not SaveManager.save_game(slot):
+			push_warning("The new journey opened, but its first save could not be written.")
+	queue_free()
+
+
+func _build_notice() -> void:
+	_notice = PanelContainer.new()
+	_notice.position = Vector2(746, 747)
+	_notice.size = Vector2(540, 112)
+	_notice.visible = false
+	_notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("2c1b19")
+	style.border_color = GOLD
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(10)
+	style.shadow_color = Color(0, 0, 0, 0.5)
+	style.shadow_size = 10
+	style.content_margin_left = 18
+	style.content_margin_right = 18
+	style.content_margin_top = 14
+	style.content_margin_bottom = 14
+	_notice.add_theme_stylebox_override("panel", style)
+	_canvas.add_child(_notice)
+	_notice_text = Label.new()
+	_notice_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_notice_text.add_theme_font_override("font", _serif())
+	_notice_text.add_theme_font_size_override("font_size", 23)
+	_notice_text.add_theme_color_override("font_color", Color("ffebc9"))
+	_notice_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_notice.add_child(_notice_text)
+
+
+func _show_notice(message: String) -> void:
+	_notice_text.text = message
+	_notice.visible = true
+	var tween := create_tween()
+	_notice.modulate.a = 1.0
+	tween.tween_interval(4.0)
+	tween.tween_property(_notice, "modulate:a", 0.0, 0.45)
+	tween.tween_callback(func() -> void: _notice.visible = false)

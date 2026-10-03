@@ -186,6 +186,8 @@ func update_visuals(_delta: float) -> void:
 		var front := head - car.offset_from_head - (car.length * 0.5 - car.bogie_offset)
 		var rear := front - car.bogie_offset * 2.0
 		car.place(path.position_at(front), path.direction_at(front), path.position_at(rear), path.direction_at(rear))
+		# Tief im Berg verschwinden Wagen (der Tunnel ist kürzer als lange Züge).
+		car.visible = _tunnel_depth(head - car.offset_from_head - car.length * 0.5) < TUNNEL_HIDE_DEPTH
 		car.roll(moved)
 		if clacks:
 			var old_front := front - moved
@@ -206,6 +208,20 @@ func update_visuals(_delta: float) -> void:
 	if previous < emerge_at + 6.0 and head >= emerge_at + 6.0 and not _emerged:
 		_emerged = true
 		_play_voice("horn", -12.0, train_type.horn_pitch * 1.05)
+
+
+## Ab dieser Tiefe hinter dem Tunnelmund sind Wagen unsichtbar.
+const TUNNEL_HIDE_DEPTH := 14.0
+
+
+## Wie tief die Strecke [param distance] im Tunnel liegt (0 = draußen).
+## Tunnelgleise beginnen am Mundloch (StarterRailway, RegionPortal).
+func _tunnel_depth(distance: float) -> float:
+	var index := path.index_at(clampf(distance, 0.0, path.total_length))
+	var segment := network.get_segment(path.segment_ids[index])
+	if segment == null or not segment.tunnel:
+		return 0.0
+	return path._local_offset(index, segment, distance)
 
 
 func set_dark(dark: bool) -> void:
@@ -502,7 +518,7 @@ func _doors_held(dt: float) -> bool:
 		_hold_time = 0.0
 		return false
 	_hold_time += dt
-	return _hold_time < MAX_DOOR_HOLD
+	return _hold_time < float(get_meta("boarding_grace",MAX_DOOR_HOLD))
 
 
 ## Der Güterbahnhof lädt: Der Zug wartet mit der Abfahrt, bis [method release_departure]
@@ -531,6 +547,8 @@ func _cargo_held(dt: float) -> bool:
 
 
 func _departure_due() -> bool:
+	if has_meta("region_line"):
+		return true
 	var hours_left := fposmod(entry.get_departure_hours() - WorldClock.time_of_day + 12.0, 24.0) - 12.0
 	return hours_left <= 0.0
 
@@ -557,7 +575,7 @@ func _update_sounds(target: float) -> void:
 		if not _rolling.playing:
 			SoundLibrary.play(_rolling)
 		_rolling.volume_db = -20.0 + level * 12.0
-		_rolling.pitch_scale = 0.75 + level * 0.45
+		_rolling.pitch_scale = (0.75 + level * 0.45) * train_type.rolling_pitch
 	elif _rolling.playing:
 		_rolling.stop()
 	if _horn_pending and speed > 0.4:

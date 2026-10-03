@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/menu_gallery.gd" id="1_gallery"]
+
+[node name="MenuGallery" type="Control"]
+layout_mode = 3
+offset_right = 1672.0
+offset_bottom = 941.0
+mouse_filter = 0
+script = ExtResource("1_gallery")

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Reise: Kompass ueber Landkarte -->
+  <g stroke="#3b2a20" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M6 14 L22 8 L42 14 L58 8 V50 L42 56 L22 50 L6 56 Z" fill="#f0e2c4"/>
+    <path d="M22 8 V50 M42 14 V56" fill="none" stroke-width="1.8"/>
+    <path d="M10 44 C18 36 26 40 32 32 C38 24 46 28 54 18" fill="none" stroke="#a8321e" stroke-width="2.4" stroke-dasharray="4 3"/>
+    <circle cx="44" cy="40" r="11" fill="#d9a441"/>
+    <path d="M44 31 L47 40 L44 49 L41 40 Z" fill="#c9443a" stroke-width="1.8"/>
+  </g>
+</svg>

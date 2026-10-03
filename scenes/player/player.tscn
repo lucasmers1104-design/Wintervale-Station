@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/player/player_controller.gd" id="1_player"]
 [ext_resource type="Script" path="res://scripts/characters/character_model.gd" id="2_model"]
-[ext_resource type="Resource" path="res://assets/characters/player_appearance.tres" id="3_look"]
+[ext_resource type="Resource" path="res://assets/characters/designs/player_male.tres" id="3_look"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.3

@@ -31,10 +31,61 @@ var _corridor_cells: Dictionary[int, Array] = {}
 var _corridor_bounds: Dictionary[int, Rect2] = {}
 ## Rasterzelle → Liste von Vector2i(Korridor-ID, Abschnitts-Index)
 var _cells: Dictionary[Vector2i, Array] = {}
+## Exact rotated station footprints, including a soft bank outside the floor.
+var _pads: Dictionary[int, Dictionary] = {}
+var _pad_cells: Dictionary[Vector2i, Array] = {}
 
 
 func has_corridors() -> bool:
-	return not _corridors.is_empty()
+	return not _corridors.is_empty() or not _pads.is_empty()
+
+func set_pad(id: int, footprint: Dictionary, ground_y: float, bank := 4.0) -> Rect2:
+	var previous := remove_pad(id)
+	# Start from the first corner explicitly: a zero-size rectangle is valid.
+	var corners := VillageFootprint.corners(footprint,bank)
+	var bounds := Rect2(corners[0],Vector2.ZERO)
+	for corner in corners:
+		bounds = bounds.expand(corner)
+	_pads[id] = {"footprint":footprint,"y":ground_y,"bank":bank,"bounds":bounds}
+	for cx in range(floori(bounds.position.x/CELL),floori(bounds.end.x/CELL)+1):
+		for cz in range(floori(bounds.position.y/CELL),floori(bounds.end.y/CELL)+1):
+			var cell := Vector2i(cx,cz)
+			if not _pad_cells.has(cell):
+				_pad_cells[cell] = []
+			_pad_cells[cell].append(id)
+	return bounds if previous.size==Vector2.ZERO else previous.merge(bounds)
+
+func remove_pad(id: int) -> Rect2:
+	if not _pads.has(id):
+		return Rect2()
+	var bounds: Rect2 = _pads[id]["bounds"]
+	for cx in range(floori(bounds.position.x/CELL),floori(bounds.end.x/CELL)+1):
+		for cz in range(floori(bounds.position.y/CELL),floori(bounds.end.y/CELL)+1):
+			var cell := Vector2i(cx,cz)
+			if _pad_cells.has(cell):
+				_pad_cells[cell].erase(id)
+				if _pad_cells[cell].is_empty():
+					_pad_cells.erase(cell)
+	_pads.erase(id)
+	return bounds
+
+func _sample_pads(x: float, z: float, base: float) -> Vector2:
+	var entries: Array = _pad_cells.get(Vector2i(floori(x/CELL),floori(z/CELL)),[])
+	var best := 0.0
+	var height := base
+	var nearest := INF
+	for id: int in entries:
+		var pad: Dictionary = _pads[id]
+		var fp: Dictionary = pad["footprint"]
+		var local := (Vector2(x,z)-(fp["center"] as Vector2)).rotated(float(fp["angle"]))
+		var excess := local.abs()-(fp["half"] as Vector2)
+		var distance := Vector2(maxf(0,excess.x),maxf(0,excess.y)).length()
+		var weight := 1.0-smoothstep(0,float(pad["bank"]),distance)
+		if weight>best+0.0001 or (weight>0 and is_equal_approx(weight,best) and local.length_squared()<nearest):
+			best = weight
+			nearest = local.length_squared()
+			height = float(pad["y"])
+	return Vector2(lerpf(base,height,best),best)
 
 
 func has_corridor(id: int) -> bool:
@@ -87,9 +138,11 @@ func remove_corridor(id: int) -> Rect2:
 ## Angepasste Höhe an (x, z). [param base] ist die natürliche Geländehöhe.
 ## Rückgabe: Vector2(Höhe, Einfluss 0..1).
 func sample(x: float, z: float, base: float) -> Vector2:
+	var pad := _sample_pads(x,z,base)
+	base = pad.x
 	var entries: Array = _cells.get(Vector2i(floori(x / CELL), floori(z / CELL)), [])
 	if entries.is_empty():
-		return Vector2(base, 0.0)
+		return pad
 
 	var point := Vector2(x, z)
 	var best_weight := 0.0
@@ -115,4 +168,4 @@ func sample(x: float, z: float, base: float) -> Vector2:
 			best_weight = weight
 			best_distance = distance
 			best_height = target
-	return Vector2(lerpf(base, best_height, best_weight), best_weight)
+	return Vector2(lerpf(base, best_height, best_weight), maxf(best_weight,pad.y))

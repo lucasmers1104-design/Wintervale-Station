@@ -16,6 +16,9 @@ const NEEDLES_LIGHT := Color(0.24, 0.43, 0.3)
 const BARK := Color(0.38, 0.25, 0.17)
 const BIRCH := Color(0.9, 0.88, 0.84)
 const BIRCH_MARK := Color(0.2, 0.19, 0.2)
+## Birkenlaub (Vertex-Alpha 0.7 = Sommerlaub: nur ohne Schneeauflage sichtbar).
+const BIRCH_LEAF := Color(0.42, 0.58, 0.28, 0.7)
+const BIRCH_LEAF_LIGHT := Color(0.56, 0.68, 0.34, 0.7)
 const SAGE := Color(0.42, 0.52, 0.38)
 const WOOD := Color(0.62, 0.40, 0.24)
 const WOOD_DARK := Color(0.44, 0.28, 0.17)
@@ -102,10 +105,27 @@ static func tree_birch(st: SurfaceTool, rng: RandomNumberGenerator) -> void:
 			var from := start.lerp(tip, 0.55 + k * 0.25)
 			var twig := from + (out.rotated(Vector3.UP, (k - 0.5) * 1.3) * 0.45 + Vector3.UP * 0.35)
 			LowPolyBuilder.add_cylinder_between(st, from, twig, 0.02, 3, BARK.lightened(0.1))
-	# Ein paar letzte goldene Blätter bleiben hängen
+	# Einzelne Blätter an den Zweigspitzen – als Sommerlaub markiert: im Winter wirkten
+	# sie als schwebende gelbe Plättchen, jetzt erscheinen sie nur ohne Schnee (Herbst golden).
 	for i in 6:
 		var p := top + Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.2, 0.2), rng.randf_range(-1.0, 1.0))
-		LowPolyBuilder.add_box(st, p, Vector3(0.1, 0.02, 0.1), Color(0.88, 0.66, 0.28))
+		LowPolyBuilder.add_box(st, p, Vector3(0.1, 0.02, 0.1), BIRCH_LEAF_LIGHT)
+	# Sommerlaub: lockere Büschel an Ästen und Krone. Sie wachsen erst, wo der Schnee
+	# geschmolzen ist (Vertex-Alpha SEASONAL_LEAF, siehe foliage_sway.gdshader) –
+	# im Winter bleibt die Birke kahl, im Herbst färbt sich das Laub golden.
+	# Erst nach allen bisherigen Teilen erzeugt, damit die Winterform unverändert bleibt.
+	for i in 7:
+		var t := 0.42 + i * 0.075
+		var angle := i * 2.4 + 0.2
+		var length := lerpf(1.6, 0.7, float(i) / 6.0)
+		var out := Vector3(cos(angle), 0.0, sin(angle))
+		var tip := Vector3.ZERO.lerp(top, t) + out * length * 0.85 + Vector3.UP * length * 0.75
+		var leaf := BIRCH_LEAF.lerp(BIRCH_LEAF_LIGHT, rng.randf())
+		LowPolyBuilder.add_rock(st, rng, tip, lerpf(0.5, 0.34, float(i) / 6.0), leaf, leaf, 3, 6)
+	for i in 3:
+		var p := top + Vector3(rng.randf_range(-0.35, 0.35), rng.randf_range(-0.2, 0.35), rng.randf_range(-0.35, 0.35))
+		var leaf := BIRCH_LEAF.lerp(BIRCH_LEAF_LIGHT, rng.randf())
+		LowPolyBuilder.add_rock(st, rng, p, rng.randf_range(0.45, 0.6), leaf, leaf, 3, 6)
 
 
 ## Rundkroniger Laubbaum im Spielzeug-Stil: kugelige Krone mit Schneehaube.
@@ -543,8 +563,10 @@ static func hedge(st: SurfaceTool, length: float, rng: RandomNumberGenerator) ->
 		var x := length * (i + 0.5) / blobs
 		var color := NEEDLES.lerp(NEEDLES_LIGHT, rng.randf() * 0.5)
 		LowPolyBuilder.add_rock(st, rng, Vector3(x, 0.55, 0), 0.62, color, SNOW, 4, 7)
-	LowPolyBuilder.add_box(st, Vector3(length * 0.5, 0.45, 0), Vector3(maxf(length - 0.4, 0.2), 0.9, 0.8), NEEDLES_DARK)
-	LowPolyBuilder.add_box(st, Vector3(length * 0.5, 0.92, 0), Vector3(maxf(length - 0.3, 0.2), 0.08, 0.7), SNOW)
+	# Dunkler Kern hält die Hecke dicht; er bleibt unter den Buschkugeln, deren
+	# Oberseiten die Schneehauben tragen (früher lag eine flache Schneeplatte darüber
+	# und die Hecke wirkte wie eine weiße Leiste mit Zacken).
+	LowPolyBuilder.add_box(st, Vector3(length * 0.5, 0.36, 0), Vector3(maxf(length - 0.4, 0.2), 0.72, 0.8), NEEDLES_DARK)
 
 
 # --- Hilfen -----------------------------------------------------------------------------

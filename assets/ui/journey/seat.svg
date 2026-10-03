@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Plaetze: gepolsterter Sitz -->
+  <g stroke="#3b2a20" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M18 8 H40 C44 8 46 11 45 15 L41 38 H17 L14 15 C13 11 15 8 18 8 Z" fill="#a8321e"/>
+    <path d="M20 14 H39" fill="none" stroke="#e66a52" stroke-width="2"/>
+    <rect x="12" y="36" width="38" height="10" rx="4" fill="#c9443a"/>
+    <path d="M18 46 L16 58 M44 46 L46 58" stroke-width="3.4"/>
+    <rect x="46" y="28" width="10" height="5" rx="2" fill="#7a5a44"/>
+  </g>
+</svg>

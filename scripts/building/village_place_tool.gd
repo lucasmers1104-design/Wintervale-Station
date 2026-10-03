@@ -36,6 +36,7 @@ var _marker: MeshInstance3D
 
 func _on_setup() -> void:
 	_items = VillageCatalog.get_items(category)
+	_refresh_unlocked_items.call_deferred()
 	_marker = MeshInstance3D.new()
 	_marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_marker.material_override = marker_material
@@ -45,6 +46,7 @@ func _on_setup() -> void:
 
 func activate() -> void:
 	super()
+	_refresh_unlocked_items()
 	_announce_items()
 
 
@@ -81,6 +83,8 @@ func select_item(item_id: String) -> void:
 
 
 func handle_input(event: InputEvent) -> bool:
+	if _items.is_empty():
+		return false
 	if event.is_action_pressed(&"build_rotate"):
 		_angle = fposmod(_angle - deg_to_rad(rotate_step), TAU)
 		_auto_orient = false
@@ -109,19 +113,29 @@ func update_tool(_delta: float) -> void:
 ## Klick: Einzelobjekt setzen bzw. Linie beginnen/beenden. true = gebaut.
 func click_at(point: Vector3) -> bool:
 	var item_id := get_item()
+	if not point.is_finite() or item_id=="":
+		return false
 	point = _snap(point)
 	if VillageCatalog.is_line(item_id):
 		if _start == Vector3.INF:
 			_start = point
+			if context.feedback:
+				context.feedback.snapped(point,true)
 			return false
 		preview_at(point)
 		if not _valid:
+			if context.feedback:
+				context.feedback.reject(point,get_status())
 			return false
-		_commit(village.prepare(item_id, _start, 0.0, _variant, point))
-		_start = point  # direkt weiterbauen
+		var finish := _clamp_length(item_id,_start,point)
+		var data := village.prepare(item_id, _start, 0.0, _variant, finish)
+		_commit(data)
+		_start = SaveUtils.array_to_vec3(data["end"])  # includes terrain height
 		return true
 	preview_at(point)
 	if not _valid:
+		if context.feedback:
+			context.feedback.reject(point,get_status())
 		return false
 	_commit(village.prepare(item_id, point, _current_angle(point), _variant))
 	return true
@@ -133,6 +147,9 @@ func preview_at(point: Vector3) -> void:
 		_clear_ghost()
 		return
 	var item_id := get_item()
+	if item_id=="":
+		_clear_ghost()
+		return
 	point = _snap(point)
 	# Nur neu prüfen, wenn sich etwas geändert hat (die Prüfung kostet Physik- und Wegetests)
 	var check_key := "%s|%d|%s|%s|%.3f|%d" % [item_id, _variant, point.snapped(Vector3.ONE * 0.05), _start,
@@ -198,6 +215,16 @@ func _commit(data: Dictionary) -> void:
 	undo_redo.add_do_method(village.build.bind(data))
 	undo_redo.add_undo_method(village.demolish.bind(id))
 	undo_redo.commit_action()
+	if village.get_object(id) and context.feedback:
+		var at := SaveUtils.array_to_vec3(data["pos"])
+		var points := PackedVector3Array()
+		if data.has("end"):
+			var finish := SaveUtils.array_to_vec3(data["end"])
+			for i in range(17):
+				var p := at.lerp(finish,i/16.0)
+				p.y = context.terrain.get_surface_height(p.x,p.z)+0.05
+				points.append(p)
+		context.feedback.confirm(VillageCatalog.get_kind(String(data["item"])),at,points,VillageCatalog.get_label(String(data["item"])))
 	_ghost_key = ""
 	_check_key = ""
 
@@ -218,7 +245,10 @@ func _current_angle(point: Vector3) -> float:
 func _snap(point: Vector3) -> Vector3:
 	var item_id := get_item()
 	if VillageCatalog.get_kind(item_id) == "path":
-		return village.snap_path_point(point)
+		var snapped := village.snap_path_point(point)
+		if context.feedback:
+			context.feedback.snapped(snapped,snapped.distance_to(point)>0.08)
+		return snapped
 	if VillageCatalog.get_kind(item_id) == "house":
 		return Vector3(snappedf(point.x, 0.5), point.y, snappedf(point.z, 0.5))
 	return point
@@ -319,3 +349,11 @@ func _announce_items() -> void:
 func _on_item_requested(item_id: String) -> void:
 	if visible and _items.has(item_id):
 		select_item(item_id)
+
+func _refresh_unlocked_items() -> void:
+	var progress := RegionProgression.find(get_tree())
+	_items = VillageCatalog.get_items(category)
+	if progress:
+		_items.assign(_items.filter(func(id: String) -> bool: return progress.epoch>=EpochCatalog.item_epoch(id)))
+	_index = clampi(_index,0,maxi(0,_items.size()-1))
+	_announce_items()

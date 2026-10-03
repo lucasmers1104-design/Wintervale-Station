@@ -36,7 +36,7 @@ var _is_dark := false
 func _ready() -> void:
 	add_to_group(GameDefs.GROUP_SAVEABLE)
 	_is_dark = _compute_dark()
-	_last_total_minutes = int(time_of_day * 60.0)
+	_last_total_minutes = _total_minutes()
 
 
 func _process(delta: float) -> void:
@@ -68,11 +68,17 @@ func cycle_time_scale() -> float:
 
 
 func get_hour() -> int:
-	return int(time_of_day)
+	return int(_total_minutes() / 60.0)
 
 
 func get_minute() -> int:
-	return int(fmod(time_of_day, 1.0) * 60.0)
+	return _total_minutes() % 60
+
+
+## Ganze Spielminuten seit Mitternacht. Das kleine Epsilon verhindert, dass
+## z.B. 23:27 (23.45 h × 60 = 1406.9999…) als 23:26 angezeigt wird.
+func _total_minutes() -> int:
+	return mini(int(time_of_day * 60.0 + 0.0001), 24 * 60 - 1)
 
 
 func get_time_string() -> String:
@@ -118,7 +124,7 @@ func _set_time_scale_index(index: int) -> void:
 
 
 func _emit_changes() -> void:
-	var total_minutes := int(time_of_day * 60.0)
+	var total_minutes := _total_minutes()
 	if total_minutes != _last_total_minutes:
 		var previous_hour := int(_last_total_minutes / 60.0)
 		_last_total_minutes = total_minutes

@@ -39,6 +39,9 @@ func _ready() -> void:
 	context.terrain_adapter = terrain_adapter
 	context.undo_redo = undo_redo
 	context.village = village
+	context.feedback = BuildFeedback.new()
+	context.feedback.name = "BuildFeedback"
+	add_child(context.feedback)
 
 	for child in get_children():
 		var tool := child as BuildTool
@@ -104,6 +107,10 @@ func set_active(value: bool) -> void:
 
 
 func select_tool(tool_id: StringName) -> void:
+	var progress := RegionProgression.find(get_tree())
+	if progress and not progress.tool_unlocked(tool_id):
+		Events.notification_requested.emit("Dieses Werkzeug kommt in einer späteren Epoche")
+		return
 	var tool: BuildTool = _tools.get(tool_id)
 	if tool == null:
 		return
@@ -126,6 +133,7 @@ func get_current_tool() -> BuildTool:
 func undo() -> void:
 	if undo_redo.has_undo():
 		undo_redo.undo()
+		Events.notification_requested.emit("Letzter Bauschritt zurückgenommen · wiederherstellbar mit Strg+Y")
 
 
 func redo() -> void:
@@ -153,6 +161,12 @@ func _try_toggle_switch_outside_build(event: InputEvent) -> bool:
 	var point := context.get_mouse_ground_point()
 	if point == Vector3.INF:
 		return false
+	var progress := RegionProgression.find(get_tree())
+	if progress:
+		var station := progress.region.station_at(point)
+		if station:
+			Events.region_station_requested.emit(station.station_id)
+			return true
 	var switch := rail_network.find_switch_near(point, switch_pick_radius)
 	if switch == null:
 		return false

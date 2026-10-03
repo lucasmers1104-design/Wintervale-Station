@@ -908,11 +908,7 @@ func _ensure_crowd(now: float) -> void:
 	if _rng.randf() < 0.35 and npc_director.get_travellers().size() < 22:
 		var child := npc_director.spawn_traveller(_rng)
 		child.set_meta(&"festival_guest", true)
-		var look := child.model.appearance.duplicate() as CharacterAppearance
-		look.height_scale = _rng.randf_range(0.7, 0.78)
-		look.width_scale = 0.95
-		look.hat_style = CharacterAppearance.HatStyle.POMPOM_BEANIE
-		child.model.appearance = look
+		child.model.appearance = CharacterDesigns.random_child(_rng)
 		child.model.carry = CharacterModel.Carry.NONE
 		child.appear_at(start + Vector3(0.6, 0, 0.3))
 		child.visit_festival(self, until)
@@ -1162,10 +1158,8 @@ func _laternenumzug() -> void:
 		walkers[0].add_child(_procession_music)
 		SoundLibrary.stop_on_exit(_procession_music)
 		SoundLibrary.play(_procession_music)
-		var music := _procession_music
-		get_tree().create_timer(120.0).timeout.connect(func() -> void:
-			if is_instance_valid(music):
-				music.queue_free())
+		# Gebundene Methode: getrennt, falls die Musik vorher mit dem Umzug verschwindet
+		get_tree().create_timer(120.0, false).timeout.connect(_procession_music.queue_free)
 	Events.event_banner_requested.emit("Laternenumzug", "Laterne, Laterne … die Kinder ziehen durchs Dorf", "lantern")
 	_stats["processions"] = int(_stats["processions"]) + 1
 	add_chronicle("Laternenumzug mit %d Laternen durchs Dorf." % walkers.size(), "lantern")
@@ -1223,9 +1217,13 @@ func _run_steps(steps: Array[Array]) -> void:
 		if float(step[0]) <= 0.0:
 			callback.call()
 		else:
-			get_tree().create_timer(float(step[0])).timeout.connect(func() -> void:
-				if is_instance_valid(self) and _active != "":
-					callback.call())
+			get_tree().create_timer(float(step[0]), false).timeout.connect(_run_step.bind(callback))
+
+
+## Ein verzögerter Umzugsschritt (gebunden: entfällt, wenn der Festleiter entladen ist).
+func _run_step(callback: Callable) -> void:
+	if _active != "" and callback.is_valid():
+		callback.call()
 
 
 # --- Reigen (Herbstfest) ------------------------------------------------------------------------
@@ -1367,17 +1365,11 @@ func _add_fire_basket(p: Vector3, rng: RandomNumberGenerator, decor: SurfaceTool
 
 ## Musikant auf der Bühne mit Akkordeon (Balg zieht sich im Takt auf und zu).
 func _add_musician(at: Vector3, basis: Basis) -> void:
-	var look := CharacterAppearance.new()
-	look.top_style = CharacterAppearance.TopStyle.PLAID_SHIRT
-	look.shirt_color = Color(0.62, 0.22, 0.16)
-	look.shirt_stripe_color = Color(0.2, 0.1, 0.08)
-	look.hat_style = CharacterAppearance.HatStyle.FLAT_CAP
-	look.beard = true
-	look.hair_color = Color(0.72, 0.7, 0.73)
+	# Der Seemann aus den Charakterblättern spielt auf (Bart, Ringelpulli)
+	var look := CharacterDesigns.by_name("sailor")
 	_musician = CharacterModel.new()
 	_musician.name = "Musician"
 	_musician.appearance = look
-	_musician.outfit = CharacterAppearance.Outfit.SUMMER
 	_site.add_child(_musician)
 	_musician.global_transform = Transform3D(basis, at)
 	_musician.set_pose(CharacterModel.Pose.WARM_HANDS)

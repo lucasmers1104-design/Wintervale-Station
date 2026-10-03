@@ -251,6 +251,12 @@ func set_track_corridor(id: int, axis_points: PackedVector3Array) -> void:
 func remove_track_corridor(id: int) -> void:
 	_mark_dirty(_deformer.remove_corridor(id), true)
 
+func set_station_pad(id: int, footprint: Dictionary, ground_y: float) -> void:
+	_mark_dirty(_deformer.set_pad(id,footprint,ground_y),true)
+
+func remove_station_pad(id: int) -> void:
+	_mark_dirty(_deformer.remove_pad(id),true)
+
 
 ## Zeigt die Geländeanpassung eines geplanten Gleises (nur Optik, ohne Kollision).
 ## Leeres Array = Vorschau entfernen.

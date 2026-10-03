@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="CharacterAppearance" format=3]
+
+[ext_resource type="Script" path="res://scripts/characters/character_appearance.gd" id="1_look"]
+
+[resource]
+resource_name = "Smith"
+script = ExtResource("1_look")
+skin_color = Color(0.95, 0.62, 0.44, 1)
+beard = true
+mustache = true
+hair_style = 6
+hair_color = Color(0.36, 0.2, 0.12, 1)
+top_style = 4
+shirt_color = Color(0.84, 0.72, 0.6, 1)
+sleeves = 0
+accent_color = Color(0.4, 0.22, 0.12, 1)
+outer = 7
+outer_color = Color(0.28, 0.22, 0.19, 1)
+bottom = 0
+pants_color = Color(0.4, 0.3, 0.18, 1)
+shoe_color = Color(0.44, 0.24, 0.13, 1)
+mitten_color = Color(0.38, 0.21, 0.12, 1)
+gloves = true
+width_scale = 1.06
+brow_thickness = 0.8

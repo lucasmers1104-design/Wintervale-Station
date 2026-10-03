@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Fahrgaeste: zwei Reisende mit Muetze -->
+  <g stroke="#3b2a20" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M36 58 V44 C36 37 41 33 47 33 C53 33 58 37 58 44 V58 Z" fill="#4f6f8f"/>
+    <circle cx="47" cy="24" r="8" fill="#f2c9a0"/>
+    <path d="M38.5 21 C39 13 55 13 55.5 21 Z" fill="#c9443a"/>
+    <path d="M6 58 V42 C6 34 12 29 20 29 C28 29 34 34 34 42 V58 Z" fill="#a8321e"/>
+    <circle cx="20" cy="19" r="9.5" fill="#f2c9a0"/>
+    <path d="M9.5 16 C10 6 30 6 30.5 16 Z" fill="#3f6a4c"/>
+    <circle cx="20" cy="5.5" r="3" fill="#f0e2c4"/>
+    <rect x="22" y="44" width="11" height="9" rx="2" fill="#c98a3d"/>
+  </g>
+</svg>

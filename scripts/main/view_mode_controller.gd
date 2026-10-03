@@ -31,8 +31,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		toggle()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed(&"release_mouse"):
-		GameInput.capture_mouse(false)
-		bird_eye.stop_following()
+		# Erst Maus freigeben bzw. Mitfahren beenden – erst ein weiteres Esc öffnet das Pausenmenü.
+		if GameInput.is_mouse_captured() or bird_eye.follow_target:
+			GameInput.capture_mouse(false)
+			bird_eye.stop_following()
+		else:
+			Events.pause_menu_requested.emit()
 		get_viewport().set_input_as_handled()
 	elif mode == GameDefs.ViewMode.EXPLORE and event.is_action_pressed(&"interact_primary") \
 			and not GameInput.is_mouse_captured():

@@ -17,11 +17,73 @@ var _item_row: HFlowContainer
 var _item_buttons: Dictionary[String, Button] = {}
 var _cost_row: HBoxContainer
 var _money_label: Label
+var _day_value: Label
+var _time_value: Label
+var _bar_speed_label: Label
+var _status_bar: Control
+var _clock_hands: HudClockHands
 var _money_tween: Tween
 var _shown_money := -1
+var _cost_signature := -1
 
 const COIN_ICON := preload("res://assets/ui/icons/coin.svg")
 const NOTEBOOK_ICON := preload("res://assets/ui/icons/notebook.svg")
+## Freigegebene Leiste ohne die gemalten Uhrzeiger (tools/generate_hud_clock_face.gd);
+## das Original liegt unverändert daneben (hud_status_bar.png).
+const STATUS_BAR_ART := preload("res://assets/ui/hud_status_bar_clean.png")
+## Größe der Leiste relativ zur 1672×941-Referenz (1410 px breit → ≈ 35 % der Bildbreite).
+const STATUS_BAR_SCALE := 0.42
+## Mitte des Zifferblatts in Leistenkoordinaten (Vorlage 1167|196.8 minus Ausschnitt 130|83).
+const CLOCK_CENTER := Vector2(1037.0, 113.8)
+
+
+## Die zwei Zeiger der kleinen Uhr – sie zeigen immer die Spielzeit der Digitalanzeige.
+class HudClockHands extends Control:
+	const INK := Color("2b1a12")
+	const SHADOW := Color(0.12, 0.05, 0.02, 0.28)
+	const BRASS := Color("c99a4e")
+	## Umriss in Zeiger-Koordinaten: x quer, y von der Mitte zur Spitze (Bildpixel der Vorlage).
+	const MINUTE_SHAPE := [Vector2(-1.5, -5.0), Vector2(1.5, -5.0), Vector2(1.2, 25.5),
+		Vector2(2.7, 28.5), Vector2(0.0, 34.5), Vector2(-2.7, 28.5), Vector2(-1.2, 25.5)]
+	const HOUR_SHAPE := [Vector2(-2.3, -5.0), Vector2(2.3, -5.0), Vector2(2.0, 14.5),
+		Vector2(4.1, 17.5), Vector2(0.0, 23.5), Vector2(-4.1, 17.5), Vector2(-2.0, 14.5)]
+
+	var hour_degrees := 0.0
+	var minute_degrees := 0.0
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _process(_delta: float) -> void:
+		set_time(WorldClock.time_of_day)
+
+	## [param hours] = Spielzeit in Stunden (16.0 → Stundenzeiger auf 4, Minutenzeiger auf 12).
+	func set_time(hours: float) -> void:
+		var minute := fposmod(hours, 1.0) * 360.0
+		var hour := fposmod(hours, 12.0) / 12.0 * 360.0
+		if absf(minute - minute_degrees) < 0.05 and absf(hour - hour_degrees) < 0.05:
+			return
+		minute_degrees = minute
+		hour_degrees = hour
+		queue_redraw()
+
+	func _draw() -> void:
+		for layer: Color in [SHADOW, INK]:
+			var offset := Vector2(0.9, 1.2) if layer == SHADOW else Vector2.ZERO
+			_draw_hand(HOUR_SHAPE, hour_degrees, layer, offset)
+			_draw_hand(MINUTE_SHAPE, minute_degrees, layer, offset)
+		draw_circle(Vector2.ZERO, 4.3, INK, true, -1.0, true)
+		draw_circle(Vector2.ZERO, 1.6, BRASS, true, -1.0, true)
+
+	func _draw_hand(shape: Array, degrees: float, color: Color, offset: Vector2) -> void:
+		var along := Vector2(sin(deg_to_rad(degrees)), -cos(deg_to_rad(degrees)))
+		var across := Vector2(-along.y, along.x)
+		var points := PackedVector2Array()
+		for p: Vector2 in shape:
+			points.append(offset + across * p.x + along * p.y)
+		draw_colored_polygon(points, color)
+		points.append(points[0])
+		draw_polyline(points, color, 0.8, true)
 
 @onready var _clock_label: Label = %ClockLabel
 @onready var _speed_label: Label = %SpeedLabel
@@ -128,6 +190,21 @@ func show_toast(text: String) -> void:
 func get_legend() -> KeyLegend:
 	return _legend
 
+## Werkzeug-Knopf im Baumenü (z.B. für Tutorial-Hinweise); null = gibt es nicht.
+func get_tool_button(id: StringName) -> Button:
+	return _tool_buttons.get(id)
+
+func get_tutorial_target(id: String) -> Control:
+	return _status_bar if id=="status" else _tool_row if id=="build" else null
+
+func bind_progression(progress: RegionProgression) -> void:
+	progress.changed.connect(_refresh_progression_tools.bind(progress))
+	_refresh_progression_tools(progress)
+
+func _refresh_progression_tools(progress: RegionProgression) -> void:
+	for id: StringName in _tool_buttons:
+		_tool_buttons[id].visible = progress.tool_unlocked(id)
+
 
 ## Legende passend zum aktuellen Modus (Erkunden, Vogelperspektive, Werkzeug).
 func _update_legend() -> void:
@@ -142,6 +219,12 @@ func _update_legend() -> void:
 
 func _update_clock() -> void:
 	_clock_label.text = "Tag %d  ·  %s" % [WorldClock.day, WorldClock.get_time_string()]
+	if _day_value:
+		var day_text := "Tag %d" % WorldClock.day
+		_day_value.text = day_text
+		_day_value.add_theme_font_size_override("font_size", 68 if day_text.length() <= 5 else 56)
+	if _time_value:
+		_time_value.text = WorldClock.get_time_string()
 
 
 func _on_minute_changed(_hour: int, _minute: int) -> void:
@@ -155,6 +238,9 @@ func _on_day_changed(_day: int) -> void:
 func _on_time_scale_changed(time_scale: float) -> void:
 	_speed_label.visible = time_scale > 1.0
 	_speed_label.text = "×%d" % int(time_scale)
+	if _bar_speed_label:
+		_bar_speed_label.visible = time_scale > 1.0
+		_bar_speed_label.text = "×%d" % int(time_scale)
 
 
 func _on_view_mode_changed(mode: GameDefs.ViewMode) -> void:
@@ -194,50 +280,115 @@ func _on_game_loaded(_slot: String) -> void:
 	show_toast("Spielstand geladen")
 
 
-## Gemeindekasse (Münze + Betrag) und ein Knopf fürs Notizbuch neben der Uhr.
+## Der Referenzrahmen bleibt erhalten; Geld, Tag und Uhrzeit sind echte Live-Werte.
 func _build_money_display() -> void:
-	var clock_row := _clock_label.get_parent() as HBoxContainer
-	var coin := TextureRect.new()
-	coin.texture = COIN_ICON
-	coin.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	coin.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	coin.custom_minimum_size = Vector2(24, 24)
-	coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	clock_row.add_child(coin)
-	clock_row.move_child(coin, 0)
-	_money_label = Label.new()
-	_money_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.5))
-	clock_row.add_child(_money_label)
-	clock_row.move_child(_money_label, 1)
-	var dot := Label.new()
-	dot.text = "·"
-	clock_row.add_child(dot)
-	clock_row.move_child(dot, 2)
+	$Root/ClockPanel.visible = false
+	_status_bar = Control.new()
+	_status_bar.name = "PremiumStatusBar"
+	_status_bar.size = Vector2(1410, 213)
+	_status_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	$Root.add_child(_status_bar)
+	var crop := AtlasTexture.new()
+	crop.atlas = STATUS_BAR_ART
+	crop.region = Rect2(130, 83, 1410, 213)
+	var artwork := TextureRect.new()
+	artwork.name = "StatusBarArtwork"
+	artwork.texture = crop
+	artwork.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	artwork.stretch_mode = TextureRect.STRETCH_SCALE
+	artwork.size = _status_bar.size
+	artwork.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_status_bar.add_child(artwork)
+	_money_label = _status_value("MoneyValue", Vector2(263, 58), Vector2(253, 105), 71)
+	_day_value = _status_value("DayValue", Vector2(688, 58), Vector2(250, 105), 68)
+	_time_value = _status_value("TimeValue", Vector2(1100, 58), Vector2(235, 105), 68)
+	_bar_speed_label = _status_value("SpeedValue", Vector2(1217, 155), Vector2(112, 32), 20)
+	_bar_speed_label.visible = false
+	_clock_hands = HudClockHands.new()
+	_clock_hands.name = "ClockHands"
+	_clock_hands.position = CLOCK_CENTER
+	_status_bar.add_child(_clock_hands)
+	_clock_hands.set_time(WorldClock.time_of_day)
+	_status_bar.add_child(_build_notebook_button())
+	_layout_status_bar()
+	get_viewport().size_changed.connect(_layout_status_bar)
+	Economy.money_changed.connect(_on_money_changed)
+	_on_money_changed(Economy.money)
+
+
+## Notizbuch-Knopf neben der Uhr – Gestaltung wie vom Nutzer angelegt (flaches Symbol).
+## Die Mindestgröße verhindert, dass der Knopf auf wenige Pixel zusammenschrumpft.
+func _build_notebook_button() -> Button:
 	var book := Button.new()
+	book.name = "NotebookButton"
 	book.icon = NOTEBOOK_ICON
 	book.expand_icon = true
 	book.flat = true
 	book.focus_mode = Control.FOCUS_NONE
-	book.custom_minimum_size = Vector2(34, 30)
+	# Größe in Leisteneinheiten: bleibt mit der kleineren Leiste ein gut klickbares
+	# Symbol (≈ 20 px bei 1280×720), mittig zur Zahlenzeile.
+	book.position = Vector2(1416, 78)
+	book.custom_minimum_size = Vector2(64, 64)
+	book.size = Vector2(64, 64)
 	book.tooltip_text = "Notizbuch (Taste %s)" % InputConfig.get_action_label(&"toggle_notebook")
 	book.pressed.connect(Events.notebook_requested.emit.bind(""))
-	clock_row.add_child(book)
-	Economy.money_changed.connect(_on_money_changed)
-	_on_money_changed(Economy.money)
+	return book
+
+
+func get_clock_hands() -> HudClockHands:
+	return _clock_hands
+
+
+func _status_value(node_name: String, at: Vector2, dimensions: Vector2, font_size: int) -> Label:
+	var value := Label.new()
+	value.name = node_name
+	value.position = at
+	value.size = dimensions
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	value.clip_text = true
+	var font := SystemFont.new()
+	font.font_names = PackedStringArray(["Georgia", "Palatino Linotype", "Noto Serif", "Times New Roman"])
+	value.add_theme_font_override("font", font)
+	value.add_theme_font_size_override("font_size", font_size)
+	value.add_theme_color_override("font_color", Color("542a1b"))
+	value.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_status_bar.add_child(value)
+	return value
+
+
+func _layout_status_bar() -> void:
+	if _status_bar == null:
+		return
+	var viewport_size := get_viewport().get_visible_rect().size
+	var viewport_factor := minf(viewport_size.x / 1672.0, viewport_size.y / 941.0)
+	# Etwa ein Drittel der Bildbreite (CD-Wunsch: vorher 52 %, „viel zu groß“)
+	var factor := viewport_factor * STATUS_BAR_SCALE
+	_status_bar.scale = Vector2.ONE * factor
+	_status_bar.position = Vector2((viewport_size.x - 1410.0 * factor) * 0.5, 14.0 * viewport_factor)
+	var toast_top := _status_bar.position.y + 213.0 * factor + 12.0 * viewport_factor
+	_toast_label.offset_top = toast_top
+	_toast_label.offset_bottom = toast_top + 36.0 * viewport_factor
 
 
 ## Der Betrag zählt weich zum neuen Wert (kein hektisches Springen).
 func _on_money_changed(money: int) -> void:
 	if _shown_money < 0:
 		_shown_money = money
-		_money_label.text = Economy.format_money(money, false)
+		_set_money_text(money)
 		return
 	if _money_tween and _money_tween.is_valid():
 		_money_tween.kill()
 	_money_tween = create_tween()
 	_money_tween.tween_method(func(value: float) -> void:
 		_shown_money = roundi(value)
-		_money_label.text = Economy.format_money(_shown_money, false), float(_shown_money), float(money), 0.6)
+		_set_money_text(_shown_money), float(_shown_money), float(money), 0.6)
+
+
+func _set_money_text(amount: int) -> void:
+	var amount_text := Economy.format_money(amount, false)
+	_money_label.text = amount_text
+	_money_label.add_theme_font_size_override("font_size", 71 if amount_text.length() <= 6 else (59 if amount_text.length() <= 8 else 48))
 
 
 func get_money_text() -> String:
@@ -245,7 +396,12 @@ func get_money_text() -> String:
 
 
 func _on_build_cost_changed(cost: Dictionary) -> void:
+	var signature := hash([cost,Economy.revision,_build_active])
+	if signature==_cost_signature:
+		return
+	_cost_signature = signature
 	for child in _cost_row.get_children():
+		_cost_row.remove_child(child)
 		child.queue_free()
 	_cost_row.visible = not cost.is_empty() and _build_active
 	if cost.is_empty():
@@ -275,6 +431,14 @@ func _on_build_cost_changed(cost: Dictionary) -> void:
 		_cost_row.add_child(amount)
 	if cost.size() == 0 or entries.is_empty():
 		title.text = "Kostenlos"
+	# Fehlende Baustoffe kauft der Baustoffhandel dazu (Epochen-Spiel).
+	var shop := Economy.get_shop_cost(cost)
+	if shop > 0:
+		var note := Label.new()
+		note.text = "+ %s Baustoffhandel" % Economy.format_money(shop)
+		note.add_theme_font_size_override("font_size", 14)
+		note.add_theme_color_override("font_color", Color(1.0, 0.8, 0.45))
+		_cost_row.add_child(note)
 
 
 ## Objekte der gewählten Dorf-Kategorie als kleine Buttons.

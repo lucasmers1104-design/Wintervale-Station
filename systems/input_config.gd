@@ -29,6 +29,8 @@ const KEY_BINDINGS := {
 	&"toggle_fullscreen": [KEY_F11],
 	&"release_mouse": [KEY_ESCAPE],
 	&"build_mode": [KEY_B],
+	&"build_tool_station": [KEY_H],
+	&"region_overview": [KEY_P],
 	&"toggle_notebook": [KEY_N],
 	&"next_season": [KEY_J],
 	&"next_weather": [KEY_K],
@@ -68,6 +70,7 @@ const MOUSE_BINDINGS := {
 ## Werkzeuge im Build-Mode. Die Reihenfolge bestimmt Buttons und Zifferntasten.
 const BUILD_TOOLS: Array[Dictionary] = [
 	{"id": &"rail", "action": &"build_tool_rail", "label": "Schiene"},
+	{"id": &"station", "action": &"build_tool_station", "label": "Haltepunkt"},
 	{"id": &"switch", "action": &"build_tool_switch", "label": "Weiche"},
 	{"id": &"signal", "action": &"build_tool_signal", "label": "Signal"},
 	{"id": &"remove", "action": &"build_tool_remove", "label": "Entfernen"},
@@ -101,6 +104,7 @@ const LEGENDS := {
 		{"actions": [&"interact_primary"], "text": "Zug anklicken: mitfahren"},
 		{"actions": [&"interact_primary"], "text": "Weiche anklicken: umstellen"},
 		{"actions": [&"build_mode"], "text": "Bauen"},
+		{"actions": [&"region_overview"], "text": "Reise & Fuhrpark"},
 		{"actions": [&"toggle_view"], "text": "Zur Spielfigur"},
 	],
 	&"build_rail": [
@@ -116,7 +120,11 @@ const LEGENDS := {
 		{"literal": ["Mausseite"], "text": "Fahrtrichtung"},
 	],
 	&"build_remove": [
-		{"actions": [&"interact_primary"], "text": "Gleis, Signal oder Dorfobjekt entfernen"},
+		{"actions": [&"interact_primary"], "text": "Gleis, Haltepunkt, Signal oder Dorfobjekt entfernen"},
+	],
+	&"build_station": [
+		{"actions": [&"interact_primary"], "text": "Neben dem Gleis: Haltepunkt errichten"},
+		{"actions": [&"build_tool_remove"], "text": "Falsch gesetzt? Entfernen"},
 	],
 	&"build_village": [
 		{"actions": [&"interact_primary"], "text": "Setzen / Linie: Start und Ende"},
@@ -129,6 +137,7 @@ const LEGENDS := {
 		{"actions": [&"interact_primary"], "text": "Signal: Halt ein / aus"},
 	],
 	&"build_common": [
+		{"actions": [&"build_tool_station"], "text": "Haltepunkt"},
 		{"actions": [&"build_tool_rail", &"build_tool_switch", &"build_tool_signal", &"build_tool_remove",
 			&"build_tool_test"], "text": "Bahn-Werkzeug"},
 		{"actions": [&"build_tool_houses", &"build_tool_paths", &"build_tool_nature", &"build_tool_lighting",
@@ -149,6 +158,7 @@ const LEGENDS := {
 		{"actions": [&"quick_save"], "text": "Speichern"},
 		{"actions": [&"quick_load"], "text": "Laden"},
 		{"actions": [&"toggle_help"], "text": "Legende"},
+		{"actions": [&"release_mouse"], "text": "Menü / Pause"},
 	],
 }
 

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Gesperrt: Messingschloss -->
+  <g stroke="#3b2a20" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M20 28 V20 C20 8 44 8 44 20 V28" fill="none" stroke-width="6"/>
+    <path d="M20 28 V20 C20 8 44 8 44 20 V28" fill="none" stroke="#b9b2a6" stroke-width="2.4"/>
+    <rect x="12" y="27" width="40" height="30" rx="6" fill="#d9a441"/>
+    <circle cx="32" cy="39" r="4.5" fill="#3b2a20"/>
+    <path d="M32 42 V50" stroke-width="4"/>
+  </g>
+</svg>

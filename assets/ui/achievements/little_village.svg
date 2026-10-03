@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+<defs><radialGradient id="seal"><stop stop-color="#f9d898"/><stop offset=".64" stop-color="#d49a4a"/><stop offset="1" stop-color="#6d391f"/></radialGradient><linearGradient id="face" x2="0" y2="1"><stop stop-color="#734325"/><stop offset="1" stop-color="#2f201b"/></linearGradient></defs>
+<path d="M48 3 57 8 68 7 74 16 84 20 86 31 93 40 89 50 91 61 82 69 78 80 67 83 58 91 48 87 38 91 29 83 18 80 14 69 5 61 7 50 3 40 10 31 12 20 22 16 28 7 39 8z" fill="url(#seal)" stroke="#362018" stroke-width="2"/>
+<circle cx="48" cy="48" r="38" fill="none" stroke="#ffe4a8" stroke-opacity=".75" stroke-width="1.5"/><circle cx="48" cy="48" r="34" fill="url(#face)" stroke="#29190e" stroke-width="2"/>
+<path d="M23 29q25-18 50 0" fill="none" stroke="#ffe4a8" stroke-opacity=".4" stroke-width="1.2"/>
+<g fill="none" stroke="#e8bb77" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><path d="M16 50 31 37l15 13M22 46v25h20V46M48 44l15-14 16 14M54 40v31h20V40M28 56h7m27-7h7M14 73h68"/></g>
+<path d="M31 80h34" stroke="#f7d998" stroke-width=".8"/><text x="48" y="86" text-anchor="middle" font-family="Georgia,serif" font-size="9" font-weight="bold" fill="#fff0bd">25</text>
+</svg>

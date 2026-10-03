@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Gueter: Holzkiste mit Seil -->
+  <g stroke="#3b2a20" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M8 22 L32 12 L56 22 L32 32 Z" fill="#e0a95a"/>
+    <path d="M8 22 V46 L32 56 V32 Z" fill="#c98a3d"/>
+    <path d="M56 22 V46 L32 56 V32 Z" fill="#a86c2c"/>
+    <path d="M8 34 L32 44 L56 34" fill="none" stroke-width="2"/>
+    <path d="M20 17 L44 27 V39" fill="none" stroke="#7a5518" stroke-width="3"/>
+  </g>
+</svg>

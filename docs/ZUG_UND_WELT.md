@@ -1,5 +1,9 @@
 # Etappe 9.5 – Premium-Zug und Welt-Feinschliff
 
+> Aktualisierung vom 2. Oktober 2026: Leerer Neustart, sechs Epochen und Bahnhofsstufen, sechs weitere Referenzzüge, regionale Linien, Güterversorgung und organisches Ortswachstum sind in [PROGRESSION.md](PROGRESSION.md) dokumentiert, einschließlich Bedienung, Save-Kompatibilität und Integrationstests.
+
+> Aktualisierung vom 1. Oktober 2026: Die nachfolgend beschriebene ursprüngliche Regionaltriebzug-Geometrie wurde durch den kantigen Normalzug und WinterSpecial nach den neuen Bildvorlagen ersetzt. Aktueller Aufbau: `scripts/procgen/reference_railcar_meshes.gd`; Aufnahmen, Bildabweichungen und Prüfergebnisse: [TRAIN_REFERENCE_QA.md](TRAIN_REFERENCE_QA.md). Die Angaben zu Rundnase, dunklem Führerstand und drittem Frontscheinwerfer unten dokumentieren den früheren Stand.
+
 ## Neuer Regionaltriebzug (`scripts/procgen/railcar_meshes.gd`)
 
 RE und RB fahren jetzt als moderner, dreiteiliger Triebzug: `railcar_front`, `railcar_middle`, `railcar_rear`. Die alte Lok mit Wagen (`loco_regional`, `coach`) gibt es weiterhin. Man kann sie in jeder Zuggattung wieder eintragen.

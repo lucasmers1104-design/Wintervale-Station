@@ -90,6 +90,18 @@ func _process(delta: float) -> void:
 func get_trains() -> Array[Train]:
 	return _trains
 
+## Regional services share all simulation, occupancy, materials and sound hooks.
+func spawn_region_train(entry: TimetableEntry, path: TrainPath) -> Train:
+	var train := Train.new()
+	add_child(train)
+	train.setup(_next_id,entry,path,self,network,interlocking,_materials)
+	_next_id += 1
+	train.set_meta("entry_index",-1)
+	train.set_dark(_dark)
+	_trains.append(train)
+	trains_changed.emit()
+	return train
+
 
 # --- Fahrplan -------------------------------------------------------------------------
 

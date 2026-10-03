@@ -23,10 +23,16 @@ void fragment() {
 	float fresnel = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
 	float band = fract((local_pos.x * 0.6 + local_pos.z * 0.6 + local_pos.y * 1.1) * 0.8);
 	float streak = smoothstep(0.0, 0.05, band) * (1.0 - smoothstep(0.12, 0.2, band));
-	ALBEDO = mix(glass_color, sky_tint, clamp(fresnel * 0.55 + streak * shine * (1.0 - glow), 0.0, 0.8));
+	// Tagsüber spiegelt der obere Teil der Scheibe den Himmel (Grün = Höhe im Fenster),
+	// unten schimmert es warm aus dem Raum – so lesen sich Fenster als Glas statt als
+	// graue Fläche. Nachts tritt die Spiegelung hinter das Lampenlicht zurück.
+	float day = 1.0 - glow;
+	float upper_sky = smoothstep(0.35, 1.0, COLOR.g) * 0.32 * day;
+	ALBEDO = mix(glass_color, sky_tint, clamp(fresnel * 0.55 + upper_sky + streak * shine * day, 0.0, 0.8));
 	ROUGHNESS = 0.12;
 	METALLIC = 0.15;
 	SPECULAR = 0.7;
 	float lamp = COLOR.r * (0.75 + 0.25 * (1.0 - COLOR.g));
-	EMISSION = light_color * lamp * (0.06 + glow * glow_energy);
+	float room = (1.0 - smoothstep(0.2, 0.8, COLOR.g)) * 0.1 * day;
+	EMISSION = light_color * lamp * (0.07 + room + glow * glow_energy);
 }

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Umbenennen: Bleistift -->
+  <g stroke="#3b2a20" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M44 8 L56 20 L22 54 L8 56 L10 42 Z" fill="#e0a95a"/>
+    <path d="M38 14 L50 26" fill="none"/>
+    <path d="M10 42 L22 54 L8 56 Z" fill="#f0e2c4"/>
+    <path d="M44 8 L56 20 L52 24 L40 12 Z" fill="#c9443a"/>
+  </g>
+</svg>

@@ -29,6 +29,7 @@ func _ready() -> void:
 	WorldClock.set_time(12.0)
 	WorldClock.paused = true
 	main = load("res://scenes/main/main.tscn").instantiate()
+	main.legacy_world = true
 	add_child(main)
 	village = main.get_node("World/Village")
 	director = main.get_node("NpcDirector")
@@ -270,19 +271,28 @@ func _test_arrival_by_train() -> void:
 	var alighted: Array = []
 	director.passenger_alighted.connect(func(npc: Npc, _train: Train) -> void: alighted.append(npc))
 	var n := 0
+	# Wer zuerst ankommt, lebt danach normal weiter (z.B. Abendspaziergang) –
+	# deshalb pro Person merken, ob sie ihr neues Zuhause erreicht hat.
+	var reached_home := {}
 	while npcs.any(func(npc: Npc) -> bool: return npc.is_moving_in()) and n < 30000:
 		await get_tree().physics_frame
 		n += 1
+		for npc in npcs:
+			if npc.state == Npc.State.AT_HOME and not npc.is_moving_in():
+				reached_home[npc] = true
+	for npc in npcs:
+		if npc.state == Npc.State.AT_HOME and not npc.is_moving_in():
+			reached_home[npc] = true
 	WorldClock.time_scale = 1.0
 	WorldClock.paused = true
 	dispatcher.enabled = false
 	dispatcher.clear_trains()
 	check(npcs.all(func(npc: Npc) -> bool: return alighted.has(npc)), "the family got off a train at Wintervale")
 	for npc in npcs:
-		if npc.state != Npc.State.AT_HOME or npc.is_moving_in():
+		if not reached_home.has(npc):
 			print("      %s: state %d, moving %s, busy %s, at %s, frames %d, time %.2f" % [npc.display_name, npc.state, npc.is_moving(),
 				npc.is_busy(), npc.global_position, n, WorldClock.time_of_day])
-	check(npcs.all(func(npc: Npc) -> bool: return npc.state == Npc.State.AT_HOME and not npc.is_moving_in()),
+	check(npcs.all(func(npc: Npc) -> bool: return reached_home.has(npc)),
 		"and walked home with their suitcases")
 
 

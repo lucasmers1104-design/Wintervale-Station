@@ -16,6 +16,35 @@ const MIX_RATE := 22050
 static var _cache := {}
 
 
+static func category_for_stream(stream: AudioStream) -> String:
+	if stream == null:
+		return ""
+	for sound_name: String in _cache:
+		if _cache[sound_name] != stream:
+			continue
+		if sound_name in ["wind", "tree_wind", "snow_hiss", "rain_roof", "fog_horn"]:
+			return "WintervaleWeather"
+		if sound_name in ["rolling", "clack", "brake", "brake_squeal", "horn", "door_open", "door_close", "door_unlock", "stairs_in", "stairs_out", "chime"]:
+			return "WintervaleTrain"
+		if sound_name in ["page", "done_chime"]:
+			return "WintervaleUI"
+		return "WintervaleAmbient"
+	return ""
+
+
+static func category_for_player(player: Node) -> String:
+	var stream: AudioStream = player.get(&"stream")
+	var category := category_for_stream(stream)
+	if category != "":
+		return category
+	var cursor := player.get_parent()
+	while cursor:
+		if cursor.name == "Festivals":
+			return "WintervaleMusic" if stream and stream.get_length() >= 8.0 else "WintervaleAmbient"
+		cursor = cursor.get_parent()
+	return ""
+
+
 static func get_sound(sound_name: String) -> AudioStreamWAV:
 	if _cache.has(sound_name):
 		return _cache[sound_name]
@@ -857,4 +886,7 @@ static var audible := DisplayServer.get_name() != "headless"
 ## Spielt [param player] ab, sofern es eine Audioausgabe gibt.
 static func play(player: Node) -> void:
 	if audible:
+		var category := category_for_player(player)
+		if category != "":
+			player.set(&"bus", category)
 		player.call(&"play")

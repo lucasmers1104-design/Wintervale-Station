@@ -553,7 +553,7 @@ func _on_climbed_out() -> void:
 		var gesture: CharacterModel.Pose = [CharacterModel.Pose.STRETCH, CharacterModel.Pose.LOOK_UP,
 			CharacterModel.Pose.CHECK_WATCH, CharacterModel.Pose.STAND][_rng.randi() % 4]
 		model.play_gesture(gesture, 2.0)
-		get_tree().create_timer(_rng.randf_range(1.2, 2.6) / director.speed_factor()).timeout.connect(func() -> void:
+		get_tree().create_timer(_rng.randf_range(1.2, 2.6) / director.speed_factor(), false).timeout.connect(func() -> void:
 			if not is_instance_valid(self):
 				return
 			_busy = false
@@ -845,7 +845,7 @@ func _arrive_festival_activity() -> void:
 			_festival.on_customer(self, activity)
 			var mug := bool(activity.get("mug", false))
 			var icon := String(activity.get("icon", ""))
-			get_tree().create_timer(2.4 / director.speed_factor()).timeout.connect(func() -> void:
+			get_tree().create_timer(2.4 / director.speed_factor(), false).timeout.connect(func() -> void:
 				if not is_instance_valid(self) or state != State.FESTIVAL:
 					return
 				if mug:
@@ -1009,9 +1009,9 @@ func join_procession(route: PackedVector3Array, delay: float) -> void:
 				model.set_pose(CharacterModel.Pose.STAND)
 				show_icon("lantern", 3.0), 0.62), 0.9)
 	if _seated:
-		_stand_up(func() -> void: get_tree().create_timer(delay).timeout.connect(start))
+		_stand_up(func() -> void: get_tree().create_timer(delay, false).timeout.connect(start))
 	else:
-		get_tree().create_timer(maxf(delay, 0.05)).timeout.connect(start)
+		get_tree().create_timer(maxf(delay, 0.05), false).timeout.connect(start)
 
 
 ## Was jemand auf dem Fest gerade erzählt (für Gespräche).
@@ -1240,14 +1240,14 @@ func walk_to(target: Vector3, on_arrive := Callable(), pace := 1.0) -> void:
 	if director.walk_graph == null:
 		_walk_path(PackedVector3Array([global_position, target]), on_arrive, pace)
 		return
-	var path := director.walk_graph.find_path(global_position, target)
+	var path := director.find_walk_path(global_position, target)
 	# Lieblingsweg: auf längeren Wegen (Haus ↔ Bahnhof) gern über den Lieblingsplatz,
 	# solange der Umweg nicht zu groß ist
 	var via := profile.favourite_via if profile else Vector3.INF
 	if via != Vector3.INF and global_position.distance_to(target) > 22.0 \
 			and via.distance_to(global_position) > 4.0 and via.distance_to(target) > 4.0:
-		var first := director.walk_graph.find_path(global_position, via)
-		var second := director.walk_graph.find_path(via, target)
+		var first := director.find_walk_path(global_position, via)
+		var second := director.find_walk_path(via, target)
 		var combined := first.duplicate()
 		for i in range(1, second.size()):
 			combined.append(second[i])

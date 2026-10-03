@@ -17,7 +17,9 @@ func build(segment: RailSegment, ballast_material: Material, rail_material: Mate
 	collision_layer = GameDefs.LAYER_RAILS
 	collision_mask = 0
 
-	var parts := RailMeshes.create_track(segment.curve, segment.id)
+	# Tunnelgleise sind nur am Mundloch sichtbar; dahinter liegt der Berg.
+	var curve := segment.curve if not segment.tunnel else _tunnel_mouth(segment.curve)
+	var parts := RailMeshes.create_track(curve, segment.id)
 	_add_mesh(parts["ballast"], ballast_material)
 	_add_mesh(parts["rails"], rail_material)
 
@@ -27,6 +29,18 @@ func build(segment: RailSegment, ballast_material: Material, rail_material: Mate
 	var collision := CollisionShape3D.new()
 	collision.shape = shape
 	add_child(collision)
+
+
+## Die ersten Meter eines Tunnelgleises (vom Mundloch aus).
+static func _tunnel_mouth(curve: Curve3D, visible_length := 18.0) -> Curve3D:
+	var length := curve.get_baked_length()
+	if length <= visible_length:
+		return curve
+	var part := Curve3D.new()
+	var steps := 8
+	for i in steps + 1:
+		part.add_point(curve.sample_baked(visible_length * i / steps, true))
+	return part
 
 
 ## Überlagert das Gleis mit einem Hervorhebungs-Material (null = normal).

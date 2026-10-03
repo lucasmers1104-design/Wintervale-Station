@@ -76,6 +76,7 @@ ambient_light_color = Color(0.64, 0.62, 0.72, 1)
 ambient_light_energy = 0.5
 reflected_light_source = 2
 tonemap_mode = 3
+tonemap_white = 2.0
 ssao_enabled = true
 ssao_radius = 1.2
 ssao_intensity = 1.6
@@ -116,6 +117,8 @@ weather = NodePath("../Weather")
 light_color = Color(1, 0.88, 0.7, 1)
 light_angular_distance = 0.8
 shadow_enabled = true
+shadow_bias = 0.06
+shadow_normal_bias = 2.0
 directional_shadow_blend_splits = true
 directional_shadow_max_distance = 95.0
 
@@ -123,6 +126,8 @@ directional_shadow_max_distance = 95.0
 light_color = Color(0.8, 0.82, 0.9, 1)
 light_energy = 0.0
 shadow_enabled = true
+shadow_bias = 0.06
+shadow_normal_bias = 2.0
 directional_shadow_blend_splits = true
 directional_shadow_max_distance = 80.0
 

@@ -6,6 +6,9 @@
 ## Außerdem: Mausfang und Vollbild.
 extends Node
 
+const BINDINGS_PATH := "user://keybindings.cfg"
+var storage_path := QaSandbox.redirect(BINDINGS_PATH)
+
 
 func _enter_tree() -> void:
 	for action: StringName in InputConfig.KEY_BINDINGS:
@@ -32,6 +35,65 @@ func _enter_tree() -> void:
 			var event := InputEventMouseButton.new()
 			event.button_index = button as MouseButton
 			InputMap.action_add_event(action, event)
+	_load_bindings()
+
+
+func rebind_key(action: StringName, physical_keycode: Key) -> String:
+	if not InputConfig.KEY_BINDINGS.has(action) or physical_keycode == KEY_NONE:
+		return "This action cannot be rebound."
+	for other: StringName in InputMap.get_actions():
+		if other == action:
+			continue
+		for bound: InputEvent in InputMap.action_get_events(other):
+			if bound is InputEventKey and not bound.ctrl_pressed and not bound.alt_pressed \
+					and not bound.shift_pressed and not bound.meta_pressed \
+					and (bound.physical_keycode == physical_keycode or
+						(bound.physical_keycode == KEY_NONE and bound.keycode == physical_keycode)):
+				return "Key already used for %s." % String(other).replace("_", " ").capitalize()
+	InputMap.action_erase_events(action)
+	var event := InputEventKey.new()
+	event.physical_keycode = physical_keycode
+	InputMap.action_add_event(action, event)
+	_save_bindings()
+	return ""
+
+
+func restore_default_bindings() -> void:
+	for action: StringName in InputConfig.KEY_BINDINGS:
+		InputMap.action_erase_events(action)
+		for keycode: int in InputConfig.KEY_BINDINGS[action]:
+			var event := InputEventKey.new()
+			event.physical_keycode = keycode as Key
+			InputMap.action_add_event(action, event)
+	var config := ConfigFile.new()
+	config.save(storage_path)
+
+
+func _load_bindings() -> void:
+	var config := ConfigFile.new()
+	if config.load(storage_path) != OK:
+		return
+	for action_name in config.get_section_keys("keys"):
+		var action := StringName(action_name)
+		if not InputConfig.KEY_BINDINGS.has(action):
+			continue
+		var code := int(config.get_value("keys", action_name, 0))
+		if code == 0:
+			continue
+		InputMap.action_erase_events(action)
+		var event := InputEventKey.new()
+		event.physical_keycode = code as Key
+		InputMap.action_add_event(action, event)
+
+
+func _save_bindings() -> void:
+	var config := ConfigFile.new()
+	for action: StringName in InputConfig.KEY_BINDINGS:
+		for event: InputEvent in InputMap.action_get_events(action):
+			if event is InputEventKey:
+				config.set_value("keys", String(action), event.physical_keycode)
+				break
+	config.save(storage_path)
 
 
 func _unhandled_input(event: InputEvent) -> void:

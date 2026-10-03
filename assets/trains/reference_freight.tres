@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="TrainType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trains/train_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+type_code = "GZ"
+display_name = "Güterzug"
+category = 1
+consist = PackedStringArray("reference_freight_loco", "reference_boxcar", "wagon_timber", "reference_tank", "reference_coal")
+max_speed_kmh = 55.0
+acceleration = 0.25
+min_dwell_seconds = 8.0
+primary_color = Color(0.76, 0.15, 0.11, 1)
+secondary_color = Color(0.96, 0.9, 0.78, 1)
+accent_color = Color(0.98, 0.76, 0.12, 1)
+roof_color = Color(0.17, 0.175, 0.19, 1)
+required_epoch = 3
+required_station_level = 3
+passenger_capacity = 0
+cargo_capacity = 94
+rolling_pitch = 0.78
+purchase_price = 400
+comfort = 1.45
+service_role = "Baustoffe und Holz"
+horn_pitch = 0.9650000000000001
+

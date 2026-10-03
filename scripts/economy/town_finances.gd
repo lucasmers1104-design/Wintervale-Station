@@ -27,11 +27,15 @@ func _on_passenger_boarded(_npc: Npc, _train: Train) -> void:
 func _on_hour_changed(hour: int) -> void:
 	if hour != tax_hour or npc_director == null:
 		return
-	var residents := npc_director.get_npcs().size()
+	var residents := _population()
 	if residents > 0:
 		Economy.earn(residents * tax_per_resident, "Gemeindeabgaben (%d Einwohner)" % residents, "taxes")
 
 
 ## Voraussichtliche Einnahmen pro Tag aus Abgaben (für das Notizbuch).
 func get_daily_taxes() -> int:
-	return (npc_director.get_npcs().size() if npc_director else 0) * tax_per_resident
+	return _population() * tax_per_resident
+
+func _population() -> int:
+	var progress := RegionProgression.find(get_tree())
+	return int(progress.metrics()["population"]) if progress else (npc_director.get_npcs().size() if npc_director else 0)

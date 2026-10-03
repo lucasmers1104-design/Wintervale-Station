@@ -206,7 +206,7 @@ func _book_origin() -> Vector2:
 func _build() -> void:
 	_root = Control.new()
 	_root.name = "Root"
-	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_root.size = JourneyStyle.DESIGN_SIZE
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_root)
 	_dim = ColorRect.new()
@@ -225,7 +225,7 @@ func _build() -> void:
 	_book.size = BOOK_SIZE
 	_book.mouse_filter = Control.MOUSE_FILTER_STOP
 	_root.add_child(_book)
-	_root.resized.connect(_layout)
+	get_viewport().size_changed.connect(_layout)
 	var half := BOOK_SIZE.x * 0.5
 	_left = _page_column(Rect2(Vector2(82, 58), Vector2(half - 128, BOOK_SIZE.y - 108)))
 	_right = _page_column(Rect2(Vector2(half + 52, 58), Vector2(half - 118, BOOK_SIZE.y - 108)))
@@ -277,15 +277,25 @@ func _build() -> void:
 
 
 func _page_column(rect: Rect2) -> VBoxContainer:
+	var page_scroll := ScrollContainer.new()
+	page_scroll.position = rect.position
+	page_scroll.size = rect.size
+	page_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_book.add_child(page_scroll)
 	var column := VBoxContainer.new()
-	column.position = rect.position
-	column.size = rect.size
-	column.custom_minimum_size = rect.size
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	column.add_theme_constant_override("separation", 6)
 	column.mouse_filter = Control.MOUSE_FILTER_PASS
 	column.clip_contents = true
-	_book.add_child(column)
+	page_scroll.add_child(column)
 	return column
+
+func reserve_guide_space(value: bool, footer := 244.0) -> void:
+	for column in [_left,_right]:
+		(column.get_parent() as ScrollContainer).size.y = BOOK_SIZE.y-(footer if value else 108)
+
+func guide_host() -> Control:
+	return _book
 
 
 func _tab_style(color: Color) -> StyleBoxFlat:
@@ -305,6 +315,10 @@ func _tab_style(color: Color) -> StyleBoxFlat:
 
 
 func _layout() -> void:
+	var viewport := get_viewport().get_visible_rect().size
+	var factor := JourneyStyle.screen_factor(viewport)
+	_root.scale = Vector2.ONE*factor
+	_root.size = viewport/factor
 	_book.position = _book_origin()
 	_update_tabs()
 
@@ -347,7 +361,8 @@ func _fill_page() -> void:
 
 func _page_storage() -> void:
 	_heading(_left, "Lager am Güterbahnhof")
-	_note(_left, "Güterzüge bringen das Material, der Kran legt es ins Lager. Häkchen = Dauerauftrag (wird abgenommen und bezahlt).")
+	var progress := RegionProgression.find(get_tree())
+	_note(_left, "Häkchen = Dauerauftrag für Güterlieferungen. Fehlende Baustoffe kannst du beim Bauen direkt zukaufen." if progress else "Güterzüge bringen das Material, der Kran legt es ins Lager. Häkchen = Dauerauftrag (wird abgenommen und bezahlt).")
 	for goods in Economy.get_goods():
 		var row := _row(_left, 12)
 		_icon(row, goods.icon, 52)
@@ -379,6 +394,9 @@ func _page_storage() -> void:
 		if reserved > 0:
 			detail = "%d für Baustellen zurückgelegt · " % reserved + detail
 		_label(column, detail, 14, INK_SOFT)
+	if progress:
+		_page_regional_storage(progress.region)
+		return
 	_heading(_right, "Kran & Lieferungen")
 	_label(_right, freight_yard.get_status_text() if freight_yard else "–", 17, INK_BLUE)
 	_divider(_right)
@@ -407,11 +425,35 @@ func _page_storage() -> void:
 			int(empties["pallet_stack"]), int(empties["container_empty"]), freight_yard.pallet_deposit, freight_yard.container_deposit])
 
 
+func _page_regional_storage(region: RegionRailway) -> void:
+	_heading(_right,"Baustoffhandel & Güterverkehr")
+	_note(_right,"Der Baustoffhandel ergänzt fehlendes Material beim Bauen. Eigene Güterlinien sind ab Epoche 3 verfügbar; bestellte Waren werden erst nach dem Umschlag eingelagert.")
+	_divider(_right)
+	_label(_right,"Deine Güterlinien",21,INK,true)
+	var count := 0
+	for line in region.lines:
+		var type := EpochCatalog.train(String(line["train"]))
+		if type.category!=TrainType.Category.FREIGHT:
+			continue
+		count += 1
+		_label(_right,"Linie %d · %s" % [int(line["id"]),type.display_name],18,INK,true)
+		var train := region.train_for_line(int(line["id"]))
+		_note(_right,train.get_info_text() if train else ("Wartet auf freie Gleise" if bool(line.get("enabled",true)) else "Pausiert"))
+	if count==0:
+		_note(_right,"Noch keine Güterlinie. Setze einen Güterzug im Fuhrpark ein, sobald er freigeschaltet ist.")
+	_divider(_right)
+	_label(_right,"Erfolgreich geliefert: %d Güter" % region.progression.goods,21,INK,true)
+	for station in region.stations:
+		if station.delivered_goods>0:
+			_label(_right,"%s · %d Güter" % [station.station_name,station.delivered_goods],17,INK_BLUE)
+	if not region._deliveries.is_empty():
+		_note(_right,"Gerade im Umschlag: %d Ladungen." % region._deliveries.size())
+
 func _page_residents() -> void:
 	var homes := _households()
 	var total := 0
 	for home in homes:
-		total += (home["npcs"] as Array).size()
+		total += int(home.get("count",(home["npcs"] as Array).size()))
 	_heading(_left, "Einwohner: %d" % total)
 	_note(_left, "%d Haushalte · neue Familien kommen mit dem Zug, sobald ihr Haus fertig ist." % homes.size())
 	if _selected_home == "" and not homes.is_empty():
@@ -475,6 +517,10 @@ func _page_residents() -> void:
 
 
 func _page_timetable() -> void:
+	var progress := RegionProgression.find(get_tree())
+	if progress:
+		_page_regional_timetable(progress.region)
+		return
 	_heading(_left, "Personenzüge")
 	var now := WorldClock.time_of_day
 	var entries: Array[TimetableEntry] = []
@@ -517,6 +563,28 @@ func _page_timetable() -> void:
 		var cargo_row := _row(_right, 8)
 		_label(cargo_row, "aus %s:" % entry.origin, 15, INK_SOFT)
 		_cargo_icons(cargo_row, consist_cargo(entry.train_type))
+
+func _page_regional_timetable(region: RegionRailway) -> void:
+	_heading(_left,"Personenzüge")
+	_heading(_right,"Güterverkehr")
+	if region.lines.is_empty():
+		_note(_left,"Noch keine Verbindung. Im Fuhrpark (P) kannst du einen Zug einsetzen.")
+	for line in region.lines:
+		var type := EpochCatalog.train(String(line["train"]))
+		var column := _right if type.category==TrainType.Category.FREIGHT else _left
+		var origin := region.station_by_id(int(line["a"]))
+		var destination := region.station_by_id(int(line["b"]))
+		if origin==null or destination==null:
+			continue
+		_divider(column)
+		_label(column,"Linie %d · %s" % [int(line["id"]),type.display_name],20,INK,true)
+		_label(column,"%s ⇄ %s" % [origin.station_name,destination.station_name],17,INK_BLUE)
+		var train := region.train_for_line(int(line["id"]))
+		var status := train.get_info_text() if train else ("Wartet auf freie Gleise" if bool(line.get("enabled",true)) else "Pausiert")
+		_note(column,status)
+		_label(column,"%d Ankünfte · %d Gäste · %d Güter" % [int(line.get("trips",0)),int(line.get("passengers",0)),int(line.get("goods",0))],16,INK_SOFT)
+		if type.category==TrainType.Category.FREIGHT:
+			_cargo_icons(_row(column,8),consist_cargo(type))
 
 
 func _page_projects() -> void:
@@ -706,22 +774,33 @@ func _households() -> Array[Dictionary]:
 	if village == null or npc_director == null:
 		return result
 	for house in village.get_houses():
+		var director := npc_director
+		var progress := RegionProgression.find(get_tree())
+		var station: RegionStation
+		if progress and house.region_station_id>0:
+			station = progress.region.station_by_id(house.region_station_id)
+			if station and is_instance_valid(station.director):
+				director = station.director
 		var npcs: Array = []
-		for npc in npc_director.get_npcs():
+		for npc in director.get_npcs():
 			if npc.profile and npc.profile.home_name == house.home_name:
 				npcs.append(npc)
 		var state := ""
 		if not house.is_finished():
 			state = "Baustelle %d %%" % roundi(house.build_progress * 100.0)
+		elif station and station.waiting_houses.has(house.object_id):
+			state = "Familie wartet auf einen Zug aus dem Tunnel"
+		elif station:
+			state = "%d Personen · %s" % [VillageManager.household_size(house),station.station_name]
 		elif npcs.is_empty():
 			state = "Haus bereit, Familie noch nicht da"
 		else:
-			var household := village.get_household(house).size() if not npc_director.has_family(house.home_name) else npcs.size()
+			var household := village.get_household(house).size() if not director.has_family(house.home_name) else npcs.size()
 			if household > npcs.size():
 				state = "%d von %d eingezogen" % [npcs.size(), household]
 		result.append({"home": house.home_name, "house": "%s (%s)" % [VillageCatalog.get_label(house.item_id),
 			"fertig seit Tag %d" % house.finished_day if house.finished_day > 0 else "von Anfang an"],
-			"state": state, "npcs": npcs})
+			"state": state, "npcs": npcs,"count":VillageManager.household_size(house) if station and house.is_finished() and not station.waiting_houses.has(house.object_id) else npcs.size()})
 	return result
 
 

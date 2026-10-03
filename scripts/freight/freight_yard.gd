@@ -129,6 +129,7 @@ var _time := 0.0
 var _rng := RandomNumberGenerator.new()
 var _dark := false
 var _built := false
+var progressive_dormant := false
 var _static_body: SurfaceTool
 var _static_glow: SurfaceTool
 
@@ -143,7 +144,7 @@ func _ready() -> void:
 
 
 func _setup() -> void:
-	if not is_inside_tree() or is_queued_for_deletion():
+	if progressive_dormant or not is_inside_tree() or is_queued_for_deletion():
 		return
 	yard_y = _find_track_height()
 	_level_ground()
@@ -186,11 +187,15 @@ func _job_travel_y() -> float:
 
 ## Rodet Bäume und Steine auf dem Hof ([PropScatter]).
 func clears(x: float, z: float) -> bool:
+	if progressive_dormant:
+		return false
 	return x > crane_west_x - 2.0 and x < 40.0 and z > runway_start_z - 4.0 and z < 27.0
 
 
 ## Gehört der Punkt zum Hof (dort baut das Dorf nicht)?
 func covers(x: float, z: float) -> bool:
+	if progressive_dormant:
+		return false
 	return x > 12.6 and x < 39.2 and z > runway_start_z - 2.2 and z < 25.2
 
 
@@ -989,9 +994,10 @@ func _set_phase(phase: String) -> void:
 
 ## Ist der Auftrag noch ausführbar (Zug steht noch, Platz ist noch belegt/frei)?
 func _job_valid() -> bool:
-	var car: TrainCar = _job["car"]
-	if not is_instance_valid(car) or get_current_train() == null:
+	# Erst prüfen, dann typisiert zuweisen: ein abgefahrener Zug ist schon freigegeben.
+	if not is_instance_valid(_job.get("car")) or get_current_train() == null:
 		return false
+	var car: TrainCar = _job["car"]
 	var entry: Dictionary = car.get_cargo()[_job["index"]]
 	if _job["kind"] == "unload":
 		return entry["state"] == "full"
@@ -1231,7 +1237,7 @@ func _pour_stones(at: Vector3) -> void:
 	particles.emitting = true
 	var pour := _make_player("gravel", -8.0, 40.0, particles)
 	SoundLibrary.play(pour)
-	get_tree().create_timer(2.5).timeout.connect(particles.queue_free)
+	get_tree().create_timer(2.5, false).timeout.connect(particles.queue_free)
 
 
 # --- Leben auf dem Hof ------------------------------------------------------------------------

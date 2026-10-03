@@ -49,6 +49,11 @@ void fragment() {
 		snow = 1.0;
 		color = ws_soft_snow(color);
 	} else {
+		// Sommerlaub (Vertex-Alpha 0.6–0.75, z.B. Birke) wächst erst dort, wo die
+		// Schneeauflage geschmolzen ist – umgekehrt zum Schnee auf den Ästen.
+		if (COLOR.a < 0.75 && !ws_layer_melted(world_pos)) {
+			discard;
+		}
 		// Nur grüne Flächen (Blätter, Nadeln) färben sich mit den Jahreszeiten
 		float leafy = smoothstep(0.02, 0.08, color.g - max(color.r, color.b));
 		float light = dot(color, vec3(0.3, 0.55, 0.15));

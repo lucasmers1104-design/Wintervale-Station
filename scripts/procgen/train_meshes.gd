@@ -33,6 +33,9 @@ const SPECS := {
 ## "empty" = Leergut, das auf frei gewordene Plätze zurückgeladen werden kann;
 ## "bulk" = Schüttgut, das der Kran mit dem Greifer in so vielen Portionen entlädt.
 const CARGO := {
+	"reference_boxcar": {"goods":"brick","amount":6,"piece":"brick_pallet","empty":"pallet_stack","slots":[Vector3(0,1.34,-3),Vector3(0,1.34,-1),Vector3(0,1.34,1),Vector3(0,1.34,3)]},
+	"reference_tank": {"goods":"glass","amount":8,"piece":"glass_container","enclosed":true,"empty":"container_empty","slots":[Vector3(0,1.35,-2),Vector3(0,1.35,2)]},
+	"reference_coal": {"goods":"stone","amount":8,"piece":"coal_pile","bulk":3,"slots":[Vector3.ZERO]},
 	"wagon_timber": {"goods": "wood", "amount": 10, "piece": "wood_bundle",
 		"slots": [Vector3(0.0, 1.36, -2.95), Vector3(0.0, 1.36, 0.0), Vector3(0.0, 1.36, 2.95)]},
 	"wagon_flat": {"goods": "brick", "amount": 6, "piece": "brick_pallet", "empty": "pallet_stack",
@@ -95,6 +98,8 @@ static func clear_cache() -> void:
 
 
 static func get_spec(kind: String) -> Dictionary:
+	if EraTrainMeshes.SPECS.has(kind):
+		return EraTrainMeshes.SPECS[kind]
 	if RailcarMeshes.SPECS.has(kind):
 		return RailcarMeshes.SPECS[kind]
 	return SPECS.get(kind, SPECS["coach"])
@@ -112,6 +117,14 @@ static func build_car(kind: String, livery: Dictionary, variant := 0) -> Diction
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(key)
 	var result: Dictionary
+	if EraTrainMeshes.SPECS.has(kind):
+		result = EraTrainMeshes.build(kind,livery,variant)
+		var era_spec := get_spec(kind)
+		result["length"] = era_spec["length"]
+		result["bogie"] = era_spec["bogie"]
+		result["wheel_base"] = era_spec["wheel_base"]
+		_cache[key] = result
+		return result
 	match kind:
 		"loco_regional":
 			result = _build_loco_regional(livery, rng)
@@ -563,6 +576,10 @@ static func create_cargo(piece: String, variant := 0) -> ArrayMesh:
 			_cargo_steel_bundle(st, rng)
 		"stone_pile":
 			_cargo_stone_pile(st, rng)
+		"coal_pile":
+			for z in range(-4,4):
+				for x: float in [-0.7,0.0,0.7]:
+					LowPolyBuilder.add_rock(st,rng,Vector3(x,2.45,z+0.5),0.44,Color(0.10,0.12,0.14),Color(0.18,0.19,0.20))
 		"stone_scoop":
 			for i in 5:
 				LowPolyBuilder.add_rock(st, rng, Vector3(rng.randf_range(-0.35, 0.35), 0.18 + rng.randf() * 0.2,

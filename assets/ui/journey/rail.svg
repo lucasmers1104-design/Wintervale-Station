@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Streckenlaenge: Gleis in die Ferne -->
+  <g stroke="#3b2a20" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M14 60 L26 6 H38 L50 60 Z" fill="#e8dcc2" stroke-width="2"/>
+    <g fill="#9a6a3c" stroke-width="2">
+      <rect x="12" y="50" width="40" height="5" rx="1"/>
+      <rect x="16" y="38" width="32" height="4.5" rx="1"/>
+      <rect x="19.5" y="27" width="25" height="4" rx="1"/>
+      <rect x="22.5" y="17" width="19" height="3.5" rx="1"/>
+      <rect x="25" y="9" width="14" height="3" rx="1"/>
+    </g>
+    <path d="M22 60 L29 6 M42 60 L35 6" fill="none" stroke="#5a5f66" stroke-width="3.2"/>
+  </g>
+</svg>

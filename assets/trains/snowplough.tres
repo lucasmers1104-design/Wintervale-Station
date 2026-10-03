@@ -18,3 +18,7 @@ secondary_color = Color(0.36, 0.38, 0.4, 1)
 accent_color = Color(0.14, 0.13, 0.12, 1)
 roof_color = Color(0.3, 0.3, 0.32, 1)
 horn_pitch = 0.74
+special = true
+required_station_level = 3
+passenger_capacity = 0
+service_role = "Winterlicher Streckendienst"

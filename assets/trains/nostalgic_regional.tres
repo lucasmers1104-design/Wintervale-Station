@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="TrainType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trains/train_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+type_code = "NR"
+display_name = "Nostalgischer Regionalzug"
+category = 0
+consist = PackedStringArray("heritage_loco", "heritage_coach", "heritage_coach", "heritage_loco_rear")
+max_speed_kmh = 65.0
+acceleration = 0.38
+min_dwell_seconds = 8.0
+primary_color = Color(0.09, 0.3, 0.22, 1)
+secondary_color = Color(0.95, 0.9, 0.76, 1)
+accent_color = Color(0.96, 0.76, 0.2, 1)
+roof_color = Color(0.17, 0.175, 0.19, 1)
+required_epoch = 2
+required_station_level = 2
+passenger_capacity = 64
+cargo_capacity = 0
+purchase_price = 240
+comfort = 1.3
+service_role = "Landverbindung · Lok an beiden Enden"
+rolling_pitch = 0.9
+horn_pitch = 1.01
+

@@ -269,9 +269,7 @@ func _on_returned(owner: Npc, player: Node) -> void:
 	owner.model.carry = CharacterModel.Carry.SUITCASE
 	owner.say("Mein Koffer! Sie sind ein Engel – tausend Dank!", 5.0)
 	owner.model.play_gesture(CharacterModel.Pose.WAVE, 2.2)
-	get_tree().create_timer(3.0).timeout.connect(func() -> void:
-		if is_instance_valid(owner):
-			owner.show_icon("heart", 3.0))
+	get_tree().create_timer(3.0, false).timeout.connect(owner.show_icon.bind("heart", 3.0))
 	Economy.earn(REWARD, "Finderlohn: Koffer zurückgebracht", "reward")
 	_stats["luggage_returned"] = int(_stats["luggage_returned"]) + 1
 	Events.event_banner_requested.emit("Danke!", "Der Koffer ist wieder bei seinem Besitzer · Finderlohn %d" % REWARD, "heart")
@@ -281,16 +279,21 @@ func _on_returned(owner: Npc, player: Node) -> void:
 
 ## Der Besitzer fährt mit dem nächsten Zug wieder zurück.
 func _owner_leaves(owner: Npc, after: float) -> void:
-	var destination := _owner_destination
-	get_tree().create_timer(after).timeout.connect(func() -> void:
-		if not is_instance_valid(owner):
-			return
-		owner.special_interaction = {}
-		owner.trip_destination = destination if destination != "" else owner.trip_destination
-		if owner.trip_destination == "":
-			owner.leave_to_village()
-		if owner == _owner:
-			_owner = null)
+	# Gebundene Methode + WeakRef statt Lambda mit erfasstem Npc: Wird die Welt vorher
+	# entladen, trennt Godot die Verbindung, und ein verschwundener Besitzer wird übersprungen.
+	get_tree().create_timer(after, false).timeout.connect(_on_owner_leaves.bind(weakref(owner), _owner_destination))
+
+
+func _on_owner_leaves(owner_ref: WeakRef, destination: String) -> void:
+	var owner := owner_ref.get_ref() as Npc
+	if owner == null:
+		return
+	owner.special_interaction = {}
+	owner.trip_destination = destination if destination != "" else owner.trip_destination
+	if owner.trip_destination == "":
+		owner.leave_to_village()
+	if owner == _owner:
+		_owner = null
 
 
 func _update_owner(now: float) -> void:

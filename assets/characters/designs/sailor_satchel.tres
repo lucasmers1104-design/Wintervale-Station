@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="CharacterAppearance" format=3]
+
+[ext_resource type="Script" path="res://scripts/characters/character_appearance.gd" id="1_look"]
+
+[resource]
+resource_name = "Sailor Satchel"
+script = ExtResource("1_look")
+skin_color = Color(0.95, 0.63, 0.45, 1)
+beard = true
+hair_style = 12
+hair_color = Color(0.42, 0.24, 0.14, 1)
+hair_volume = 0.82
+hat_style = 2
+hat_color = Color(0.17, 0.2, 0.42, 1)
+hat_color2 = Color(0.84, 0.78, 0.66, 1)
+hat_tilt = -6.0
+hat_lift = 0.04
+top_style = 1
+shirt_color = Color(0.17, 0.2, 0.42, 1)
+shirt_stripe_color = Color(0.84, 0.78, 0.66, 1)
+shirt_pattern = 3
+sleeves = 1
+accent_color = Color(0.82, 0.6, 0.26, 1)
+outer = 1
+outer_color = Color(0.36, 0.42, 0.2, 1)
+bottom = 0
+pants_color = Color(0.36, 0.42, 0.2, 1)
+bottom_color2 = Color(0.66, 0.56, 0.38, 1)
+cargo_pockets = true
+shoe_color = Color(0.45, 0.25, 0.13, 1)
+scarf_style = 1
+scarf_color = Color(0.62, 0.2, 0.12, 1)
+bag = true
+bag_color = Color(0.4, 0.23, 0.13, 1)
+width_scale = 1.04

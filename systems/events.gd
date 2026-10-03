@@ -30,8 +30,12 @@ signal village_items_changed(category: StringName, items: Array[String], selecte
 signal village_item_requested(item_id: String)
 ## Kosten des Objekts unter dem Mauszeiger ({"money", "<material>": Menge}; leer = ausblenden).
 signal build_cost_changed(cost: Dictionary)
+## Esc wurde gedrückt, ohne dass etwas anderes es brauchte: Pausenmenü öffnen.
+signal pause_menu_requested
 ## Das Notizbuch soll auf- oder zugehen (z.B. per Button im HUD); page "" = zuletzt offene Seite.
 signal notebook_requested(page: String)
+signal region_station_requested(station_id: int)
+signal journey_guide_requested
 
 ## Die Kamera folgt jetzt diesem Zug (null = keinem).
 signal followed_train_changed(train: Node)
