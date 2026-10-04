@@ -135,11 +135,8 @@ void fragment() {
 	// Small earth pockets interrupt the transition into grass without a painted stripe.
 	float verge = smoothstep(edge - 0.20, edge + 0.03, across) * (1.0 - shoulder);
 	color = mix(color, season_bare.rgb * (0.88 + 0.16 * soil), verge * 0.32 * (1.0 - snow_cover));
-	// Am Rand bleibt geräumter Schnee liegen (kleiner Wall)
-	float bank = smoothstep(edge - 0.1, edge + 0.05, across) * (1.0 - smoothstep(edge + 0.1, edge + 0.3, across)) * snow_cover;
-	color = mix(color, ws_soft_snow(vec3(0.9, 0.93, 0.97)), bank * 0.7);
 	color = mix(color, ground, shoulder);
-	snow = max(mix(snow, ground_snow, shoulder), bank * 0.7);
+	snow = mix(snow, ground_snow, shoulder);
 
 	// Derivative relief works without mesh tangents or extra geometry on every path.
 	float height = relief * (1.0 - shoulder) * (1.0 - snow);

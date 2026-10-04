@@ -55,6 +55,8 @@ var _next_id := 1
 var _dark := false
 var _network_dirty := false
 var _project_timer := 0.0
+var _path_surface_dirty := false
+var _path_surface_root: Node3D
 
 
 func _ready() -> void:
@@ -936,6 +938,7 @@ func _new_home_name(seed_value: int) -> String:
 # --- Fußwegenetz ---------------------------------------------------------------------------
 
 func _after_change(obj, removed_footprint := {}) -> void:
+	queue_path_surfaces()
 	var fp: Dictionary = obj.get_footprint() if obj else removed_footprint
 	if nature and not fp.is_empty():
 		var half: Vector2 = fp["half"]
@@ -946,6 +949,43 @@ func _after_change(obj, removed_footprint := {}) -> void:
 		_network_dirty = true
 		rebuild_walk_network.call_deferred()
 	changed.emit()
+
+
+func queue_path_surfaces() -> void:
+	if not _path_surface_dirty:
+		_path_surface_dirty = true
+		rebuild_path_surfaces.call_deferred()
+
+
+## One surface per connected style, so crossings have no coplanar overlays.
+func rebuild_path_surfaces() -> void:
+	_path_surface_dirty = false
+	if _path_surface_root:
+		remove_child(_path_surface_root)
+		_path_surface_root.queue_free()
+	_path_surface_root = Node3D.new()
+	_path_surface_root.name = "PathSurfaces"
+	add_child(_path_surface_root)
+	for item: String in PathMeshes.STYLES:
+		var remaining: Array = get_objects().filter(func(obj: Node3D) -> bool: return obj is VillagePath and obj.item_id==item)
+		while not remaining.is_empty():
+			var members: Array = [remaining.pop_back()]
+			var cursor := 0
+			while cursor<members.size():
+				for i in range(remaining.size()-1,-1,-1):
+					if VillageFootprint.overlaps(members[cursor].get_footprint(),remaining[i].get_footprint(),0.5):
+						members.append(remaining[i])
+						remaining.remove_at(i)
+				cursor += 1
+			var routes: Array = []
+			for path: VillagePath in members:
+				routes.append(path.render_points())
+			var surface := MeshInstance3D.new()
+			surface.name = item
+			surface.mesh = PathMeshes.build_network(item,routes,func(x: float,z: float) -> float: return terrain.get_surface_height(x,z) if terrain else 0.0)
+			surface.material_override = PathMeshes.material(item)
+			surface.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			_path_surface_root.add_child(surface)
 
 
 ## Baut den dynamischen Teil des Fußwegenetzes neu: Wege, Dorfplatz, Haustüren.

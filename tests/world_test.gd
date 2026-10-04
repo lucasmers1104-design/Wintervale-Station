@@ -141,13 +141,11 @@ func _test_paths() -> void:
 		var a := Vector3(-52.0, 0.0, 12.5)
 		var b := Vector3(-30.0, 0.0, 12.5)
 		var mesh := PathMeshes.build(id, a, b, height)
-		check(mesh.get_surface_count() == 2, "%s: path surface + detail surface" % id)
+		check(mesh.get_surface_count() == 1, "%s: one flat path surface without snow banks" % id)
 		var arrays := mesh.surface_get_arrays(0)
 		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
-		var colors: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
 		var buried := 0
-		var disc_lanes := 0.0
 		for i in vertices.size():
 			var v := vertices[i]
 			if absf(uvs[i].x) <= 1.0 and v.y < terrain.get_surface_height(v.x, v.z) + 0.02:
@@ -160,10 +158,8 @@ func _test_paths() -> void:
 				var q := vertices[i] * w.x + vertices[i + 1] * w.y + vertices[i + 2] * w.z
 				if q.y < terrain.get_surface_height(q.x, q.z) + 0.01:
 					buried += 1
-			if is_zero_approx(uvs[i].y) and absf(uvs[i].x) < 0.9:
-				disc_lanes = maxf(disc_lanes, colors[i].r)
 		check(buried == 0, "%s: the path band never sinks into the ground (%d)" % [id, buried])
-		check(disc_lanes == 0.0, "%s: node discs have no wheel ruts (no rings)" % id)
+		check(mesh.get_aabb().position.x >= a.x-0.2 and mesh.get_aabb().end.x <= b.x+0.2, "%s: flat ends never protrude into circular caps" % id)
 	check(styles.size() == 3, "gravel, stone and road look different")
 
 

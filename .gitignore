@@ -6,6 +6,9 @@
 /build/
 *.tmp
 
+# Lokale Testprotokolle
+/_probe/*.log
+
 # Betriebssystem / Editor
 .DS_Store
 Thumbs.db

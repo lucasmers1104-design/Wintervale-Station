@@ -105,6 +105,10 @@ func _setup() -> void:
 
 ## Alle Bewohner passend zur Uhrzeit aufstellen; Reisende verschwinden.
 func resume_all() -> void:
+	# Loading replaces stations before game_loaded is emitted. Their detached
+	# directors still receive the signal until queued deletion is flushed.
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
 	for traveller in _travellers:
 		if is_instance_valid(traveller):
 			traveller.queue_free()
@@ -113,7 +117,8 @@ func resume_all() -> void:
 		_close_queues(train_id, _queue_trains.get(train_id))
 	_arrivals_seen.clear()
 	for npc in _npcs:
-		npc.resume(WorldClock.time_of_day)
+		if is_instance_valid(npc) and npc.is_inside_tree() and not npc.is_queued_for_deletion():
+			npc.resume(WorldClock.time_of_day)
 	_last_hours = WorldClock.time_of_day
 
 

@@ -53,6 +53,9 @@ var _progress_label: Label
 var _goal_signature := ""
 var guide: JourneyGuide
 var _guide_active := false
+var _compact_intro := true
+var _large_intro := false
+var _intro_shade: ColorRect
 
 func set_guide_active(value: bool) -> void:
 	_guide_active = value
@@ -63,6 +66,14 @@ func set_guide_active(value: bool) -> void:
 
 
 func _ready() -> void:
+	_intro_shade = ColorRect.new()
+	_intro_shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_intro_shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var blur := ShaderMaterial.new()
+	blur.shader = preload("res://assets/materials/journey_backdrop.gdshader")
+	_intro_shade.material = blur
+	_intro_shade.hide()
+	add_child(_intro_shade)
 	layer = 66
 	_canvas = Control.new()
 	_canvas.size = S.DESIGN_SIZE
@@ -242,6 +253,13 @@ func _on_progress_changed() -> void:
 
 func _show_current() -> void:
 	_shown_step = _step()
+	_large_intro = not is_finished() and not _compact_intro and _step() in [0,1,8]
+	var parchment := JourneyArt.panel_style("board",80) if _large_intro else S.card_style()
+	if _large_intro:
+		parchment.set_texture_margin_all(100)
+		parchment.content_margin_top = 86
+		parchment.content_margin_bottom = 76
+	_card.add_theme_stylebox_override("panel",parchment)
 	for child in _body.get_children():
 		_body.remove_child(child)
 		child.queue_free()
@@ -262,6 +280,9 @@ func _show_current() -> void:
 
 
 func _build_step_card(step: Dictionary) -> void:
+	if _large_intro:
+		_build_large_step(step)
+		return
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 14)
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -306,8 +327,9 @@ func _build_step_card(step: Dictionary) -> void:
 		_update_progress(String(step["id"]))
 	if step.has("note"):
 		_body.add_child(S.paragraph(String(step["note"]), 16, S.INK_FADED))
-	var footer := HBoxContainer.new()
-	footer.add_theme_constant_override("separation", 10)
+	var footer := HFlowContainer.new()
+	footer.add_theme_constant_override("h_separation", 10)
+	footer.add_theme_constant_override("v_separation", 8)
 	_body.add_child(footer)
 	var skip := Button.new()
 	skip.text = "Einführung überspringen"
@@ -320,10 +342,6 @@ func _build_step_card(step: Dictionary) -> void:
 	skip.add_theme_color_override("font_hover_color", S.INK_SOFT)
 	skip.pressed.connect(finish)
 	footer.add_child(skip)
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	footer.add_child(spacer)
 	if step.has("look"):
 		# Kamera fährt sanft zur passenden Stelle (Tunnel, Haltepunkt, Bauplatz).
 		var look := String(step["look"])
@@ -337,6 +355,64 @@ func _build_step_card(step: Dictionary) -> void:
 				else:
 					panel.open_page("epochs")
 			_complete_step(), true, "", 20)
+
+
+## The illustrated teaching card is large while explaining, then stays compact
+## for steps that need unobstructed clicks on the landscape.
+func _build_large_step(step: Dictionary) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation",28)
+	_body.add_child(row)
+	row.add_child(_portrait(268))
+	var words := VBoxContainer.new()
+	words.add_theme_constant_override("separation",16)
+	words.alignment = BoxContainer.ALIGNMENT_CENTER
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(words)
+	words.add_child(S.label("SCHRITT %d VON %d" % [_step()+1,STEPS.size()],24,S.GOLD.darkened(0.3)))
+	words.add_child(S.paragraph(String(step["title"]),64,S.INK))
+	S.divider(words)
+	words.add_child(S.paragraph(String(step["text"]),28,S.INK))
+	if step.has("keys"):
+		var keys := HFlowContainer.new()
+		keys.add_theme_constant_override("h_separation",12)
+		words.add_child(keys)
+		for action: StringName in step["keys"]:
+			keys.add_child(S.keycap(InputConfig.get_action_label(action),56))
+			var plate := PanelContainer.new()
+			plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			plate.add_theme_stylebox_override("panel",S.flat(S.PAPER_DARK,S.GOLD,2,12,20))
+			plate.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			plate.add_child(S.label(_key_caption(action),34))
+			keys.add_child(plate)
+	var dots := JourneyArt.StepRail.new()
+	dots.current = _step()
+	dots.count = STEPS.size()
+	dots.custom_minimum_size = Vector2(26,480)
+	row.add_child(dots)
+	S.divider(_body)
+	var footer := HBoxContainer.new()
+	footer.add_theme_constant_override("separation",16)
+	_body.add_child(footer)
+	var skip := S.button(footer,"Einführung überspringen  ›",finish,false,"",21)
+	skip.flat = true
+	var compact := S.button(footer,"Kleiner anzeigen",func() -> void:
+		_compact_intro = true
+		_show_current(),false,"",18)
+	compact.tooltip_text = "Die Erklärung bleibt am Rand, damit du mehr vom Tal siehst."
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	footer.add_child(spacer)
+	if step.has("look"):
+		S.button(footer,"Zeigen",func() -> void: _look_at(String(step["look"])),false,"journey",21)
+	if step.has("button"):
+		S.button(footer,String(step["button"]),func() -> void:
+			if step["id"]=="grow":
+				if guide:
+					guide.start_tour()
+				else:
+					panel.open_page("epochs")
+			_complete_step(),true,"",24)
 
 
 ## Nach der Einführung: nächste Epoche mit ihren offenen Bedingungen.
@@ -405,15 +481,15 @@ func _goal_text_signature() -> String:
 
 
 func _portrait(edge: float) -> Control:
-	var frame := PanelContainer.new()
-	var ring := S.flat(Color("dfe7ef"), S.GOLD, 4, int(edge), 2.0)
-	frame.add_theme_stylebox_override("panel", ring)
-	frame.custom_minimum_size = Vector2(edge, edge)
-	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	frame.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
-	var face := S.icon_rect(S.icon("conductor"), edge - 8)
-	frame.add_child(face)
-	return frame
+	var portrait := S.icon_rect(JourneyArt.texture("conductor"),edge)
+	var cutout := ShaderMaterial.new()
+	cutout.shader = preload("res://assets/materials/journey_portrait.gdshader")
+	var atlas := portrait.texture as AtlasTexture
+	var source_size := atlas.atlas.get_size()
+	cutout.set_shader_parameter("portrait_region",Vector4(atlas.region.position.x/source_size.x,atlas.region.position.y/source_size.y,atlas.region.size.x/source_size.x,atlas.region.size.y/source_size.y))
+	portrait.material = cutout
+	portrait.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	return portrait
 
 
 func _step_dots() -> Control:
@@ -472,8 +548,8 @@ func _layout() -> void:
 	_canvas.scale = Vector2.ONE * factor
 	# Linke obere Ecke des Bildschirms (nicht der zentrierten Leinwand).
 	_canvas.position = Vector2.ZERO
-	_card.custom_minimum_size.x = CARD_WIDTH if not is_finished() else 420.0
-	_card.position = CARD_POS
+	_card.custom_minimum_size.x = 1420 if _large_intro else (CARD_WIDTH if not is_finished() else 420.0)
+	_card.position = Vector2((S.DESIGN_SIZE.x-1420)/2,92) if _large_intro else CARD_POS
 	_fit_card.call_deferred()
 
 
@@ -487,13 +563,15 @@ func _fit_card() -> void:
 
 ## Ist das Reisebuch offen, spricht Ilse in dessen Kopfzeile; die Karte ruht.
 func _update_ribbon() -> void:
+	_intro_shade.visible = _large_intro and not panel.is_open() and not _guide_active
+	panel._launcher.visible = not panel.is_open() and not _intro_shade.visible
 	if _guide_active:
 		_card.hide()
 		_snow.hide()
 		return
 	var open := panel.is_open()
 	_card.visible = not open
-	_snow.visible = not open
+	_snow.hide()
 	if open != _ribbon:
 		_ribbon = open
 		if not open:

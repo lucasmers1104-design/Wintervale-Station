@@ -196,6 +196,10 @@ func _test_guide() -> void:
 	await frames(4)
 	check(guide._mode=="" and guide._state()["pending"].has(2),"epoch introduction waits until the notebook is closed")
 	guide._notebook().close()
+	# The guide checks pending introductions in _process, not physics.
+	# Heavy UI layouts may run several catch-up physics ticks in one frame.
+	await get_tree().process_frame
+	await get_tree().process_frame
 	await frames(4)
 	check(guide._mode=="epoch" and guide._epoch==2,"unlock presents a concise epoch introduction: %s / %d, %s" % [guide._mode,guide._epoch,str(guide._state())])
 	guide.start_tour(2)

@@ -1,7 +1,20 @@
 # Wintervale Station
 
 Ein gemütliches Low-Poly Eisenbahn- und Dorfbau-Spiel im Winter.
-Engine: **Godot 4.7** (GDScript, Renderer Forward+).
+Version: **0.1.3**. Engine: **Godot 4.7.2** (GDScript, Compatibility-Renderer).
+
+## Auf einem anderen PC herunterladen
+
+1. [Version 0.1.3 auf GitHub](https://github.com/lucasmers1104-design/Wintervale-Station/releases/tag/v0.1.3) öffnen und **Source code (zip)** herunterladen.
+2. Das ZIP vollständig in einen eigenen Ordner entpacken.
+3. Godot **4.7.2 Standard** installieren, das entpackte `project.godot` importieren und den ersten Dateiimport abwarten.
+4. Mit **F5** starten. Das Archiv enthält das gesamte Projekt einschließlich Grafiken, Szenen und Tests; eine Godot-Installation ist zum Starten erforderlich.
+
+Alternativ mit Git: `git clone --branch v0.1.3 https://github.com/lucasmers1104-design/Wintervale-Station.git`.
+
+Spielstände liegen separat unter `user://saves/` (Windows: `%APPDATA%\Godot\app_userdata\Wintervale Station\saves\`). Zum Weiterspielen auf einem anderen PC diesen Ordner zusätzlich übertragen.
+
+Die Änderungen dieser Version stehen in [docs/RELEASE_0.1.3.md](docs/RELEASE_0.1.3.md).
 
 Aktueller Stand: **Etappe 8 – Güterbahnhof, Wirtschaft und lebendiges Dorf**: Güterzüge bringen Holz, Ziegel, Glas, Stahl und Stein zum neuen Güterbahnhof, ein Portalkran lädt alles sichtbar ins Lager. Häuser kosten Geld und Material, entstehen als Baustelle und bekommen Bewohner, die mit dem Zug zuziehen. Das Notizbuch (N) zeigt Lager, Einwohner, Fahrplan, Bauprojekte und Finanzen. Davor, **Etappe 7**: überarbeitete Gleise, Bäume, Bahnsteig, Fenster und Figuren, Schneeglitzern, weichere Nachtbeleuchtung, Bahnhofshall und 8 behobene Fehler. Dazu aus Etappe 6: Hinter dem Bahnhof liegt ein kleines Dorf mit Dorfplatz; im Build-Mode baut man Häuser (8 Formen), Wege, Natur, Beleuchtung und Dekoration. Jedes neue Haus bekommt eine Familie, die morgens über die Wege zum Bahnhof geht und mit dem Zug fährt.
 Das Spiel startet in der Vogelperspektive über dem Bahnhof. Unten rechts zeigt eine Legende immer die passenden Tasten.
@@ -13,7 +26,7 @@ Das Spiel startet in der Vogelperspektive über dem Bahnhof. Unten rechts zeigt 
 3. Beim ersten Öffnen importiert Godot kurz die Dateien.
 4. **F5** (oder ▶ oben rechts) startet das Spiel.
 
-Voraussetzung: Eine Grafikkarte mit aktuellem Vulkan-Treiber (Forward+).
+Voraussetzung: Ein Grafiktreiber mit OpenGL-3.3-Unterstützung; das Projekt verwendet den Compatibility-Renderer.
 
 ## Steuerung
 
@@ -25,7 +38,7 @@ Voraussetzung: Eine Grafikkarte mit aktuellem Vulkan-Treiber (Forward+).
 | Maus | Umsehen |
 | Mausrad | Kameraabstand |
 | V | Ich-Perspektive ↔ Verfolgerperspektive |
-| E | Sprechen / Aufheben / Übergeben (Bewohner, vergessener Koffer) |
+| E | Sprechen / Aufheben / Übergeben, Aushang lesen und Bahnhofsrunden erledigen |
 | Tab | Zur Vogelperspektive |
 
 | Vogelperspektive | |
@@ -39,7 +52,7 @@ Voraussetzung: Eine Grafikkarte mit aktuellem Vulkan-Treiber (Forward+).
 | Linksklick auf Weiche | Weiche umstellen |
 | B | Build-Mode ein/aus |
 | Tab | Zurück zur Figur |
-| N | Notizbuch (Lager, Einwohner, Fahrplan, Bauprojekte, Finanzen, Feste) – Reiter per Klick, 1–6 oder Q/E, Esc schließt |
+| N | Notizbuch (Lager, Einwohner, Fahrplan, Bauprojekte, Finanzen, Feste, Dorfleben) – Reiter per Klick, 1–7 oder Q/E, Esc schließt |
 
 | Build-Mode | |
 |---|---|
@@ -66,6 +79,10 @@ Voraussetzung: Eine Grafikkarte mit aktuellem Vulkan-Treiber (Forward+).
 
 ## Automatische Tests
 
+Unter **N → Lager** verkauft Nordtal bereits vor Epoche 3 kleine Baustoffmengen. Fehlendes Hausmaterial kann auch direkt beim Bauen zugekauft werden; der Aufpreis steht in der Vorschau. Ein Güterbahnhof ist für die ersten zwölf Bewohner nicht erforderlich.
+
+Unter **N → Dorfleben** oder am Aushang neben dem Bahnhof gibt es kleine tägliche Runden für die Spielfigur: Papier einsammeln, Post zustellen und Aussichtspunkte entdecken. **Tab** wechselt zur Figur, **E** erledigt die Handlung vor Ort. Fortschritt, Titel und Erinnerungen werden gespeichert. Diese Runden geben kein zusätzliches Geld und keine Baustoffe.
+
 ```
 godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn
 godot --headless --path . --fixed-fps 60 res://tests/railway_test.tscn
@@ -75,12 +92,16 @@ godot --headless --path . --fixed-fps 60 res://tests/village_test.tscn
 godot --headless --path . --fixed-fps 60 res://tests/economy_test.tscn
 godot --headless --path . --fixed-fps 60 res://tests/world_test.tscn
 godot --headless --path . --fixed-fps 60 res://tests/festival_test.tscn
+godot --headless --path . --fixed-fps 60 res://tests/feedback_test.tscn -- --qa-sandbox
+godot --headless --path . res://tests/journey_gui_test.tscn
 ```
 
 Exit-Code 0 = alle Prüfungen bestanden.
 
 ## Weitere Doku
 
+- [docs/GUI_2026-10-03.md](docs/GUI_2026-10-03.md) – Reise, Orte, Fuhrpark, Linien, Holzschilder und Einführung nach den Bildvorlagen
+- [docs/FEEDBACK_2026-10-03.md](docs/FEEDBACK_2026-10-03.md) – echte Vorplatzbeleuchtung, flache gemeinsame Wege, früher Baustoffhandel und kleine Charakterrunden
 - [docs/BUGFIX_2026-10-03.md](docs/BUGFIX_2026-10-03.md) – Bahnhofskorrekturen, begehbare Treppen, flacheres Gelände, dauerhafte Haushalte und neue Physiktests
 - [docs/POLISH_2026-10-03.md](docs/POLISH_2026-10-03.md) – Kurvenwege, verbesserte Platzierung, echte Kreuzungen, Ausbauprüfung, mehr sichtbare Bewohner und geprüfter Einstieg
 - [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md) – Aufbau, Gleisnetz, Stellwerk, Geländeanpassung, Dateien

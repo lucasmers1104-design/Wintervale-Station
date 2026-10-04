@@ -53,7 +53,7 @@ func _ready() -> void:
 	add_child(_canvas)
 	_card = PanelContainer.new()
 	_card.theme = _canvas.theme
-	_card.add_theme_stylebox_override("panel",S.flat(S.PAPER,S.GOLD,2,12,14))
+	_card.add_theme_stylebox_override("panel",S.card_style())
 	_canvas.add_child(_card)
 	_body = VBoxContainer.new()
 	_body.add_theme_constant_override("separation",9)

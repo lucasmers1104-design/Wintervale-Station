@@ -246,6 +246,18 @@ func get_missing(cost: Dictionary) -> Dictionary:
 var material_shop := false
 const SHOP_MARKUP := 1.5
 
+## Explicit small purchases use the same prices as automatic construction supply.
+func buy_material(goods_id: String, amount: int) -> bool:
+	if not material_shop or not has_goods(goods_id) or amount<=0:
+		return false
+	if get_stock(goods_id)+amount>get_max(goods_id):
+		return false
+	var price := ceili(amount*get_goods_type(goods_id).unit_price*SHOP_MARKUP)
+	if not pay(price,"Baustoffhandel Nordtal: %d %s" % [amount,get_goods_type(goods_id).display_name],"purchase"):
+		return false
+	add_stock(goods_id,amount)
+	return true
+
 
 ## Was der Baustoffhandel für die fehlenden Baustoffe von [param cost] verlangt.
 func get_shop_cost(cost: Dictionary) -> int:

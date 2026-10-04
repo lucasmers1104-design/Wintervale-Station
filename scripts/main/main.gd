@@ -88,6 +88,10 @@ func _ready() -> void:
 	GameSettings.apply_gameplay.call_deferred()
 	WorldClock.day_changed.connect(_on_autosave_day)
 	if region:
+		var activities := VillageActivities.new()
+		activities.name = "VillageActivities"
+		activities.region = region
+		add_child(activities)
 		var panel := RegionPanel.new()
 		panel.region = region
 		panel.name = "RegionPanel"

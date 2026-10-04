@@ -8,10 +8,11 @@
 ##   Bauprojekte – Baustellen mit Fortschritt und Material, Baukosten aller Häuser
 ##   Finanzen    – Gemeindekasse, Tagesbilanz, Kassenbuch
 ##   Feste       – Festkalender, heutiges Programm, Sonderzüge, Dorfchronik (Etappe 10)
+##   Dorfleben   – optionale Bahnhofsrunden, persönliche Titel und Erinnerungen
 ##
 ## Das Buch wird komplett per Code gezeichnet (keine Texturen außer den eigenen
 ## Icons). Es liest nur Daten ([code]Economy[/code], Dorf, Güterbahnhof,
-## Fahrdienstleiter) und ändert selbst nur die Daueraufträge.
+## Fahrdienstleiter). Hier kauft man Vorräte, wählt Daueraufträge und nimmt Runden an.
 class_name Notebook
 extends CanvasLayer
 
@@ -22,6 +23,7 @@ const PAGES: Array[Dictionary] = [
 	{"id": "projects", "label": "Bauprojekte", "icon": preload("res://assets/ui/icons/tab_projects.svg"), "color": Color(0.93, 0.72, 0.48)},
 	{"id": "finances", "label": "Finanzen", "icon": preload("res://assets/ui/icons/tab_finances.svg"), "color": Color(0.93, 0.83, 0.46)},
 	{"id": "festivals", "label": "Feste", "icon": preload("res://assets/ui/icons/tab_festivals.svg"), "color": Color(0.9, 0.62, 0.6)},
+	{"id": "activities", "label": "Dorfleben", "icon": preload("res://assets/ui/icons/tab_residents.svg"), "color": Color(0.75,0.84,0.57)},
 ]
 const COIN := preload("res://assets/ui/icons/coin.svg")
 const INK := Color(0.2, 0.16, 0.13)
@@ -356,12 +358,14 @@ func _fill_page() -> void:
 			_page_finances()
 		"festivals":
 			_page_festivals()
+		"activities":
+			_page_activities()
 	_restore_scroll.call_deferred(scrolls)
 
 
 func _page_storage() -> void:
-	_heading(_left, "Lager am Güterbahnhof")
 	var progress := RegionProgression.find(get_tree())
+	_heading(_left,"Baustofflager · Nordtal" if progress else "Lager am Güterbahnhof")
 	_note(_left, "Häkchen = Dauerauftrag für Güterlieferungen. Fehlende Baustoffe kannst du beim Bauen direkt zukaufen." if progress else "Güterzüge bringen das Material, der Kran legt es ins Lager. Häkchen = Dauerauftrag (wird abgenommen und bezahlt).")
 	for goods in Economy.get_goods():
 		var row := _row(_left, 12)
@@ -378,6 +382,9 @@ func _page_storage() -> void:
 		var check := InkCheck.new()
 		check.button_pressed = Economy.is_ordered(goods.id)
 		check.caption = "bestellen"
+		if progress and progress.epoch<3:
+			check.disabled = true
+			check.caption = "ab Ep. 3"
 		check.tooltip_text = "Dauerauftrag: Güterzüge liefern %s und der Güterbahnhof bezahlt es (%d Taler je Einheit)." % [
 			goods.display_name, goods.unit_price]
 		check.toggled.connect(func(on: bool) -> void: Economy.set_ordered(goods.id, on))
@@ -394,6 +401,14 @@ func _page_storage() -> void:
 		if reserved > 0:
 			detail = "%d für Baustellen zurückgelegt · " % reserved + detail
 		_label(column, detail, 14, INK_SOFT)
+		if progress and Economy.material_shop:
+			var amount := mini(5,Economy.get_max(goods.id)-stock)
+			var price := ceili(amount*goods.unit_price*Economy.SHOP_MARKUP)
+			var buy := _action_button(column,"%d kaufen · %s" % [amount,Economy.format_money(price)],func() -> void:
+				if Economy.buy_material(goods.id,amount):
+					Events.notification_requested.emit("Nordtal: %d %s im Lager." % [amount,goods.display_name])
+					_fill_page.call_deferred())
+			buy.disabled = amount<=0 or Economy.money<price
 	if progress:
 		_page_regional_storage(progress.region)
 		return
@@ -427,7 +442,8 @@ func _page_storage() -> void:
 
 func _page_regional_storage(region: RegionRailway) -> void:
 	_heading(_right,"Baustoffhandel & Güterverkehr")
-	_note(_right,"Der Baustoffhandel ergänzt fehlendes Material beim Bauen. Eigene Güterlinien sind ab Epoche 3 verfügbar; bestellte Waren werden erst nach dem Umschlag eingelagert.")
+	_note(_right,"Du brauchst vor Epoche 3 keinen Güterbahnhof: Nordtal liefert fehlendes Baumaterial sofort beim Bauen. Der Zukauf steht zusätzlich zum Hauspreis in der Kostenleiste.")
+	_note(_right,"Links kannst du auch kleine Vorräte direkt kaufen. Nordtal berechnet 50 % Handelsaufschlag; eigene Güterzüge versorgen dein Lager später zum Güterpreis.")
 	_divider(_right)
 	_label(_right,"Deine Güterlinien",21,INK,true)
 	var count := 0
@@ -440,7 +456,7 @@ func _page_regional_storage(region: RegionRailway) -> void:
 		var train := region.train_for_line(int(line["id"]))
 		_note(_right,train.get_info_text() if train else ("Wartet auf freie Gleise" if bool(line.get("enabled",true)) else "Pausiert"))
 	if count==0:
-		_note(_right,"Noch keine Güterlinie. Setze einen Güterzug im Fuhrpark ein, sobald er freigeschaltet ist.")
+		_note(_right,"Güterzüge kommen ab Epoche 3. Bis dahin reicht der Baustoffhandel für alle benötigten Häuser." if region.progression.epoch<3 else "Noch keine Güterlinie. Setze einen Güterzug im Fuhrpark ein, sobald er freigeschaltet ist.")
 	_divider(_right)
 	_label(_right,"Erfolgreich geliefert: %d Güter" % region.progression.goods,21,INK,true)
 	for station in region.stations:
@@ -689,6 +705,68 @@ func _page_finances() -> void:
 
 
 ## Seite "Feste": Festkalender, heutiges Programm, Sonderzüge und die Dorfchronik.
+func _action_button(parent: Node,text: String,callback: Callable) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.flat = true
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.focus_mode = Control.FOCUS_NONE
+	button.add_theme_font_override("font",_hand)
+	button.add_theme_font_size_override("font_size",17)
+	button.add_theme_color_override("font_color",INK_GREEN)
+	button.add_theme_color_override("font_disabled_color",INK_FADED)
+	button.pressed.connect(callback)
+	parent.add_child(button)
+	return button
+
+func _page_activities() -> void:
+	_heading(_left,"Dorfleben · kleine Bahnhofsrunden")
+	_note(_left,"Tab wechselt zur Spielfigur. Mit E liest du den Aushang und erledigst die markierten Aufgaben; N zeigt deinen Fortschritt.")
+	var activities := VillageActivities.find(get_tree())
+	if activities==null:
+		_note(_left,"Sprich mit Bewohnern, erkunde das Dorf oder bring einen gefundenen Koffer zurück.")
+		_heading(_right,"Unterwegs in Wintervale")
+		_note(_right,"Freiwillige kleine Aktivitäten begleiten deine Zugreise.")
+		_note(_right,"Die Bahnhofsrunden stehen in einer regionalen Reise ab dem ersten eigenen Bahnhof bereit.")
+		_note(_right,"Deine Gemeindekasse wächst weiter mit den normalen Fahrkarten und Abgaben.")
+		return
+	var station := activities.region.station_by_id(activities.selected_station)
+	if station==null:
+		var player := get_tree().get_first_node_in_group(&"player") as PlayerController
+		station = activities.region.nearest_station(player.global_position if player else Vector3.ZERO)
+	if station:
+		_label(_left,"Aushang in %s" % station.station_name,21,INK_BLUE,true)
+	for kind: String in VillageActivities.JOBS:
+		var job: Dictionary = VillageActivities.JOBS[kind]
+		_label(_left,String(job["title"]),21,INK,true)
+		_note(_left,String(job["text"]))
+		var reason := activities.can_start(kind,station)
+		var button := _action_button(_left,"Runde annehmen" if reason=="" else "Gerade nicht verfügbar",func() -> void:
+			if activities.start_job(kind,station.station_id):
+				close())
+		button.disabled = reason!=""
+		if reason!="":
+			_note(_left,reason)
+		_divider(_left)
+	_heading(_right,activities.rank_title())
+	_note(_right,"Diese Runden geben Erinnerungen und persönliche Titel. Sie verändern weder dein Geld noch Baustoffe oder Epochenziele.")
+	if not activities.active.is_empty():
+		_label(_right,String(VillageActivities.JOBS[activities.active["kind"]]["title"]),22,INK_BLUE,true)
+		_note(_right,activities.progress_text())
+		_action_button(_right,"Runde zurücklegen",func() -> void:
+			activities.cancel_job()
+			_fill_page.call_deferred())
+	_divider(_right)
+	for kind: String in VillageActivities.JOBS:
+		_label(_right,"%s: %d" % [VillageActivities.JOBS[kind]["title"],int(activities.completed[kind])],17,INK_SOFT)
+	_label(_right,"Deine Erinnerungen",21,INK,true)
+	var log := VBoxContainer.new()
+	var scroll := _scroll(_right,"activity_history")
+	scroll.add_child(log)
+	for entry: Dictionary in activities.history:
+		_label(log,"Tag %d · %s" % [int(entry["day"]),entry["title"]],16,INK_BLUE)
+		_label(log,String(entry["station"]),14,INK_SOFT)
+
 func _page_festivals() -> void:
 	var festivals := FestivalDirector.find(get_tree())
 	var events := get_tree().get_first_node_in_group(&"train_events") as TrainEvents

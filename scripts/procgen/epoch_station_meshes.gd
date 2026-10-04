@@ -61,7 +61,7 @@ static func build(level: int) -> Dictionary:
 			lamps.append(canopy_lamps[i]-Vector3.UP*0.22)
 	_access_stairs(st,level)
 	if level>=2:
-		_forecourt(st,glow,level,x,width,length,height,rng)
+		lamps.append_array(_forecourt(st,glow,level,x,width,length,height,rng))
 	for z: float in [-length*0.28,length*0.28]:
 		var bench := TrainMeshes._new_st()
 		StationMeshes.add_bench(bench,Vector3.ZERO,rng)
@@ -129,7 +129,8 @@ static func _access_stairs(st: SurfaceTool, level: int) -> void:
 			var p := a.lerp(b,fraction)
 			LowPolyBuilder.add_box(st,p-Vector3.UP*0.45,Vector3(0.07,0.9,0.07),FASCIA if level==1 else IRON)
 
-static func _forecourt(st: SurfaceTool, glow: SurfaceTool, level: int, x: float, width: float, length: float, height: float, rng: RandomNumberGenerator) -> void:
+static func _forecourt(st: SurfaceTool, glow: SurfaceTool, level: int, x: float, width: float, length: float, height: float, rng: RandomNumberGenerator) -> Array[Vector3]:
+	var lights: Array[Vector3] = []
 	var access := StationAccess.describe(level)
 	var beginning := float(access["back"])+StationAccess.RISERS*StationAccess.TREAD
 	var z := float(access["z"])
@@ -137,7 +138,7 @@ static func _forecourt(st: SurfaceTool, glow: SurfaceTool, level: int, x: float,
 	LowPolyBuilder.add_box(st,Vector3((beginning+20.5)*0.5,0.0,z),Vector3(20.5-beginning,0.05,3.2),CREAM.darkened(0.22))
 	for side: float in [-1,1]:
 		StationMeshes.add_planter(st,Vector3(beginning+1.1,0,z+side*2.1),rng)
-		_lantern_post(st,glow,Vector3(19.3,0,z+side*2.0))
+		lights.append(_lantern_post(st,glow,Vector3(19.3,0,z+side*2.0)))
 	var board := Vector3(x+width/2-0.14,height,-length*0.12)
 	for dz: float in [-0.62,0.62]:
 		LowPolyBuilder.add_box(st,board+Vector3(0,0.9,dz),Vector3(0.10,1.8,0.10),IRON)
@@ -151,6 +152,7 @@ static func _forecourt(st: SurfaceTool, glow: SurfaceTool, level: int, x: float,
 		LowPolyBuilder.add_box(st,ticket+Vector3(0,0.8,0),Vector3(0.45,1.6,0.7),IRON)
 		LowPolyBuilder.add_box(glow,ticket+Vector3(-0.24,1.15,0),Vector3(0.025,0.38,0.45),Color(0.56,0.75,0.66))
 		LowPolyBuilder.add_box(st,ticket+Vector3(-0.25,0.63,0),Vector3(0.04,0.09,0.30),WOOD)
+	return lights
 
 static func _house(st: SurfaceTool, glow: SurfaceTool, at: Vector3, size: Vector3, color: Color, roof: Color) -> void:
 	# These buildings share the elevated station floor: a complete stone plinth

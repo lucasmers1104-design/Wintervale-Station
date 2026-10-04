@@ -279,7 +279,8 @@ func _path_route(point: Vector3) -> PackedVector3Array:
 
 
 func _path_cost_text(cost: Dictionary) -> String:
-	return "%d Münzen · %d Stein%s" % [int(cost.get("money",0)),int(cost.get("stone",0))," · Klick zum Bauen"]
+	var trade := Economy.get_shop_cost(cost)
+	return "%d Münzen · %d Stein%s · Klick zum Bauen" % [int(cost.get("money",0)),int(cost.get("stone",0))," + %d Nordtal" % trade if trade>0 else ""]
 
 
 # --- Intern ---------------------------------------------------------------------------
@@ -405,6 +406,13 @@ func _show_ghost(item_id: String, position: Vector3, angle: float, end: Vector3)
 
 
 func _show_marker(point: Vector3, radius: float) -> void:
+	if VillageCatalog.get_kind(get_item())=="path":
+		var square := BoxMesh.new()
+		square.size = Vector3(0.2,0.025,0.2)
+		_marker.mesh = square
+		_marker.transform = Transform3D(Basis(Vector3.UP,PI/4),Vector3(point.x,context.terrain.get_height(point.x,point.z)+0.075,point.z))
+		_marker.visible = true
+		return
 	var disc := CylinderMesh.new()
 	disc.top_radius = radius
 	disc.bottom_radius = radius

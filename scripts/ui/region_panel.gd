@@ -2,7 +2,7 @@
 ##
 ## Gestaltung wie die Menüseiten: Pergament im verschneiten Holzrahmen,
 ## Messingknöpfe, Serifenschrift, eigene Symbole (assets/ui/journey). Die Seite
-## liegt unter der Statusleiste, damit Geld, Tag und Uhr sichtbar bleiben.
+## füllt beim Öffnen den Bildschirm; im Tal bleiben die kleinen Holzschilder.
 ## Solange das Buch offen ist, steht die Weltuhr still.
 ##
 ## Seiten: "epochs" (Reise), "stations" (Orte), "station" (ein Bahnhof),
@@ -11,8 +11,8 @@ class_name RegionPanel
 extends CanvasLayer
 
 const S = preload("res://scripts/ui/journey_style.gd")
-const BOARD_POS := Vector2(96.0, 116.0)
-const BOARD_SIZE := Vector2(1480.0, 806.0)
+const BOARD_POS := Vector2(16.0, 16.0)
+const BOARD_SIZE := Vector2(1640.0, 910.0)
 const TABS := [
 	{"id": "epochs", "text": "Reise", "icon": "journey"},
 	{"id": "stations", "text": "Orte", "icon": "station"},
@@ -43,6 +43,9 @@ var _tab_buttons := {}
 var _launcher: HBoxContainer
 var _epoch_button: Button
 var _fleet_button: Button
+var _help_button: Button
+var _launcher_title: Label
+var _chapter_pips: JourneyArt.ChapterPips
 var _assign_button: Button
 var _page := "epochs"
 var _station_id := 0
@@ -52,8 +55,6 @@ var _previous_pause := false
 var _was_captured := false
 var _preview: Node3D
 var _viewport: SubViewport
-var _preview_camera: Camera3D
-var _preview_length := 16.0
 var _debug := false
 var _refresh_pending := false
 var _guide_targets := {}
@@ -64,6 +65,9 @@ func _ready() -> void:
 	layer = 65
 	_shade = ColorRect.new()
 	_shade.color = Color(0.07, 0.05, 0.09, 0.42)
+	var blur := ShaderMaterial.new()
+	blur.shader = preload("res://assets/materials/journey_backdrop.gdshader")
+	_shade.material = blur
 	_shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_shade.mouse_filter = Control.MOUSE_FILTER_STOP
 	_shade.gui_input.connect(func(event: InputEvent) -> void:
@@ -94,51 +98,56 @@ func _ready() -> void:
 ## Zwei kleine Holzschilder oben rechts: Reise und Fuhrpark.
 func _build_launcher() -> void:
 	_launcher = HBoxContainer.new()
-	_launcher.add_theme_constant_override("separation", 10)
+	_launcher.add_theme_constant_override("separation", 8)
 	_launcher.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_launcher)
 	_launcher.theme = _canvas.theme
 	_epoch_button = _sign_button("Reise · Epoche 1", "journey", func() -> void: open_page("epochs"))
 	_fleet_button = _sign_button("Fuhrpark", "trips", func() -> void: open_page("fleet"))
-	var help := _sign_button("Hilfe", "conductor", Events.journey_guide_requested.emit)
+	var help := S.button(_launcher,"?",Events.journey_guide_requested.emit,false,"",34)
+	_help_button = help
+	help.custom_minimum_size = Vector2(64,64)
+	help.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var seal := StyleBoxTexture.new()
+	seal.texture = preload("res://assets/ui/journey/help_badge.svg")
+	for state in ["normal","hover","pressed"]:
+		var face := seal.duplicate() as StyleBoxTexture
+		face.modulate_color = Color(1.12,1.08,1.0) if state=="hover" else (Color(0.86,0.82,0.76) if state=="pressed" else Color.WHITE)
+		help.add_theme_stylebox_override(state,face)
 	help.tooltip_text = "Ilse erklärt dir alle Menüs und Werkzeuge"
 
 
 func _sign_button(text: String, icon_name: String, action: Callable) -> Button:
 	var sign := Button.new()
-	sign.text = text
-	sign.icon = S.icon(icon_name)
+	sign.custom_minimum_size = Vector2(270 if icon_name=="journey" else 166,72)
 	sign.focus_mode = Control.FOCUS_NONE
 	sign.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	sign.tooltip_text = "Reisebuch (Taste %s)" % InputConfig.get_action_label(&"region_overview")
-	var base := S.flat(Color("f3dfb8"), S.WOOD, 4, 12, 14.0)
-	base.shadow_color = Color(0.1, 0.05, 0.02, 0.35)
-	base.shadow_size = 5
-	base.shadow_offset = Vector2(0, 3)
-	base.content_margin_top = 7
-	base.content_margin_bottom = 7
-	var hover := base.duplicate() as StyleBoxFlat
-	hover.bg_color = Color("fbeccb")
-	hover.border_color = Color("7a4a2a")
+	var base := JourneyArt.panel_style("sign",12)
+	base.set_texture_margin_all(0)
+	var hover := base.duplicate() as StyleBoxTexture
+	hover.modulate_color = Color(1.1,1.06,0.96)
 	sign.add_theme_stylebox_override("normal", base)
 	sign.add_theme_stylebox_override("hover", hover)
 	sign.add_theme_stylebox_override("pressed", hover)
 	sign.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	sign.add_theme_font_override("font", S.serif())
-	sign.add_theme_font_size_override("font_size", 22)
-	for state in ["font_color", "font_hover_color", "font_pressed_color"]:
-		sign.add_theme_color_override(state, Color("542a1b"))
-	sign.add_theme_constant_override("icon_max_width", 30)
-	sign.add_theme_constant_override("h_separation", 8)
 	sign.pressed.connect(action)
 	sign.pressed.connect(S.play_page)
-	var snow := S.SnowCap.new(text.length())
-	snow.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	snow.offset_top = -7
-	snow.offset_bottom = 5
-	snow.offset_left = 4
-	snow.offset_right = -4
-	sign.add_child(snow)
+	var edge := 30 if icon_name=="journey" else 26
+	var symbol := S.icon_rect(S.icon(icon_name),edge)
+	symbol.position = Vector2(22 if icon_name=="journey" else 20,25)
+	symbol.size = Vector2(edge,edge)
+	sign.add_child(symbol)
+	var caption := S.label(text,20)
+	caption.position = Vector2(64 if icon_name=="journey" else 56,16 if icon_name=="journey" else 25)
+	caption.size = Vector2(176 if icon_name=="journey" else 90,26)
+	sign.add_child(caption)
+	if icon_name=="journey":
+		_launcher_title = caption
+		_chapter_pips = JourneyArt.ChapterPips.new()
+		_chapter_pips.position = Vector2(69,40)
+		_chapter_pips.size = Vector2(160,12)
+		sign.add_child(_chapter_pips)
 	_launcher.add_child(sign)
 	return sign
 
@@ -152,19 +161,22 @@ func _build_board() -> void:
 	_canvas.add_child(_panel)
 	_panel.add_child(S.frame(BOARD_SIZE))
 	var header := HBoxContainer.new()
-	header.position = Vector2(96, 44)
-	header.size = Vector2(BOARD_SIZE.x - 192 - 56, 70)
+	header.position = Vector2(90, 55)
+	header.size = Vector2(BOARD_SIZE.x - 210, 78)
 	header.add_theme_constant_override("separation", 14)
 	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_panel.add_child(header)
+	var crest := S.icon_rect(S.icon("mountains"),70)
+	header.add_child(crest)
 	var heading := VBoxContainer.new()
 	heading.add_theme_constant_override("separation", -2)
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	header.add_child(heading)
-	_title = S.label("Unsere Eisenbahnreise", 40, S.INK)
+	_title = S.label("Unsere Eisenbahnreise", 49, S.INK)
+	_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	heading.add_child(_title)
-	_subtitle = S.label("", 19, S.INK_SOFT)
+	_subtitle = S.label("", 21, S.INK_SOFT)
 	heading.add_child(_subtitle)
 	_hint_row = HBoxContainer.new()
 	_hint_row.add_theme_constant_override("separation", 8)
@@ -184,7 +196,8 @@ func _build_board() -> void:
 	for tab: Dictionary in TABS:
 		var id := String(tab["id"])
 		var button := S.button(tabs, String(tab["text"]), open_page.bind(id), false, String(tab["icon"]), 20)
-		button.custom_minimum_size = Vector2(150, 52)
+		button.custom_minimum_size = Vector2(176, 62)
+		JourneyArt.tab_snow(button)
 		_tab_buttons[id] = button
 	var close_button := Button.new()
 	close_button.text = "×"
@@ -201,17 +214,17 @@ func _build_board() -> void:
 	close_button.add_theme_font_size_override("font_size", 34)
 	for state in ["font_color", "font_hover_color", "font_pressed_color"]:
 		close_button.add_theme_color_override(state, S.PAPER_LIGHT)
-	close_button.position = Vector2(BOARD_SIZE.x - 82, 22)
-	close_button.size = Vector2(54, 54)
+	close_button.position = Vector2(BOARD_SIZE.x - 92, 28)
+	close_button.size = Vector2(68, 68)
 	close_button.pressed.connect(close)
 	_panel.add_child(close_button)
 	var line := S.Divider.new()
-	line.position = Vector2(96, 124)
-	line.size = Vector2(BOARD_SIZE.x - 192, 14)
+	line.position = Vector2(90, 146)
+	line.size = Vector2(BOARD_SIZE.x - 180, 14)
 	_panel.add_child(line)
 	_scroll = ScrollContainer.new()
-	_scroll.position = Vector2(92, 146)
-	_scroll.size = Vector2(BOARD_SIZE.x - 184, BOARD_SIZE.y - 146 - 88)
+	_scroll.position = Vector2(86, 168)
+	_scroll.size = Vector2(BOARD_SIZE.x - 172, BOARD_SIZE.y - 168 - 64)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_panel.add_child(_scroll)
 	_content = VBoxContainer.new()
@@ -228,7 +241,7 @@ func _rescale() -> void:
 	_canvas.position = (viewport - S.DESIGN_SIZE * factor) * 0.5
 	_launcher.scale = Vector2.ONE * factor
 	_launcher.reset_size()
-	_launcher.position = Vector2(viewport.x - (_launcher.size.x + 24.0) * factor, 24.0 * factor)
+	_launcher.position = Vector2(viewport.x - (_launcher.size.x + 12.0) * factor, 12.0 * factor)
 
 
 # --- Öffnen / Schließen ----------------------------------------------------
@@ -263,7 +276,7 @@ func guide_host() -> Control:
 
 func reserve_guide_space(value: bool, footer := 192.0) -> void:
 	_guide_space = value
-	_scroll.size.y = BOARD_SIZE.y-146-(footer if value else 88)
+	_scroll.size.y = BOARD_SIZE.y-168-(footer if value else 64)
 
 func show_epoch(level: int) -> void:
 	open_page("epochs")
@@ -306,6 +319,7 @@ func open_page(page: String) -> void:
 		_was_captured = Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		_panel.show()
+		_launcher.hide()
 		_shade.show()
 		_panel.modulate.a = 0.0
 		_panel.position = BOARD_POS + Vector2(0, 18)
@@ -322,6 +336,7 @@ func close() -> void:
 	if not _panel.visible:
 		return
 	_panel.hide()
+	_launcher.show()
 	_shade.hide()
 	WorldClock.paused = _previous_pause
 	if _was_captured:
@@ -353,12 +368,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 
-func _process(delta: float) -> void:
-	if _panel.visible and is_instance_valid(_preview):
-		_preview.rotation.y += delta * 0.12
-		_frame_preview()
-
-
 func _schedule_refresh() -> void:
 	_update_launcher()
 	if _panel.visible and not _refresh_pending:
@@ -367,7 +376,9 @@ func _schedule_refresh() -> void:
 
 
 func _update_launcher() -> void:
-	_epoch_button.text = "Reise · Epoche %d" % region.progression.epoch
+	_launcher_title.text = "Reise · Epoche %d" % region.progression.epoch
+	_chapter_pips.current = region.progression.epoch
+	_chapter_pips.queue_redraw()
 	_launcher.reset_size()
 	_rescale()
 
@@ -391,7 +402,7 @@ func _refresh() -> void:
 	_subtitle.text = titles[1]
 	for id: String in _tab_buttons:
 		var active: bool = id == _page or (id == "stations" and _page == "station")
-		S.style_button(_tab_buttons[id], active, 20)
+		S.style_button(_tab_buttons[id], active, 24)
 	match _page:
 		"epochs": _epochs()
 		"stations": _stations()
@@ -431,6 +442,8 @@ func _epochs() -> void:
 	var state := "Erreicht" if _selected_epoch < current else ("Deine Epoche" if _selected_epoch == current else "Vor dir")
 	about.add_child(S.label("Epoche %d · %s" % [_selected_epoch, state], 18, S.GOLD.darkened(0.25)))
 	about.add_child(S.label(String(data["name"]), 34, S.INK))
+	var descriptions := ["Aus einem Gleis im Tal beginnt deine Eisenbahnreise.","Dein Bahnhof bringt Reisende und neue Nachbarn ins Tal.","Mit neuen Verbindungen wächst dein Dorf entlang der Strecke.","Mehr Orte und moderner Nahverkehr bringen das Tal zusammen.","Schnelle Verbindungen machen deine Bahnhöfe zu regionalen Knotenpunkten.","Große Hallen und ein lebendiges Netz verbinden ganz Wintervale."]
+	about.add_child(S.paragraph(descriptions[_selected_epoch-1],20))
 	var train := EpochCatalog.train(data["trains"][0])
 	var unlocks := _row(about, 18)
 	var station_box := _row(unlocks, 10)
@@ -447,10 +460,7 @@ func _epochs() -> void:
 	train_box.add_child(train_text)
 	train_text.add_child(S.label("Neuer Zug", 15, S.INK_SOFT))
 	train_text.add_child(S.label(train.display_name, 22))
-	var livery := LiveryStrip.new()
-	livery.type = train
-	livery.custom_minimum_size = Vector2(0, 74)
-	about.add_child(livery)
+	_train_preview(about,train,176)
 	var features := HFlowContainer.new()
 	features.add_theme_constant_override("h_separation", 8)
 	features.add_theme_constant_override("v_separation", 8)
@@ -512,7 +522,7 @@ func _next_tip(level: int) -> String:
 			"services": return "Noch %d erfolgreiche Fahrten – deine Züge pendeln von selbst." % missing
 			"connected": return "Verbinde %d weitere Orte: Gleis verlängern, Haltepunkt bauen (H) und eine Linie anlegen." % missing
 			"rail_length": return "Noch %d m Gleis bauen (B)." % missing
-			"population": return "Noch %d Einwohner: Häuser entstehen von selbst an Orten mit regem Bahnverkehr." % missing
+			"population": return "Noch %d Einwohner: Baue Häuser bei deinem Bahnhof. Die Familien kommen mit dem nächsten Zug aus Nordtal." % missing
 			"lines": return "Noch %d funktionierende Linien – im Fuhrpark einen Zug auf eine neue Verbindung schicken." % missing
 			"goods": return "Noch %d gelieferte Güter – ein Güterzug beliefert dein Lager." % missing
 	return "Alle Bedingungen erfüllt – die neue Epoche beginnt gleich."
@@ -538,9 +548,10 @@ func _stations() -> void:
 		tunnel_names.add_theme_constant_override("separation", -4)
 		tunnel_names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tunnel_head.add_child(tunnel_names)
-		tunnel_names.add_child(S.label(portal.station_name, 30))
-		tunnel_names.add_child(S.label("Tunnel in die weite Welt", 17, S.INK_SOFT))
-		tunnel.add_child(S.paragraph("Von hier kommen Züge, Gäste und neue Familien. %d Fahrgäste sind schon hierher gereist." % portal.passenger_total, 17))
+		tunnel_names.add_child(S.label(portal.station_name, 40))
+		tunnel_names.add_child(S.label("Tunnel in die weite Welt", 21, S.INK_SOFT))
+		tunnel.add_child(S.paragraph("Von hier kommen Züge, Gäste und neue Familien. %d Fahrgäste sind schon hierher gereist." % portal.passenger_total, 21))
+		JourneyArt.illustration(tunnel,"tunnel",228)
 	for station in region.stations:
 		var card := S.card(grid)
 		card.get_parent().size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -550,16 +561,17 @@ func _stations() -> void:
 		names.add_theme_constant_override("separation", -4)
 		names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		head.add_child(names)
-		names.add_child(S.label(station.station_name, 30))
-		names.add_child(S.label("Stufe %d · %s" % [station.level, EpochCatalog.epoch(station.level)["station"]], 17, S.INK_SOFT))
+		names.add_child(S.label(station.station_name, 40))
+		names.add_child(S.label("Stufe %d · %s" % [station.level, EpochCatalog.epoch(station.level)["station"]], 21, S.INK_SOFT))
 		head.add_child(LevelPips.make(station.level))
+		JourneyArt.illustration(card,"station",192)
 		var stats := _row(card, 26)
 		S.stat(stats, "population", str(station.population), "Einwohner")
 		S.stat(stats, "passengers", str(station.passenger_total), "Fahrgäste")
 		S.stat(stats, "trips", str(station.services), "Ankünfte")
 		var open_button := S.button(card, "Bahnhof öffnen  ›", func() -> void:
 			_station_id = station.station_id
-			open_page("station"), false, "", 19)
+			open_page("station"), true, "", 21)
 		open_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 
 
@@ -591,6 +603,7 @@ func _station() -> void:
 	edit.text_submitted.connect(func(_text: String) -> void: rename.call())
 	var rename_button := S.button(head, "Umbenennen", rename, false, "pencil", 19)
 	rename_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	JourneyArt.illustration(_content,"station",146)
 	var stats_card := S.card(_content)
 	var stats := _row(stats_card, 48)
 	S.stat(stats, "population", str(station.population), "Einwohner")
@@ -660,7 +673,8 @@ func _station() -> void:
 func _fleet() -> void:
 	var columns := _row(_content, 22)
 	var shelf := ScrollContainer.new()
-	shelf.custom_minimum_size = Vector2(420, 560)
+	shelf.custom_minimum_size = Vector2(460, 598)
+	shelf.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	shelf.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	columns.add_child(shelf)
 	var list := VBoxContainer.new()
@@ -689,14 +703,19 @@ func _fleet() -> void:
 	if not unlocked:
 		head.add_child(S.icon_rect(S.icon("lock"), 44))
 	_train_preview(detail, type)
-	var stats := _row(detail, 34)
-	S.stat(stats, "speed", "%d km/h" % int(type.max_speed_kmh), "Höchstgeschwindigkeit")
+	var stats := _row(detail, 8)
+	var stat_cards: Array[VBoxContainer] = []
+	for i in 4:
+		var stat_card := S.card(stats)
+		stat_card.get_parent().size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		stat_cards.append(stat_card)
+	S.stat(stat_cards[0], "speed", "%d km/h" % int(type.max_speed_kmh), "Tempo")
 	if type.passenger_capacity > 0:
-		S.stat(stats, "seat", str(type.passenger_capacity), "Plätze")
+		S.stat(stat_cards[1], "seat", str(type.passenger_capacity), "Plätze")
 	if type.cargo_capacity > 0:
-		S.stat(stats, "goods", str(type.cargo_capacity), "Gütereinheiten")
-	S.stat(stats, "cars", str(type.consist.size()), "Fahrzeuge")
-	S.stat(stats, "station", "Stufe %d" % type.required_station_level, "Bahnhof nötig")
+		S.stat(stat_cards[1], "goods", str(type.cargo_capacity), "Güter")
+	S.stat(stat_cards[2], "cars", str(type.consist.size()), "Fahrzeuge")
+	S.stat(stat_cards[3], "station", "Stufe %d" % type.required_station_level, "Bahnhof")
 	if unlocked:
 		_line_form(detail, _selected_train)
 	else:
@@ -713,8 +732,8 @@ func _train_tile(id: String) -> Button:
 	tile.focus_mode = Control.FOCUS_NONE
 	tile.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	var selected := id == _selected_train
-	var base := S.flat(Color("fff6dc") if selected else S.PAPER_LIGHT, S.GOLD if selected else Color("d6bd92"), 3 if selected else 2, 12, 10.0)
-	var hover := S.flat(Color("fff8e6"), S.GOLD, 2, 12, 10.0)
+	var base := S.card_style(selected)
+	var hover := S.card_style(true)
 	tile.add_theme_stylebox_override("normal", base)
 	tile.add_theme_stylebox_override("hover", hover)
 	tile.add_theme_stylebox_override("pressed", hover)
@@ -725,24 +744,29 @@ func _train_tile(id: String) -> Button:
 		_refresh())
 	var row := HBoxContainer.new()
 	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	row.offset_left = 12
-	row.offset_right = -12
+	row.offset_left = 24
+	row.offset_right = -24
 	row.add_theme_constant_override("separation", 12)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tile.add_child(row)
-	var strip := LiveryStrip.new()
-	strip.type = type
-	strip.compact = true
-	strip.custom_minimum_size = Vector2(96, 0)
-	strip.modulate = Color.WHITE if unlocked else Color(1, 1, 1, 0.45)
-	row.add_child(strip)
+	if JourneyArt.REGIONS.has(id):
+		var illustration := S.icon_rect(JourneyArt.texture(id),164)
+		illustration.custom_minimum_size.y = 78
+		row.add_child(illustration)
+	else:
+		var strip := LiveryStrip.new()
+		strip.type = type
+		strip.compact = true
+		strip.custom_minimum_size = Vector2(164, 0)
+		row.add_child(strip)
 	var texts := VBoxContainer.new()
 	texts.alignment = BoxContainer.ALIGNMENT_CENTER
 	texts.add_theme_constant_override("separation", -2)
 	texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(texts)
-	var caption := S.label(type.display_name, 19, S.INK if unlocked else S.INK_FADED)
+	var caption_size := (19 if unlocked else 17) if type.display_name.length()>22 else 21
+	var caption := S.label(type.display_name, caption_size, S.INK)
 	caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	texts.add_child(caption)
 	var sub := "Sonderzug" if type.special else ("Bereit" if unlocked else "Epoche %d" % type.required_epoch)
@@ -752,109 +776,13 @@ func _train_tile(id: String) -> Button:
 	return tile
 
 
-func _train_preview(parent: Node, type: TrainType) -> void:
-	var window := PanelContainer.new()
-	var frame_style := S.flat(Color("2b2733"), S.WOOD, 6, 14, 0.0)
-	frame_style.shadow_color = Color(0.2, 0.1, 0.05, 0.3)
-	frame_style.shadow_size = 6
-	window.add_theme_stylebox_override("panel", frame_style)
-	parent.add_child(window)
-	var container := SubViewportContainer.new()
-	container.custom_minimum_size = Vector2(0, 236)
-	container.stretch = true
-	container.mouse_default_cursor_shape = Control.CURSOR_DRAG
-	container.tooltip_text = "Mit gedrückter Maustaste drehen"
-	window.add_child(container)
-	_viewport = SubViewport.new()
-	_viewport.size = Vector2i(900, 280)
-	_viewport.own_world_3d = true
-	_viewport.msaa_3d = Viewport.MSAA_2X
-	_viewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
-	container.add_child(_viewport)
-	_preview = Node3D.new()
-	_viewport.add_child(_preview)
-	var factory := region.dispatcher
-	var length := EpochCatalog.consist_length(type)
-	_preview_length = length
-	var offset := -length / 2
-	for i in type.consist.size():
-		var car := TrainCar.new()
-		_preview.add_child(car)
-		car.build(type.consist[i], type, i == 0, i == type.consist.size() - 1, factory._materials, i)
-		car.position.z = offset + car.length / 2
-		offset += car.length + TrainMeshes.COUPLING_GAP
-		car.set_cabin_light(0.85)
-		car.set_snow_spray(0)
-		if car._exhaust:
-			car._exhaust.emitting = false
-	_preview.add_child(_preview_track(length + 6.0))
-	var light := DirectionalLight3D.new()
-	light.rotation_degrees = Vector3(-38, -32, 0)
-	light.light_energy = 1.15
-	light.light_color = Color(1.0, 0.9, 0.76)
-	light.shadow_enabled = true
-	_viewport.add_child(light)
-	var fill := DirectionalLight3D.new()
-	fill.rotation_degrees = Vector3(-20, 150, 0)
-	fill.light_energy = 0.35
-	fill.light_color = Color(0.72, 0.76, 1.0)
-	_viewport.add_child(fill)
-	var camera := Camera3D.new()
-	_preview_camera = camera
-	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	camera.keep_aspect = Camera3D.KEEP_WIDTH
-	camera.size = length * 0.85 + 10
-	_viewport.add_child(camera)
-	camera.position = Vector3(length * 0.65, length * 0.10 + 3, -length * 0.20)
-	camera.look_at(Vector3(0, 2.0, 0))
-	_frame_preview()
-	var environment := WorldEnvironment.new()
-	environment.environment = Environment.new()
-	environment.environment.background_mode = Environment.BG_COLOR
-	environment.environment.background_color = Color("2f2d3b")
-	environment.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.environment.ambient_light_color = Color("e6dccb")
-	environment.environment.ambient_light_energy = 0.55
-	environment.environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	_viewport.add_child(environment)
-	container.gui_input.connect(func(event: InputEvent) -> void:
-		if event is InputEventMouseMotion and event.button_mask & MOUSE_BUTTON_MASK_LEFT and is_instance_valid(_preview):
-			_preview.rotation.y += event.relative.x * 0.012)
-
-
-## Kurzes Schaugleis unter dem Vorschauzug (Schotter, Schwellen, Schienen).
-func _preview_track(length: float) -> MeshInstance3D:
-	var st := TrainMeshes._new_st()
-	LowPolyBuilder.add_box(st, Vector3(0, 0.12, 0), Vector3(3.6, 0.24, length), Color(0.55, 0.5, 0.47))
-	var count := int(length / 0.65)
-	for i in count:
-		LowPolyBuilder.add_box(st, Vector3(0, 0.29, -length / 2 + (i + 0.5) * length / count), Vector3(2.5, 0.12, 0.26), Color(0.42, 0.29, 0.19))
-	for side: float in [-0.7175, 0.7175]:
-		LowPolyBuilder.add_box(st, Vector3(side, 0.41, 0), Vector3(0.08, 0.13, length), Color(0.55, 0.56, 0.58))
-	var mesh := MeshInstance3D.new()
-	mesh.mesh = st.commit()
-	var material := StandardMaterial3D.new()
-	material.vertex_color_use_as_albedo = true
-	material.roughness = 0.9
-	mesh.material_override = material
-	mesh.position.y = TrainCar.RAIL_TOP - 0.475
-	return mesh
-
-
-func _frame_preview() -> void:
-	if not is_instance_valid(_preview_camera) or not is_instance_valid(_viewport) or not is_instance_valid(_preview):
-		return
-	var minimum := Vector2(INF, INF)
-	var maximum := Vector2(-INF, -INF)
-	for x: float in [-1.6, 1.6]:
-		for y: float in [0, 4.4]:
-			for z: float in [-_preview_length / 2, _preview_length / 2]:
-				var point := _preview_camera.to_local(_preview.to_global(Vector3(x, y, z)))
-				minimum = minimum.min(Vector2(point.x, point.y))
-				maximum = maximum.max(Vector2(point.x, point.y))
-	var aspect := float(_viewport.size.x) / maxf(1, _viewport.size.y)
-	var extent := maximum - minimum
-	_preview_camera.size = maxf(extent.x, extent.y * aspect) * 1.1
+func _train_preview(parent: Node, type: TrainType, height := 280.0) -> JourneyTrainPreview:
+	var preview := JourneyTrainPreview.new()
+	parent.add_child(preview)
+	preview.configure(type,region.dispatcher._materials,height)
+	_preview = preview._preview
+	_viewport = preview._viewport
+	return preview
 
 
 func _lines() -> void:
@@ -869,7 +797,9 @@ func _line_form(parent: Node, train_id: String) -> void:
 	var form := S.card(parent, true)
 	var title := _row(form, 10)
 	title.add_child(S.icon_rect(S.icon("lines"), 40))
-	title.add_child(S.label("Zug auf die Strecke schicken", 26))
+	title.add_child(S.label("Zug auf die Strecke schicken", 32))
+	form.add_child(S.paragraph("Wähle zwei Orte und einen Zug, der regelmäßig zwischen ihnen pendelt.",20))
+	S.divider(form)
 	if region.stations.is_empty():
 		form.add_child(S.paragraph("Für eine Verbindung brauchst du einen Haltepunkt am Gleis, das vom Tunnel kommt. Baue ihn im Baumodus (B) mit dem Haltepunkt-Werkzeug (H)."))
 		return
@@ -879,7 +809,10 @@ func _line_form(parent: Node, train_id: String) -> void:
 	var types := OptionButton.new()
 	for picker in [a, b, types]:
 		picker.add_theme_font_size_override("font_size", 20)
-		picker.custom_minimum_size = Vector2(0, 50)
+		picker.custom_minimum_size = Vector2(0, 70)
+		picker.expand_icon = true
+		picker.add_theme_constant_override("icon_max_width",78)
+		picker.get_popup().add_theme_constant_override("icon_max_width",40)
 		picker.focus_mode = Control.FOCUS_NONE
 		picker.get_popup().add_theme_font_size_override("font_size", 20)
 	a.custom_minimum_size.x = 230
@@ -887,25 +820,39 @@ func _line_form(parent: Node, train_id: String) -> void:
 	types.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	# Tunnel zuerst: die erste Linie fährt Nordtal ⇄ eigener Ort.
 	for portal in region.portals:
-		a.add_item("%s (Tunnel)" % portal.station_name, portal.station_id)
+		a.add_icon_item(JourneyArt.texture("tunnel_icon"),"%s (Tunnel)" % portal.station_name, portal.station_id)
 	for station in region.stations:
-		a.add_item(station.station_name, station.station_id)
-		b.add_item(station.station_name, station.station_id)
+		a.add_icon_item(JourneyArt.texture("station_icon"),station.station_name, station.station_id)
+		b.add_icon_item(JourneyArt.texture("station_icon"),station.station_name, station.station_id)
 	for portal in region.portals:
-		b.add_item("%s (Tunnel)" % portal.station_name, portal.station_id)
+		b.add_icon_item(JourneyArt.texture("tunnel"),"%s (Tunnel)" % portal.station_name, portal.station_id)
 	b.select(0)
 	if region.portals.is_empty() and region.stations.size() > 1:
 		b.select(1)
 	for id in EpochCatalog.TRAIN_IDS:
 		if region.progression.is_train_unlocked(id):
 			types.add_item(EpochCatalog.train(id).display_name)
+			if JourneyArt.REGIONS.has(id):
+				types.set_item_icon(types.item_count-1,JourneyArt.texture(id))
 			types.set_item_metadata(types.item_count - 1, id)
 			if id == train_id:
 				types.select(types.item_count - 1)
-	row.add_child(a)
+	var origin := VBoxContainer.new()
+	origin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(origin)
+	origin.add_child(S.label("Startort",20))
+	origin.add_child(a)
 	row.add_child(S.label("⇄", 28, S.GOLD.darkened(0.2)))
-	row.add_child(b)
-	row.add_child(types)
+	var destination := VBoxContainer.new()
+	destination.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(destination)
+	destination.add_child(S.label("Zielort",20))
+	destination.add_child(b)
+	var vehicle := VBoxContainer.new()
+	vehicle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(vehicle)
+	vehicle.add_child(S.label("Zug",20))
+	vehicle.add_child(types)
 	var bottom := _row(form, 14)
 	var hint := S.paragraph("", 18)
 	hint.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -915,8 +862,8 @@ func _line_form(parent: Node, train_id: String) -> void:
 			S.play_chime()
 			_show_arrival(line)
 			return
-		_refresh(), true, "trips", 22)
-	action.custom_minimum_size = Vector2(260, 56)
+		_refresh(), true, "trips", 30)
+	action.custom_minimum_size = Vector2(410, 76)
 	bottom.add_child(hint)
 	_assign_button = action
 	var update := func(_index := 0) -> void:
@@ -940,20 +887,20 @@ func _line_card(line: Dictionary) -> void:
 	var type := EpochCatalog.train(String(line["train"]))
 	var card := S.card(_content)
 	var head := _row(card, 12)
-	var strip := LiveryStrip.new()
-	strip.type = type
-	strip.compact = true
-	strip.custom_minimum_size = Vector2(96, 54)
-	head.add_child(strip)
+	var illustration := S.icon_rect(JourneyArt.texture("regional") if type.category==TrainType.Category.PASSENGER else JourneyArt.texture("freight"),290)
+	illustration.custom_minimum_size.y = 150
+	head.add_child(illustration)
 	var names := VBoxContainer.new()
 	names.add_theme_constant_override("separation", -4)
 	names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(names)
-	names.add_child(S.label("Linie %d · %s ⇄ %s" % [int(line["id"]), a.station_name, b.station_name], 26))
+	var heading := S.paragraph("Linie %d · %s ⇄ %s" % [int(line["id"]), a.station_name, b.station_name],30,S.INK)
+	names.add_child(heading)
 	var train := region.train_for_line(int(line["id"]))
 	var state := _line_state(line, train)
 	names.add_child(S.label("%s · %s" % [type.display_name, state], 17, S.INK_SOFT))
-	var stats := _row(card, 30)
+	S.divider(names)
+	var stats := _row(names, 30)
 	S.stat(stats, "trips", str(int(line.get("trips", 0))), "Fahrten")
 	S.stat(stats, "passengers", str(int(line.get("passengers", 0))), "Fahrgäste")
 	if type.cargo_capacity > 0:
@@ -962,17 +909,19 @@ func _line_card(line: Dictionary) -> void:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	stats.add_child(spacer)
 	var enabled := bool(line.get("enabled", true))
-	var toggle := S.button(stats, "Pausieren" if enabled else "Fortsetzen", func() -> void:
+	var toggle := S.button(stats, "Ⅱ  Pausieren" if enabled else "▷  Fortsetzen", func() -> void:
 		line["enabled"] = not bool(line.get("enabled", true))
 		if train:
 			region.dispatcher.retire(train, "")
 		region.refresh()
 		_refresh(), false, "", 19)
 	toggle.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var remove := S.button(stats, "Aufheben", func() -> void:
+	var remove := S.button(stats, "×  Aufheben", func() -> void:
 		region.remove_line(int(line["id"]))
 		_refresh(), false, "", 19)
 	remove.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	for state_name in ["font_color","font_hover_color","font_pressed_color"]:
+		remove.add_theme_color_override(state_name,S.RED)
 
 
 ## Nach dem Einsetzen: Buch schließen und die Kamera zum Tunnel schwenken,
@@ -1109,6 +1058,7 @@ class EpochTimeline extends Control:
 
 	func _draw() -> void:
 		var y := 74.0
+		draw_texture_rect(JourneyArt.texture("landscape"),Rect2(0,0,size.x,160),false,Color(1,1,1,0.35))
 		var left := _x(1)
 		var right := _x(6)
 		# Gleis: Schwellen, dann zwei Schienen; der gefahrene Teil in Messing.

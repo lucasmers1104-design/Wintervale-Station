@@ -1,15 +1,14 @@
 ## Gemeinsamer Look von Reisebuch (RegionPanel) und Tutorial (JourneyTutorial).
 ##
 ## Holzrahmen, Pergament, Messing und Serifenschrift – dieselbe Bildsprache wie
-## die freigegebenen Menüseiten. Der Rahmen ist das Pergament-Brett des
-## Hauptmenüs (parchment_panel.png) als Neun-Feld-Grafik, Buttons nutzen die
-## Knopfgrafiken der Spielstand-Seite. Alles Weitere wird per Code gezeichnet.
+## die gelieferten GUI-Vorlagen. Leere Rahmen aus journey_art lassen echte
+## Bedienelemente und Werte frei; Buttons nutzen die Spielstand-Grafiken.
 class_name JourneyStyle
 extends RefCounted
 
 ## Referenz-Leinwand aller Menüs; alles wird proportional auf den Bildschirm skaliert.
 const DESIGN_SIZE := Vector2(1672.0, 941.0)
-const FRAME_ART := preload("res://assets/ui/main_menu/parchment_panel.png")
+const FRAME_ART := preload("res://assets/ui/journey_art/board.png")
 const BUTTON_GOLD := preload("res://assets/ui/save_art/button_gold.png")
 const BUTTON_PLAIN := preload("res://assets/ui/save_art/button_plain.png")
 const COIN := preload("res://assets/ui/icons/coin.svg")
@@ -95,11 +94,10 @@ static func flat(color: Color, border: Color, width := 2, radius := 12, margin :
 
 
 ## Karte auf dem Pergament: helleres Papier mit feinem Messingrand.
-static func card_style(accent := false) -> StyleBoxFlat:
-	var style := flat(PAPER_LIGHT if not accent else Color("fff6dc"), GOLD if accent else Color("d6bd92"), 3 if accent else 2, 14, 18.0)
-	style.shadow_color = Color(0.35, 0.22, 0.1, 0.16)
-	style.shadow_size = 6
-	style.shadow_offset = Vector2(0, 3)
+static func card_style(accent := false) -> StyleBoxTexture:
+	var style := JourneyArt.panel_style("card",24)
+	style.set_texture_margin_all(26)
+	style.modulate_color = Color(1.02,0.98,0.91) if accent else Color.WHITE
 	return style
 
 
@@ -108,7 +106,7 @@ static func card(parent: Node, accent := false) -> VBoxContainer:
 	panel.add_theme_stylebox_override("panel", card_style(accent))
 	parent.add_child(panel)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
+	box.add_theme_constant_override("separation", 8)
 	panel.add_child(box)
 	return box
 
@@ -199,22 +197,15 @@ static func make_theme() -> Theme:
 
 
 ## Pergamentbrett mit Holzrahmen. [param board] ist die gewünschte Größe in
-## Leinwand-Einheiten; die Grafik wird halb so groß gezeichnet, damit Rahmen,
-## Nieten und Schneekappen ihre Originalproportionen behalten.
+## Leinwand-Einheiten; feste Randbereiche bewahren Nieten und Schneekappen.
 static func frame(board: Vector2) -> NinePatchRect:
-	var art := AtlasTexture.new()
-	art.atlas = FRAME_ART
-	art.region = Rect2(0, 236, 1172, 1106)
 	var patch := NinePatchRect.new()
-	patch.texture = art
-	patch.patch_margin_left = 262
-	patch.patch_margin_right = 262
-	patch.patch_margin_top = 150
-	patch.patch_margin_bottom = 270
-	patch.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE_FIT
-	patch.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE_FIT
-	patch.size = board * 2.0
-	patch.scale = Vector2(0.5, 0.5)
+	patch.texture = FRAME_ART
+	patch.patch_margin_left = 112
+	patch.patch_margin_right = 112
+	patch.patch_margin_top = 110
+	patch.patch_margin_bottom = 252
+	patch.size = board
 	patch.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return patch
 
@@ -222,11 +213,15 @@ static func frame(board: Vector2) -> NinePatchRect:
 ## Tastenkappe wie in der Tastenlegende, nur größer und auf Papier.
 static func keycap(text: String, font_size := 20) -> PanelContainer:
 	var cap := PanelContainer.new()
+	if font_size>=40:
+		cap.custom_minimum_size = Vector2(96,96)
 	var style := flat(Color("fffaf0"), Color("8a6a4e"), 2, 7, 9.0)
 	style.border_width_bottom = 4
 	style.content_margin_top = 2
 	style.content_margin_bottom = 3
 	cap.add_theme_stylebox_override("panel", style)
+	if font_size>=40:
+		cap.add_theme_stylebox_override("panel",_texture_box(BUTTON_PLAIN,12))
 	var caption := label(text, font_size, INK)
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cap.add_child(caption)

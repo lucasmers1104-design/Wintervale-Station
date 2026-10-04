@@ -55,16 +55,19 @@ func _ready() -> void:
 ## Neu an das Gelände anpassen (z.B. nachdem ein Haus den Boden geebnet hat).
 func rebuild() -> void:
 	var height := func(x: float, z: float) -> float: return terrain.get_surface_height(x, z) if terrain else 0.0
-	# Schneewälle nicht auf anderen Wegen oder dem Dorfplatz (Kreuzungen bleiben frei)
+	_mesh.mesh = PathMeshes.build_route(item_id,render_points(),height)
+	if _mesh.mesh.get_surface_count()>0:
+		_mesh.set_surface_override_material(0,PathMeshes.material(item_id))
 	var manager := get_parent()
-	var blocked := Callable()
-	if manager and manager.has_method(&"is_on_other_path"):
-		blocked = func(p: Vector3) -> bool: return bool(manager.call(&"is_on_other_path", p, object_id))
-	# Endet der Weg auf einem breiteren Weg (Hauszugang an der Straße) oder dem Dorfplatz,
-	# hört er kurz hinter dessen Rand ohne eigene Knotenscheibe auf – sonst schaut seine
-	# Scheibe mit Schnee-Bankett als heller Fleck durch die Straße.
+	if manager and manager.has_method("queue_path_surfaces"):
+		_mesh.hide()
+		manager.queue_path_surfaces()
+
+
+func render_points() -> PackedVector3Array:
+	var manager := get_parent()
+	# Übergänge zu breiterem Belag reichen nur kurz hinter dessen Rand.
 	var points := route_points.duplicate()
-	var caps := [true, true]
 	if manager and manager.has_method(&"wider_surface_depth"):
 		for k in 2:
 			var end := points[0] if k == 0 else points[-1]
@@ -75,13 +78,7 @@ func rebuild() -> void:
 					points[0] = cut
 				else:
 					points[-1] = cut
-				caps[k] = false
-	_mesh.mesh = PathMeshes.build_route(item_id, points, height, caps, blocked)
-	# Oberfläche 0: Wege-Shader (Kies, Pflaster, Straße), Oberfläche 1: Randsteine und Schneewall
-	if _mesh.mesh.get_surface_count() > 0:
-		_mesh.set_surface_override_material(0, PathMeshes.material(item_id))
-	if _mesh.mesh.get_surface_count() > 1:
-		_mesh.set_surface_override_material(1, preload("res://assets/materials/nature_vertex_color.tres"))
+	return points
 
 
 ## Punkt zwischen [param inside_from] (frei) und [param into] (auf dem breiteren Weg), an dem
@@ -165,6 +162,8 @@ func set_dark(_dark: bool) -> void:
 func set_highlight(highlight: Material) -> void:
 	if _mesh:
 		_mesh.material_overlay = highlight
+		_mesh.position.y = 0.006 if highlight else 0.0
+		_mesh.visible = highlight!=null
 
 
 func _on_terrain_changed(region: Rect2) -> void:
